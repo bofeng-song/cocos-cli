@@ -54,14 +54,18 @@ export const SchemaWebMobilePackages = z.object({
     embedWebDebugger: z.boolean().default(false).describe('Whether to embed Web debugger'), // 是否嵌入 Web 端调试工具
 }).describe('Web Mobile platform configuration'); // Web Mobile 平台配置
 
-// iOS Packages Configuration // iOS Packages 配置
-export const SchemaIOSPackage = z.object({
+// iOS Configuration // iOS 配置
+const SchemaIOSPackageBase = z.object({
     packageName: z.string()
         .min(1, 'iOS package name cannot be empty') // iOS包名不能为空
         .describe('iOS application package name (required)'), // iOS应用包名（必填）
-    provisioningProfile: z.string().optional().describe('Provisioning profile'), // 描述文件
-    certificate: z.string().optional().describe('Certificate name'), // 证书名称
-    teamId: z.string().optional().describe('Developer Team ID'), // 开发者团队ID
+
+    osTarget: z.object({
+        iphoneos: z.boolean().optional(),
+        simulator: z.boolean().optional(),
+    }).optional(),
+    targetVersion: z.string().optional(),
+    developerTeam: z.string().optional(),
 }).describe('iOS platform specific configuration'); // iOS平台特定配置
 
 // Mac Packages Configuration // Mac Packages 配置
@@ -182,14 +186,27 @@ export const SchemaWindowsBuildOption = SchemaBuildBaseOption
     .describe('Windows platform build options'); // Windows平台构建选项
 
 // iOS Build Options // iOS 构建选项
+const SchemaIOSPackageWithCatchall = SchemaIOSPackageBase.catchall(z.any());
+export const SchemaIOSPackage = SchemaIOSPackageWithCatchall
+    .refine((data) => {
+        // 当 osTarget.iphoneos 为 true 时，developerTeam 必须有值
+        if (data.osTarget && data.osTarget.iphoneos === true) {
+            return data.developerTeam && data.developerTeam.trim().length > 0;
+        }
+        return true;
+    }, {
+        message: 'developerTeam is required when osTarget.iphoneos is true',
+        path: ['developerTeam']
+    })
+    .describe('iOS platform specific configuration');
+
 export const SchemaIOSBuildOption = SchemaBuildBaseOption
     .extend({
         platform: z.literal('ios').describe('Build platform'), // 构建平台
         packages: z.object({
             ios: SchemaIOSPackage
-                .catchall(z.any())  // 允许其他任意字段
                 .optional()
-        }).describe('iOS platform configuration') // iOS平台配置
+        }).describe('iOS platform configuration')
     })
     .describe('iOS platform build options'); // iOS平台构建选项
 
