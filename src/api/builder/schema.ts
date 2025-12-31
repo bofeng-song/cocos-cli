@@ -186,10 +186,9 @@ export const SchemaIOSBuildOption = SchemaBuildBaseOption
     .extend({
         platform: z.literal('ios').describe('Build platform'), // 构建平台
         packages: z.object({
-            ios: z.intersection(
-                z.record(SchemaIOSPackage), // 动态的包配置
-                z.any().optional()
-            )
+            ios: SchemaIOSPackage
+                .catchall(z.any())  // 允许其他任意字段
+                .optional()
         }).describe('iOS platform configuration') // iOS平台配置
     })
     .describe('iOS platform build options'); // iOS平台构建选项
@@ -199,27 +198,25 @@ export const SchemaAndroidBuildOption = SchemaBuildBaseOption
     .extend({
         platform: z.literal('android').describe('Build platform'), // 构建平台
         packages: z.object({
-            android: z.intersection(
-                z.record(SchemaAndroidPackage), // 动态的包配置
-                z.any().optional()
-            )
+            android: SchemaAndroidPackage
+                .catchall(z.any())  // 允许其他任意字段
+                .optional()
         }).describe('Android platform configuration') // Android平台配置
     })
     .describe('Android platform build options'); // Android平台构建选项
 
-    
- // Mac Build Options // Mac 构建选项
+
+// Mac Build Options // Mac 构建选项
 export const SchemaMacBuildOption = SchemaBuildBaseOption
-.extend({
-    platform: z.literal('mac').describe('Build platform'), // 构建平台
-    packages: z.object({
-        mac: z.intersection(
-                z.record(SchemaMacPackage), // 动态的包配置
-                z.any().optional()
-            )
-    }).describe('Mac platform configuration') // Mac平台配置
-})
-.describe('Mac platform build options'); // Mac平台构建选项
+    .extend({
+        platform: z.literal('mac').describe('Build platform'), // 构建平台
+        packages: z.object({
+            mac: SchemaMacPackage
+                .catchall(z.any())  // 允许其他任意字段
+                .optional()
+        }).describe('Mac platform configuration') // Mac平台配置
+    })
+    .describe('Mac platform build options'); // Mac平台构建选项
 
 
 // Other Platform Build Options (Generic) // 其他平台构建选项（通用）
