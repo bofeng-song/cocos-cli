@@ -123,7 +123,8 @@ export class McpMiddleware {
                              console.debug(`call ${toolName} with args:${methodArgs.toString()} result: ${formattedResult}`);
                              return {
                                 content: [{ type: 'text' as const, text: formattedResult }],
-                                structuredContent: structuredContent
+                                structuredContent: structuredContent,
+                                isError: result.code == 500
                              };
 
                         } catch (error) {
