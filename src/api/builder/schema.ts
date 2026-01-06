@@ -183,7 +183,7 @@ export const SchemaWindowsBuildOption = SchemaBuildBaseOption
     .extend({
         platform: z.literal('windows').describe('Build Platform') // 构建平台
     })
-    .describe('Windows platform build options'); // Windows平台构建选项
+    .describe('Windows Platform Build Options'); // Windows平台构建选项
 
 // iOS Build Options // iOS 构建选项
 const SchemaIOSPackageWithCatchall = SchemaIOSPackageBase.catchall(z.any());
@@ -198,7 +198,7 @@ export const SchemaIOSPackage = SchemaIOSPackageWithCatchall
         message: 'developerTeam is required when osTarget.iphoneos is true',
         path: ['developerTeam']
     })
-    .describe('iOS platform specific configuration');
+    .describe('iOS Platform Specific Configuration');
 
 export const SchemaIOSBuildOption = SchemaBuildBaseOption
     .extend({
@@ -206,9 +206,9 @@ export const SchemaIOSBuildOption = SchemaBuildBaseOption
         packages: z.object({
             ios: SchemaIOSPackage
                 .optional()
-        }).describe('iOS platform configuration')
+        }).describe('iOS Platform Configuration') // iOS平台配置
     })
-    .describe('iOS platform build options'); // iOS平台构建选项
+    .describe('iOS Platform Build Options'); // iOS平台构建选项
 
 // Android Build Options // Android 构建选项
 export const SchemaAndroidBuildOption = SchemaBuildBaseOption
@@ -218,9 +218,9 @@ export const SchemaAndroidBuildOption = SchemaBuildBaseOption
             android: SchemaAndroidPackage
                 .catchall(z.any())  // 允许其他任意字段
                 .optional()
-        }).describe('Android platform configuration') // Android平台配置
+        }).describe('Android Platform Configuration') // Android平台配置
     })
-    .describe('Android platform build options'); // Android平台构建选项
+    .describe('Android Platform Build Options'); // Android平台构建选项
 
 
 // Mac Build Options // Mac 构建选项
@@ -231,18 +231,18 @@ export const SchemaMacBuildOption = SchemaBuildBaseOption
             mac: SchemaMacPackage
                 .catchall(z.any())  // 允许其他任意字段
                 .optional()
-        }).describe('Mac platform configuration') // Mac平台配置
+        }).describe('Mac Platform Configuration') // Mac平台配置
     })
-    .describe('Mac platform build options'); // Mac平台构建选项
+    .describe('Mac Platform Build Options'); // Mac平台构建选项
 
 
 // Other Platform Build Options (Generic) // 其他平台构建选项（通用）
 export const SchemaOtherPlatformBuildOption = SchemaBuildBaseOption
     .extend({
         platform: SchemaPlatform.optional().describe('Build Platform'), // 构建平台
-        packages: z.any().optional().describe('Platform specific configuration'), // 平台特定配置
+        packages: z.any().optional().describe('Platform Specific Configuration'), // 平台特定配置
     })
-    .describe('Other platform build options'); // 其他平台构建选项
+    .describe('Other Platform Build Options (Generic)'); // 其他平台构建选项（通用）
 
 export const SchemaKnownBuildOptions = [
     SchemaWebDesktopBuildOption,
