@@ -161,7 +161,7 @@ export const SchemaBuildBaseOption = SchemaBuildRuntimeOptions
 // Web Desktop Complete Build Options (Input, all fields optional) // Web Desktop 完整构建选项（入参，所有字段可选）
 export const SchemaWebDesktopBuildOption = SchemaBuildBaseOption
     .extend({
-        platform: z.literal('web-desktop').describe('Build platform'), // 构建平台
+        platform: z.literal('web-desktop').describe('Build Platform'), // 构建平台
         packages: z.object({
             'web-desktop': SchemaWebDesktopPackages.partial()
         }).optional().describe('Web Desktop Platform Specific Configuration') // Web Desktop 平台特定配置
@@ -169,10 +169,9 @@ export const SchemaWebDesktopBuildOption = SchemaBuildBaseOption
     .describe('Web Desktop Complete Build Options (all fields optional)'); // Web Desktop 完整构建选项（所有字段可选）
 
 // Web Mobile Complete Build Options (Input, all fields optional) // Web Mobile 完整构建选项（入参，所有字段可选）
-export const SchemaWebMobileBuildOption = SchemaBuildRuntimeOptions
-    .merge(SchemaBuildBaseConfig)
+export const SchemaWebMobileBuildOption = SchemaBuildBaseOption
     .extend({
-        platform: z.literal('web-mobile').describe('Build platform'), // 构建平台
+        platform: z.literal('web-mobile').describe('Build Platform'), // 构建平台
         packages: z.object({
             'web-mobile': SchemaWebMobilePackages.partial()
         }).optional().describe('Web Mobile Platform Specific Configuration') // Web Mobile 平台特定配置
@@ -182,7 +181,7 @@ export const SchemaWebMobileBuildOption = SchemaBuildRuntimeOptions
 // Windows Build Options // Windows 构建选项
 export const SchemaWindowsBuildOption = SchemaBuildBaseOption
     .extend({
-        platform: z.literal('windows').describe('Build platform') // 构建平台
+        platform: z.literal('windows').describe('Build Platform') // 构建平台
     })
     .describe('Windows platform build options'); // Windows平台构建选项
 
@@ -203,7 +202,7 @@ export const SchemaIOSPackage = SchemaIOSPackageWithCatchall
 
 export const SchemaIOSBuildOption = SchemaBuildBaseOption
     .extend({
-        platform: z.literal('ios').describe('Build platform'), // 构建平台
+        platform: z.literal('ios').describe('Build Platform'), // 构建平台
         packages: z.object({
             ios: SchemaIOSPackage
                 .optional()
@@ -214,7 +213,7 @@ export const SchemaIOSBuildOption = SchemaBuildBaseOption
 // Android Build Options // Android 构建选项
 export const SchemaAndroidBuildOption = SchemaBuildBaseOption
     .extend({
-        platform: z.literal('android').describe('Build platform'), // 构建平台
+        platform: z.literal('android').describe('Build Platform'), // 构建平台
         packages: z.object({
             android: SchemaAndroidPackage
                 .catchall(z.any())  // 允许其他任意字段
@@ -227,7 +226,7 @@ export const SchemaAndroidBuildOption = SchemaBuildBaseOption
 // Mac Build Options // Mac 构建选项
 export const SchemaMacBuildOption = SchemaBuildBaseOption
     .extend({
-        platform: z.literal('mac').describe('Build platform'), // 构建平台
+        platform: z.literal('mac').describe('Build Platform'), // 构建平台
         packages: z.object({
             mac: SchemaMacPackage
                 .catchall(z.any())  // 允许其他任意字段
@@ -240,7 +239,7 @@ export const SchemaMacBuildOption = SchemaBuildBaseOption
 // Other Platform Build Options (Generic) // 其他平台构建选项（通用）
 export const SchemaOtherPlatformBuildOption = SchemaBuildBaseOption
     .extend({
-        platform: SchemaPlatform.optional().describe('Build platform'), // 构建平台
+        platform: SchemaPlatform.optional().describe('Build Platform'), // 构建平台
         packages: z.any().optional().describe('Platform specific configuration'), // 平台特定配置
     })
     .describe('Other platform build options'); // 其他平台构建选项
@@ -288,11 +287,11 @@ export const SchemaPreviewSettingsResult = z.object({
         CocosEngine: z.string().describe('Cocos Engine Version'), // Cocos Engine 版本
         engine: z.object({
             debug: z.boolean().describe('Whether it is debug mode'), // 是否是调试模式
-            platform: z.string().describe('Build platform'), // 构建平台
-            customLayers: z.array(z.object({ name: z.string(), bit: z.number() })).describe('Custom layers'), // 自定义层级
-            sortingLayers: z.array(z.object({ id: z.number(), name: z.string(), value: z.number() })).describe('Sorting layers'), // 排序层级
-            macros: z.record(z.string(), z.any()).describe('Macro definitions'), // 宏定义
-            builtinAssets: z.array(z.string()).describe('Built-in assets'), // 内置资源
+            platform: z.string().describe('Build Platform'), // 构建平台
+            customLayers: z.array(z.object({ name: z.string(), bit: z.number() })).describe('Custom Layers'), // 自定义层级
+            sortingLayers: z.array(z.object({ id: z.number(), name: z.string(), value: z.number() })).describe('Sorting Layers'), // 排序层级
+            macros: z.record(z.string(), z.any()).describe('Macro Definitions'), // 宏定义
+            builtinAssets: z.array(z.string()).describe('Built-in Assets'), // 内置资源
         }),
     }),
     script2library: z.record(z.string(), z.string()).describe('Mapping between scripts and libraries'), // 脚本与库的映射关系
