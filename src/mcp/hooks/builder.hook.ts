@@ -93,9 +93,42 @@ export class BuilderHook {
         if (!args.options) {
             args.options = {};
         }
-        if (typeof args.options === 'object' && !args.options.platform) {
-            // 注入 platform
-            args.options.platform = args.platform;
+
+        // 处理 configPath
+        let options = args.options;
+        if (options.configPath) {
+            const configPath = options.configPath;
+            if (existsSync(configPath)) {
+                try {
+                    const fileContent = JSON.parse(readFileSync(configPath, 'utf-8'));
+                    // 合并配置，args.options 优先级高于配置文件
+                    options = args.options = {
+                        ...fileContent,
+                        ...options
+                    };
+
+                    // 删除 configPath 字段
+                    delete options.configPath;
+                } catch (e) {
+                    console.warn(`Failed to load config file: ${configPath}`, e);
+                }
+            }
+        }
+
+        if (typeof options === 'object') {
+            if (!options.platform) {
+                // 注入 platform
+                options.platform = args.platform;
+            }
+
+            // sourceMaps exported by CocosEditor is a string, so need to convert it to boolean
+            if (options.sourceMaps && typeof options.sourceMaps !== 'boolean') {
+                if (options.sourceMaps === 'true') {
+                    options.sourceMaps = true;
+                } else if (options.sourceMaps === 'false') {
+                    options.sourceMaps = false;
+                }
+            }
         }
     }
 

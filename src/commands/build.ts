@@ -20,20 +20,7 @@ export class BuildCommand extends BaseCommand {
                 try {
                     const resolvedPath = this.validateProjectPath(options.project);
 
-                    if (options.buildConfig) {
-                        if (!existsSync(options.buildConfig)) {
-                            console.error(`config: ${options.buildConfig} is not exist!`);
-                            process.exit(BuildExitCode.BUILD_FAILED);
-                        }
-                        console.debug(`Read config from path ${options.buildConfig}...`);
-                        let data = readJSONSync(options.buildConfig);
-                        // 功能点：options 传递的值，允许覆盖配置文件内的同属性值
-                        data = Object.assign(data, options);
-                        // 避免修改原始 options
-                        Object.assign(options, data);
-                        // 移除旧的 key 方便和 configPath 未读取的情况做区分
-                        delete options.buildConfig;
-                    }
+                    //read options.configPath move to builder.hook.ts
 
                     // 处理 Android 平台特定的命令行参数
                     if (options.platform === 'android') {
