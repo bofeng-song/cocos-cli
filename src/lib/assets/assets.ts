@@ -5,13 +5,71 @@ import { assetDBManager, assetManager } from '../../core/assets';
 
 export type * from '../../core/assets/@types/public';
 export type { CreateAssetOptions, IAssetConfig, IAssetDBInfo, ICreateMenuInfo, IUerDataConfigItem, QueryAssetType } from '../../core/assets/@types/protected';
-
+export type { FilterPluginOptions, IPluginScriptInfo } from '../../core/scripting/interface';
 
 export async function init(): Promise<void> {
-    // 启动以及初始化资源数据库
-    const { startupAssetDB } = await import('../../core/assets');
-    await startupAssetDB();
+    // 初始化资源数据库
+    const { initAssetDB } = await import('../../core/assets');
+    await initAssetDB();
 }
+
+/**
+ * Start Asset DB // 启动资源数据库，开始扫描和导入资源
+ */
+export async function start(): Promise<void> {
+    const { startAssetDB } = await import('../../core/assets');
+    await startAssetDB();
+}
+
+/**
+ * Register listener for when all asset databases are fully initialized.
+ * 
+ * 注册数据库初始化完全完成后的事件监听。
+ * 
+ * **注意事项 (Notice)**:
+ * - 触发此事件代表**所有**注册的资源数据库都已经完全导入并初始化完成（启动阶段结束）。
+ * - 收到此事件后，表示所有的资源查询、操作 API 都可以安全调用。
+ * - 第一次 ready 后，将不再有 progress 进度消息。
+ * 
+ * @param listener 回调函数
+ * @returns 移除监听的函数
+ */
+export function onReady(listener: () => void): () => void {
+    return assetManager.onReady(listener);
+}
+
+/**
+ * Register listener for when a specific database finishes starting.
+ * 
+ * 注册单个数据库启动完成后的事件监听。
+ * 
+ * **注意事项 (Notice)**:
+ * - 这个事件可能会被触发多次（如果项目存在多个子数据库，如 `assets`, `internal`）。
+ * - 主要用于需要做更精细化并行控制的上层逻辑，通常情况下普通的业务逻辑不需要关心此事件，直接监听 `onReady` 即可。
+ * 
+ * @param listener 回调函数，接收启动完成的 dbInfo
+ * @returns 移除监听的函数
+ */
+export function onDBReady(listener: (dbInfo: IAssetDBInfo) => void): () => void {
+    return assetManager.onDBReady(listener);
+}
+
+/**
+ * Register listener for initialization progress.
+ * 
+ * 注册初始化过程中的进度监听。
+ * 
+ * **注意事项 (Notice)**:
+ * - **仅在启动阶段有效**。一旦触发过一次 `ready` 事件（即启动阶段结束），将不再会有新的进度消息。
+ * - 启动时的资源冷导入会抛出密集的进度信息，建议在 UI 层面进行适当的节流（throttle）渲染。
+ * 
+ * @param listener 回调函数，包含当前进度、总数、当前处理的资源 url 和导入状态
+ * @returns 移除监听的函数
+ */
+export function onProgress(listener: (current: number, total: number, url: string, state: 'processing' | 'success' | 'failed') => void): () => void {
+    return assetManager.onProgress(listener);
+}
+
 /**
  * Delete Asset // 删除资源
  */
@@ -226,5 +284,61 @@ export async function updateAssetUserData(
  */
 export async function queryAssetConfigMap(): Promise<Record<string, IAssetConfig>> {
     return await assetManager.queryAssetConfigMap();
+}
+
+/**
+ * Listen to Asset Added Event // 监听资源添加事件
+ * @param listener Callback function that receives asset information
+ * @returns Function to remove the listener
+ * 
+ * 推荐用法：
+ * ```typescript
+ * const removeListener = onAssetAdded((info) => {
+ *     console.log(`资源已添加: ${info.name}`);
+ *     console.log(`  逻辑路径: ${info.url}`);
+ *     console.log(`  物理路径: ${info.file}`);
+ * });
+ * // 稍后移除监听
+ * removeListener();
+ * ```
+ */
+export function onAssetAdded(listener: (info: IAssetInfo) => void): () => void {
+    return assetManager.onAssetAdded(listener);
+}
+
+/**
+ * Listen to Asset Changed Event // 监听资源变更事件
+ * @param listener Callback function that receives asset information
+ * @returns Function to remove the listener
+ * 
+ * 推荐用法：
+ * ```typescript
+ * const removeListener = onAssetChanged((info) => {
+ *     console.log(`资源已变更: ${info.name}`);
+ * });
+ * // 稍后移除监听
+ * removeListener();
+ * ```
+ */
+export function onAssetChanged(listener: (info: IAssetInfo) => void): () => void {
+    return assetManager.onAssetChanged(listener);
+}
+
+/**
+ * Listen to Asset Removed Event // 监听资源删除事件
+ * @param listener Callback function that receives asset information
+ * @returns Function to remove the listener
+ * 
+ * 推荐用法：
+ * ```typescript
+ * const removeListener = onAssetRemoved((info) => {
+ *     console.log(`资源已删除: ${info.name}`);
+ * });
+ * // 稍后移除监听
+ * removeListener();
+ * ```
+ */
+export function onAssetRemoved(listener: (info: IAssetInfo) => void): () => void {
+    return assetManager.onAssetRemoved(listener);
 }
 

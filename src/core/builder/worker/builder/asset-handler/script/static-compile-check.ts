@@ -85,20 +85,25 @@ function filterAssetsErrors(output: string): string {
  * @param showOutput 是否显示输出信息（默认 true）
  * @returns 返回对象，包含检查结果和错误信息。passed 为 true 表示检查通过（没有 assets 相关错误），false 表示有错误
  */
-export async function runStaticCompileCheck(projectPath: string, showOutput: boolean = true): Promise<{ passed: boolean; errorMessage?: string }> {
+export async function runStaticCompileCheck(projectPath: string, showOutput: boolean = true, tsconfigPath?: string): Promise<{ passed: boolean; errorMessage?: string }> {
     if (showOutput) {
         console.log(chalk.blue('Running TypeScript static compile check...'));
         console.log(chalk.gray(`Project: ${projectPath}`));
+        if (tsconfigPath) {
+            console.log(chalk.gray(`Config: ${tsconfigPath}`));
+        }
         console.log('');
     }
 
     // 切换到项目目录并执行命令
     // 使用 2>&1 将 stderr 合并到 stdout，避免流写入冲突导致的乱序
     // 使用 CLI 自身依赖的 tsc，避免在项目目录中找不到 tsc
+    // 增加 --project 参数指定使用的 tsconfig.json，避免使用默认的项目根目录配置从而包含不需要的 d.ts 文件
     // 输出在代码中统一过滤，保证跨平台一致性
+    const finalTsconfigPath = tsconfigPath || path.join(projectPath, 'temp', 'cli', 'tsconfig.cocos.json');
     const command = isWindows() 
-    ? `npx tsc --noEmit 2>&1 | findstr /i "assets"`
-    : `tsc --noEmit 2>&1`;
+    ? `npx tsc --noEmit --project "${finalTsconfigPath}" 2>&1 | findstr /i "assets"`
+    : `tsc --noEmit --project "${finalTsconfigPath}" 2>&1`;
     const shell = getShell();
 
     try {
@@ -128,7 +133,12 @@ export async function runStaticCompileCheck(projectPath: string, showOutput: boo
         }
 
         // 过滤出包含 "assets" 的错误
-        const filteredOutput = filterAssetsErrors(output);
+        let filteredOutput = filterAssetsErrors(output);
+
+        // 如果输出只包含 TS18003 (No inputs were found)，说明项目没有 ts 文件，这是正常的，不视为错误
+        if (filteredOutput && filteredOutput.includes('TS18003') && filteredOutput.split('\n').every(line => line.includes('TS18003') || !line.trim())) {
+            filteredOutput = '';
+        }
 
         if (filteredOutput) {
             // 有 assets 相关的错误
@@ -170,7 +180,12 @@ export async function runStaticCompileCheck(projectPath: string, showOutput: boo
         }
 
         // 过滤出包含 "assets" 的错误
-        const filteredOutput = filterAssetsErrors(fullOutput);
+        let filteredOutput = filterAssetsErrors(fullOutput);
+
+        // 如果输出只包含 TS18003 (No inputs were found)，说明项目没有 ts 文件，这是正常的，不视为错误
+        if (filteredOutput && filteredOutput.includes('TS18003') && filteredOutput.split('\n').every(line => line.includes('TS18003') || !line.trim())) {
+            filteredOutput = '';
+        }
 
         if (filteredOutput) {
             // 有 assets 相关的错误

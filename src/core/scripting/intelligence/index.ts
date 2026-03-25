@@ -89,6 +89,9 @@ export class TypeScriptConfigBuilder {
 
             // True by default.
             strict: true,
+            strictNullChecks: false,
+            noImplicitAny: false,
+            strictPropertyInitialization: false,
 
             types,
 
@@ -118,6 +121,18 @@ export class TypeScriptConfigBuilder {
             $schema: 'https://json.schemastore.org/tsconfig',
 
             compilerOptions,
+
+            include: [
+                '../../assets/**/*',
+                '../../extensions/**/*'
+            ],
+            exclude: [
+                '../../node_modules',
+                '../../library',
+                '../../local',
+                '../../build',
+                '../../profiles'
+            ]
         };
 
         for (const key in compilerOptions) {
@@ -189,8 +204,8 @@ export class TypeScriptConfigBuilder {
     }
 
     private tsConfigTypePath(path: string): string {
-        // Path is relative from dir of "real" tsconfig.json, not extending tsconfig.json.
-        const rel = ps.relative(ps.dirname(this._realTsConfigPath), path);
+        // Path should be relative to the directory of this config file itself
+        const rel = ps.relative(ps.dirname(this._configFilePath), path);
         // No `.d.ts` is allowed
         const extensionLess = rel.endsWith('.d.ts') ? rel.substr(0, rel.length - 5) : rel;
         // Let's convert it to slash for generic

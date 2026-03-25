@@ -62,6 +62,7 @@ function buildPlatformTypeUnion(): string {
     const allKeys = [
         ...Object.keys(Modularize.WebPlatform).filter(k => isNaN(Number(k))),
         ...Object.keys(Modularize.MinigamePlatform).filter(k => isNaN(Number(k))),
+        'SUD', 'SUDV2',
         ...Object.keys(Modularize.NativePlatform).filter(k => isNaN(Number(k))),
     ].map(k => k.toUpperCase());
     const extras = ['HTML5', 'NATIVE', 'NODEJS', 'INVALID_PLATFORM'];
@@ -143,6 +144,14 @@ const packageJSON = {
     version: '0.0.1-alpha.5',
     main: 'index.d.ts',
     types: 'index.d.ts',
+    exports: {
+        '.': {
+            types: './index.d.ts'
+        },
+        './*': {
+            types: './*.d.ts'
+        }
+    },
     files: [
         '*.d.ts',
     ]
