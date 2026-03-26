@@ -192,6 +192,7 @@ export class PreviewServer {
                     packImportMapURL: `/scripting/x/${facet.packImportMapURL}`,
                     packResolutionDetailMapURL: `/scripting/x/${facet.packResolutionDetailMapURL}`,
                     engineDistPath: `/scripting/engine/${engineDistRelPath}`,
+                    globalImportMap: await facet.getGlobalImportMap(),
                 };
                 const templatePath = ps.join(__dirname, 'index.ejs');
                 const html = await ejs.renderFile(templatePath, renderData);

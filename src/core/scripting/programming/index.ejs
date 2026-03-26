@@ -47,7 +47,9 @@
     <script type="systemjs-importmap" src="<%= packImportMapURL %>"></script>
 
     <!-- Import map that map 'cc', 'cc/env'. -->
-    <script type="systemjs-importmap" src="/scripting/import-map-global"></script>
+    <script type="systemjs-importmap">
+        <%- JSON.stringify(globalImportMap) %>
+    </script>
     
     <!-- Setup the detailed resolution. -->
     <script>
