@@ -107,7 +107,7 @@ export class EngineCompiler {
         // Spine Hack End
         const env: StatsQuery.ConstantManager.ConstantOptions = {
             platform: 'NODEJS',
-            mode: options?.isWebview ? 'PREVIEW' : 'EDITOR',
+            mode: 'EDITOR',
             flags: {
                 DEBUG: true,
             },

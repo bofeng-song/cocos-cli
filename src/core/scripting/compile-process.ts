@@ -13,7 +13,7 @@ export interface ICompileWorkerData {
  * 在独立的子进程中运行项目脚本编译
  * 避免 QuickPacker 的 Rollup 等繁重任务阻塞主进程事件循环
  */
-export function startCompileScriptProcess(data: ICompileWorkerData): Promise<void> {
+export function startCompileScriptProcess(data: ICompileWorkerData, completeCallback: () => void): Promise<void> {
     return new Promise((resolve, reject) => {
         // 根据运行环境决定是使用 ts-node 还是直接执行 js
         const isTsNode = (process as any)[Symbol.for('ts-node.register.instance')] || process.env.TS_NODE_DEV;
@@ -38,6 +38,7 @@ export function startCompileScriptProcess(data: ICompileWorkerData): Promise<voi
         worker.on('message', (message: any) => {
             if (message.type === 'done') {
                 resolve();
+                completeCallback();
             } else if (message.type === 'error') {
                 reject(new Error(`[Worker Error] ${message.message}\n${message.stack}`));
             }
