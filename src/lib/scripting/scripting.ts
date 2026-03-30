@@ -1,13 +1,13 @@
 import { GlobalPaths } from '../../global';
-import scripting, { AssetChangeInfo } from '../../core/scripting';
-import { startCompileScriptProcess } from '../../core/scripting/compile-process';
-import { ProgrammingFacet } from '../../core/scripting/programming/Facet';
+import scripting from '../../core/scripting';
+import type { AssetChangeInfo } from '../../core/scripting';
+import type { ProgrammingFacet } from '../../core/scripting/programming/Facet';
 import { join } from 'path';
-import { Engine } from '../../core/engine';
 
 export type * from '../../core/scripting/interface';
 
 export async function init(projectPath: string): Promise<void> {
+    const { Engine } = await import('../../core/engine');
     return await scripting.initialize(
         projectPath,
         GlobalPaths.enginePath,
@@ -17,10 +17,13 @@ export async function init(projectPath: string): Promise<void> {
 let programmingFacet: ProgrammingFacet | null;
 
 export async function createProgrammingFacet(): Promise<ProgrammingFacet> {
+    const { Engine } = await import('../../core/engine');
     const features = Engine.getConfig().includeModules || [];
     const enginePath = GlobalPaths.enginePath;
 
-    programmingFacet = await ProgrammingFacet.create(
+    const module = await import('../../core/scripting/programming/Facet');
+    const Facet = module.ProgrammingFacet;
+    programmingFacet = await Facet.create(
         {
             root: enginePath,
             distRoot: join(enginePath, 'bin', '.cache', 'dev-cli', 'web'),
@@ -38,7 +41,10 @@ export async function createProgrammingFacet(): Promise<ProgrammingFacet> {
  * 以避免阻塞主进程
  */
 export async function startCompileScript(assetChanges?: AssetChangeInfo[]) {
+    const { Engine } = await import('../../core/engine');
     const features = Engine.getConfig().includeModules;
+
+    const { startCompileScriptProcess } = await import('../../core/scripting/compile-process');
     await startCompileScriptProcess({
         projectPath: scripting.projectPath,
         enginePath: GlobalPaths.enginePath,
