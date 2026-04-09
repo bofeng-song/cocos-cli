@@ -15,15 +15,16 @@ export class PrefabEditor extends BaseEditor {
 
     private virtualScene: Scene | null = null;
 
-    async encode(entity?: IEditorTarget | null): Promise<INode> {
+    async encode(simpleNode?: boolean, entity?: IEditorTarget | null): Promise<INode> {
         entity = entity ?? this.entity;
         if (!entity) {
             throw new Error('encode 失败，没有打开预制体');
         }
-        return sceneUtils.generateNodeInfo(entity.instance, true);
+        simpleNode = simpleNode ?? true;
+        return sceneUtils.generateNodeInfo(entity.instance, !simpleNode);
     }
 
-    async open(asset: IAssetInfo): Promise<INode> {
+    async open(asset: IAssetInfo, simpleNode?: boolean): Promise<INode> {
         // 获取预制体标识符
         const identifier = this.getIdentifier(asset);
         // 加载预制体资源
@@ -40,7 +41,7 @@ export class PrefabEditor extends BaseEditor {
             instance
         });
 
-        return this.encode();
+        return this.encode(simpleNode);
     }
 
     async close(): Promise<boolean> {
