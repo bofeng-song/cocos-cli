@@ -67,6 +67,13 @@ export default {
             },
         },
         {
+            url: '/assetManager/querySortedPlugins',
+            async handler(req: Request, res: Response) {
+                const { assetManager } = await import('../assets');
+                res.json(assetManager.querySortedPlugins({ loadPluginInEditor: true }));
+            },
+        },
+        {
             url: '/scripting/engine/modules',
             async handler(req: Request, res: Response) {
                 const { Engine } = await import('../engine');

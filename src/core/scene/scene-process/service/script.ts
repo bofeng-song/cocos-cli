@@ -120,13 +120,6 @@ export class ScriptService extends BaseService<IScriptEvents> implements IScript
     }
 
     async init() {
-        // Skip packer-driver initialization in browser preview —
-        // QuickPackLoaderContext and other Node.js dependencies are unavailable
-        const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-        if (isBrowser) {
-            return;
-        }
-
         EditorExtends.on('class-registered', (classConstructor: Function, metadata: any, className: string) => {
             console.log('classRegistered', className);
             console.log('class-registered ' + cc.js.isChildClassOf(classConstructor, cc.Component));
@@ -179,7 +172,10 @@ export class ScriptService extends BaseService<IScriptEvents> implements IScript
         });
 
         globalThis.self = window;
-        this._executor.addPolyfillFile(require.resolve('@cocos/build-polyfills/prebuilt/editor/bundle'));
+        const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+        if (!isBrowser && typeof require !== 'undefined' && require.resolve) {
+            this._executor.addPolyfillFile(require.resolve('@cocos/build-polyfills/prebuilt/editor/bundle'));
+        }
         // 同步插件脚本列表
         await this._syncPluginScripts.nextIteration();
         // 重载项目与插件脚本
@@ -282,6 +278,24 @@ export class ScriptService extends BaseService<IScriptEvents> implements IScript
      * @private
      */
     private async _syncPluginScriptList() {
+        const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+        if (isBrowser) {
+            try {
+                const serverUrl = serviceManager.getServerUrl();
+                const res = await fetch(`${serverUrl}/assetManager/querySortedPlugins`);
+                if (res.ok) {
+                    const pluginScripts = await res.json();
+                    this._executor.setPluginScripts(pluginScripts);
+                } else {
+                    this._executor.setPluginScripts([]);
+                }
+            } catch (err) {
+                console.error('Failed to fetch plugin scripts', err);
+                this._executor.setPluginScripts([]);
+            }
+            return;
+        }
+
         return Promise.resolve(Rpc.getInstance().request('assetManager', 'querySortedPlugins', [{
             loadPluginInEditor: true,
         }]))

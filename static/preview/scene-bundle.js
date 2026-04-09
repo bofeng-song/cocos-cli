@@ -1,3 +1,36 @@
+
+(function() {
+    var _process = {
+        cwd: function() { 
+            return (typeof window !== 'undefined' && (window.__CC_PROJECT_PATH__ || (window.Editor && window.Editor.Project && window.Editor.Project.path))) || '/';
+        },
+        platform: 'browser',
+        nextTick: function(fn) { 
+            var args = Array.prototype.slice.call(arguments, 1);
+            setTimeout(function() { if (typeof fn === 'function') fn.apply(null, args); }, 0); 
+        },
+        env: { NODE_ENV: 'development' },
+        versions: { node: '16.0.0' },
+        stdout: { write: function() {} },
+        stderr: { write: function() {} },
+        binding: function() { return {}; },
+        on: function() {},
+        once: function() {},
+        removeListener: function() {},
+        emit: function() {},
+    };
+    if (typeof window !== 'undefined') {
+        if (!window.process) {
+            window.process = _process;
+        } else if (!window.process.cwd) {
+            window.process.cwd = _process.cwd;
+        }
+    }
+    if (typeof globalThis !== 'undefined' && !globalThis.process) {
+        globalThis.process = _process;
+    }
+})();
+        
 System.register(['cc'], (function (exports, module) {
 	'use strict';
 	var require$$0$6, require$$0__default;
@@ -60,43 +93,70 @@ System.register(['cc'], (function (exports, module) {
 
 			var missingClassReporter = {};
 
-			let realMod$a = {};
-			                            const isBrowser$a = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-			                            const isNode$a = typeof process !== 'undefined' && process.versions && process.versions.node;
+			let realMod$9 = {};
+			                            const isBrowser$9 = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+			                            const isNode$9 = typeof process !== 'undefined' && process.versions && process.versions.node;
 			                            // Allow explicit override via global flag
-			                            const useRealNode$a = (isNode$a && !isBrowser$a && globalThis.__ENABLE_NODE_BUILTINS__ !== false) || globalThis.__ENABLE_NODE_BUILTINS__ === true;
+			                            const useRealNode$9 = (isNode$9 && !isBrowser$9 && globalThis.__ENABLE_NODE_BUILTINS__ !== false) || globalThis.__ENABLE_NODE_BUILTINS__ === true;
 			                            
-			                            if (useRealNode$a) {
+			                            if (useRealNode$9) {
 			                                // Dynamic require to hide it from static analysis
 			                                const req = typeof require !== 'undefined' ? require : (typeof _cc_require !== 'undefined' ? _cc_require : null);
 			                                if (req) {
 			                                    try {
 			                                        const modName = 'lodash';
-			                                        realMod$a = req(modName);
+			                                        realMod$9 = req(modName);
 			                                    } catch(e) {
 			                                        console.warn('Smart polyfill: failed to require lodash');
 			                                    }
 			                                }
 			                            }
 			                            
-			                            const existsSync$a = realMod$a.existsSync || function() { return false; };
-			                            const readFileSync$a = realMod$a.readFileSync || function() { return ''; };
-			                            const writeFileSync$a = realMod$a.writeFileSync || function() {};
-			                            const remove$a = realMod$a.remove || async function() {};
-			                            const readJSON$a = realMod$a.readJSON || async function() { return {}; };
-			                            const statSync$a = realMod$a.statSync || function() { return { isFile: () => false, isDirectory: () => false }; };
+			                            const existsSync$9 = realMod$9.existsSync || function() { return false; };
+			                            const readFileSync$9 = realMod$9.readFileSync || function() { return ''; };
+			                            const writeFileSync$9 = realMod$9.writeFileSync || function() {};
+			                            const remove$9 = realMod$9.remove || async function() {};
+			                            const readJSON$9 = realMod$9.readJSON || async function() { return { chunks: {}, entries: {} }; };
+			                            const readJson$9 = realMod$9.readJson || async function() { return { chunks: {}, entries: {} }; };
+			                            const statSync$9 = realMod$9.statSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const stat$9 = realMod$9.stat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstat$9 = realMod$9.lstat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstatSync$9 = realMod$9.lstatSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const mkdir$9 = realMod$9.mkdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const mkdirSync$9 = realMod$9.mkdirSync || function() {};
+			                            const rmdir$9 = realMod$9.rmdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const rmdirSync$9 = realMod$9.rmdirSync || function() {};
+			                            const realpath$9 = realMod$9.realpath || function(p, o, cb) { 
+			                                var fn = typeof o === 'function' ? o : cb; 
+			                                if (typeof fn === 'function') fn(null, p); 
+			                            };
+			                            const realpathSync$9 = realMod$9.realpathSync || function(p) { return p; };
+			                            const utimes$9 = realMod$9.utimes || function(p, a, m, cb) { cb && cb(null); };
+			                            const utimesSync$9 = realMod$9.utimesSync || function() {};
 			                            
 			                            var _smartLodash = new Proxy({}, {
 			                                get(target, prop) {
-			                                    if (prop === 'existsSync') return existsSync$a;
-			                                    if (prop === 'readFileSync') return readFileSync$a;
-			                                    if (prop === 'writeFileSync') return writeFileSync$a;
-			                                    if (prop === 'remove') return remove$a;
-			                                    if (prop === 'readJSON') return readJSON$a;
-			                                    if (prop === 'statSync') return statSync$a;
+			                                    if (prop === 'existsSync') return existsSync$9;
+			                                    if (prop === 'readFileSync') return readFileSync$9;
+			                                    if (prop === 'writeFileSync') return writeFileSync$9;
+			                                    if (prop === 'remove') return remove$9;
+			                                    if (prop === 'readJSON') return readJSON$9;
+			                                    if (prop === 'readJson') return readJson$9;
+			                                    if (prop === 'statSync') return statSync$9;
+			                                    if (prop === 'stat') return stat$9;
+			                                    if (prop === 'lstat') return lstat$9;
+			                                    if (prop === 'lstatSync') return lstatSync$9;
+			                                    if (prop === 'mkdir') return mkdir$9;
+			                                    if (prop === 'mkdirSync') return mkdirSync$9;
+			                                    if (prop === 'rmdir') return rmdir$9;
+			                                    if (prop === 'rmdirSync') return rmdirSync$9;
+			                                    if (prop === 'realpath') return realpath$9;
+			                                    if (prop === 'realpathSync') return realpathSync$9;
+			                                    if (prop === 'utimes') return utimes$9;
+			                                    if (prop === 'utimesSync') return utimesSync$9;
 			                                    
-			                                    if (realMod$a && prop in realMod$a) {
-			                                        return realMod$a[prop];
+			                                    if (realMod$9 && prop in realMod$9) {
+			                                        return realMod$9[prop];
 			                                    }
 			                                    
 			                                    // Fallback for missing methods
@@ -109,12 +169,24 @@ System.register(['cc'], (function (exports, module) {
 
 			var _smartLodash$1 = /*#__PURE__*/Object.freeze({
 				__proto__: null,
-				existsSync: existsSync$a,
-				readFileSync: readFileSync$a,
-				writeFileSync: writeFileSync$a,
-				remove: remove$a,
-				readJSON: readJSON$a,
-				statSync: statSync$a,
+				existsSync: existsSync$9,
+				readFileSync: readFileSync$9,
+				writeFileSync: writeFileSync$9,
+				remove: remove$9,
+				readJSON: readJSON$9,
+				readJson: readJson$9,
+				statSync: statSync$9,
+				stat: stat$9,
+				lstat: lstat$9,
+				lstatSync: lstatSync$9,
+				mkdir: mkdir$9,
+				mkdirSync: mkdirSync$9,
+				rmdir: rmdir$9,
+				rmdirSync: rmdirSync$9,
+				realpath: realpath$9,
+				realpathSync: realpathSync$9,
+				utimes: utimes$9,
+				utimesSync: utimesSync$9,
 				'default': _smartLodash
 			});
 
@@ -629,43 +701,70 @@ System.register(['cc'], (function (exports, module) {
 			    return foundKey;
 			}
 
-			let realMod$9 = {};
-			                            const isBrowser$9 = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-			                            const isNode$9 = typeof process !== 'undefined' && process.versions && process.versions.node;
+			let realMod$8 = {};
+			                            const isBrowser$8 = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+			                            const isNode$8 = typeof process !== 'undefined' && process.versions && process.versions.node;
 			                            // Allow explicit override via global flag
-			                            const useRealNode$9 = (isNode$9 && !isBrowser$9 && globalThis.__ENABLE_NODE_BUILTINS__ !== false) || globalThis.__ENABLE_NODE_BUILTINS__ === true;
+			                            const useRealNode$8 = (isNode$8 && !isBrowser$8 && globalThis.__ENABLE_NODE_BUILTINS__ !== false) || globalThis.__ENABLE_NODE_BUILTINS__ === true;
 			                            
-			                            if (useRealNode$9) {
+			                            if (useRealNode$8) {
 			                                // Dynamic require to hide it from static analysis
 			                                const req = typeof require !== 'undefined' ? require : (typeof _cc_require !== 'undefined' ? _cc_require : null);
 			                                if (req) {
 			                                    try {
 			                                        const modName = '@cocos/asset-db';
-			                                        realMod$9 = req(modName);
+			                                        realMod$8 = req(modName);
 			                                    } catch(e) {
 			                                        console.warn('Smart polyfill: failed to require @cocos/asset-db');
 			                                    }
 			                                }
 			                            }
 			                            
-			                            const existsSync$9 = realMod$9.existsSync || function() { return false; };
-			                            const readFileSync$9 = realMod$9.readFileSync || function() { return ''; };
-			                            const writeFileSync$9 = realMod$9.writeFileSync || function() {};
-			                            const remove$9 = realMod$9.remove || async function() {};
-			                            const readJSON$9 = realMod$9.readJSON || async function() { return {}; };
-			                            const statSync$9 = realMod$9.statSync || function() { return { isFile: () => false, isDirectory: () => false }; };
+			                            const existsSync$8 = realMod$8.existsSync || function() { return false; };
+			                            const readFileSync$8 = realMod$8.readFileSync || function() { return ''; };
+			                            const writeFileSync$8 = realMod$8.writeFileSync || function() {};
+			                            const remove$8 = realMod$8.remove || async function() {};
+			                            const readJSON$8 = realMod$8.readJSON || async function() { return { chunks: {}, entries: {} }; };
+			                            const readJson$8 = realMod$8.readJson || async function() { return { chunks: {}, entries: {} }; };
+			                            const statSync$8 = realMod$8.statSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const stat$8 = realMod$8.stat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstat$8 = realMod$8.lstat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstatSync$8 = realMod$8.lstatSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const mkdir$8 = realMod$8.mkdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const mkdirSync$8 = realMod$8.mkdirSync || function() {};
+			                            const rmdir$8 = realMod$8.rmdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const rmdirSync$8 = realMod$8.rmdirSync || function() {};
+			                            const realpath$8 = realMod$8.realpath || function(p, o, cb) { 
+			                                var fn = typeof o === 'function' ? o : cb; 
+			                                if (typeof fn === 'function') fn(null, p); 
+			                            };
+			                            const realpathSync$8 = realMod$8.realpathSync || function(p) { return p; };
+			                            const utimes$8 = realMod$8.utimes || function(p, a, m, cb) { cb && cb(null); };
+			                            const utimesSync$8 = realMod$8.utimesSync || function() {};
 			                            
 			                            var assetDb = new Proxy({}, {
 			                                get(target, prop) {
-			                                    if (prop === 'existsSync') return existsSync$9;
-			                                    if (prop === 'readFileSync') return readFileSync$9;
-			                                    if (prop === 'writeFileSync') return writeFileSync$9;
-			                                    if (prop === 'remove') return remove$9;
-			                                    if (prop === 'readJSON') return readJSON$9;
-			                                    if (prop === 'statSync') return statSync$9;
+			                                    if (prop === 'existsSync') return existsSync$8;
+			                                    if (prop === 'readFileSync') return readFileSync$8;
+			                                    if (prop === 'writeFileSync') return writeFileSync$8;
+			                                    if (prop === 'remove') return remove$8;
+			                                    if (prop === 'readJSON') return readJSON$8;
+			                                    if (prop === 'readJson') return readJson$8;
+			                                    if (prop === 'statSync') return statSync$8;
+			                                    if (prop === 'stat') return stat$8;
+			                                    if (prop === 'lstat') return lstat$8;
+			                                    if (prop === 'lstatSync') return lstatSync$8;
+			                                    if (prop === 'mkdir') return mkdir$8;
+			                                    if (prop === 'mkdirSync') return mkdirSync$8;
+			                                    if (prop === 'rmdir') return rmdir$8;
+			                                    if (prop === 'rmdirSync') return rmdirSync$8;
+			                                    if (prop === 'realpath') return realpath$8;
+			                                    if (prop === 'realpathSync') return realpathSync$8;
+			                                    if (prop === 'utimes') return utimes$8;
+			                                    if (prop === 'utimesSync') return utimesSync$8;
 			                                    
-			                                    if (realMod$9 && prop in realMod$9) {
-			                                        return realMod$9[prop];
+			                                    if (realMod$8 && prop in realMod$8) {
+			                                        return realMod$8[prop];
 			                                    }
 			                                    
 			                                    // Fallback for missing methods
@@ -678,12 +777,24 @@ System.register(['cc'], (function (exports, module) {
 
 			var assetDb$1 = /*#__PURE__*/Object.freeze({
 				__proto__: null,
-				existsSync: existsSync$9,
-				readFileSync: readFileSync$9,
-				writeFileSync: writeFileSync$9,
-				remove: remove$9,
-				readJSON: readJSON$9,
-				statSync: statSync$9,
+				existsSync: existsSync$8,
+				readFileSync: readFileSync$8,
+				writeFileSync: writeFileSync$8,
+				remove: remove$8,
+				readJSON: readJSON$8,
+				readJson: readJson$8,
+				statSync: statSync$8,
+				stat: stat$8,
+				lstat: lstat$8,
+				lstatSync: lstatSync$8,
+				mkdir: mkdir$8,
+				mkdirSync: mkdirSync$8,
+				rmdir: rmdir$8,
+				rmdirSync: rmdirSync$8,
+				realpath: realpath$8,
+				realpathSync: realpathSync$8,
+				utimes: utimes$8,
+				utimesSync: utimesSync$8,
 				'default': assetDb
 			});
 
@@ -774,66 +885,6 @@ System.register(['cc'], (function (exports, module) {
 
 			var file = {};
 
-			let realMod$8 = {};
-			                            const isBrowser$8 = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-			                            const isNode$8 = typeof process !== 'undefined' && process.versions && process.versions.node;
-			                            // Allow explicit override via global flag
-			                            const useRealNode$8 = (isNode$8 && !isBrowser$8 && globalThis.__ENABLE_NODE_BUILTINS__ !== false) || globalThis.__ENABLE_NODE_BUILTINS__ === true;
-			                            
-			                            if (useRealNode$8) {
-			                                // Dynamic require to hide it from static analysis
-			                                const req = typeof require !== 'undefined' ? require : (typeof _cc_require !== 'undefined' ? _cc_require : null);
-			                                if (req) {
-			                                    try {
-			                                        const modName = 'fs';
-			                                        realMod$8 = req(modName);
-			                                    } catch(e) {
-			                                        console.warn('Smart polyfill: failed to require fs');
-			                                    }
-			                                }
-			                            }
-			                            
-			                            const existsSync$8 = realMod$8.existsSync || function() { return false; };
-			                            const readFileSync$8 = realMod$8.readFileSync || function() { return ''; };
-			                            const writeFileSync$8 = realMod$8.writeFileSync || function() {};
-			                            const remove$8 = realMod$8.remove || async function() {};
-			                            const readJSON$8 = realMod$8.readJSON || async function() { return {}; };
-			                            const statSync$8 = realMod$8.statSync || function() { return { isFile: () => false, isDirectory: () => false }; };
-			                            
-			                            var _smartFs = new Proxy({}, {
-			                                get(target, prop) {
-			                                    if (prop === 'existsSync') return existsSync$8;
-			                                    if (prop === 'readFileSync') return readFileSync$8;
-			                                    if (prop === 'writeFileSync') return writeFileSync$8;
-			                                    if (prop === 'remove') return remove$8;
-			                                    if (prop === 'readJSON') return readJSON$8;
-			                                    if (prop === 'statSync') return statSync$8;
-			                                    
-			                                    if (realMod$8 && prop in realMod$8) {
-			                                        return realMod$8[prop];
-			                                    }
-			                                    
-			                                    // Fallback for missing methods
-			                                    if (typeof prop === 'string') {
-			                                        return function() {};
-			                                    }
-			                                    return undefined;
-			                                }
-			                            });
-
-			var _smartFs$1 = /*#__PURE__*/Object.freeze({
-				__proto__: null,
-				existsSync: existsSync$8,
-				readFileSync: readFileSync$8,
-				writeFileSync: writeFileSync$8,
-				remove: remove$8,
-				readJSON: readJSON$8,
-				statSync: statSync$8,
-				'default': _smartFs
-			});
-
-			var require$$0$5 = /*@__PURE__*/getAugmentedNamespace(_smartFs$1);
-
 			let realMod$7 = {};
 			                            const isBrowser$7 = typeof window !== 'undefined' && typeof window.document !== 'undefined';
 			                            const isNode$7 = typeof process !== 'undefined' && process.versions && process.versions.node;
@@ -845,10 +896,10 @@ System.register(['cc'], (function (exports, module) {
 			                                const req = typeof require !== 'undefined' ? require : (typeof _cc_require !== 'undefined' ? _cc_require : null);
 			                                if (req) {
 			                                    try {
-			                                        const modName = 'fs-extra';
+			                                        const modName = 'fs';
 			                                        realMod$7 = req(modName);
 			                                    } catch(e) {
-			                                        console.warn('Smart polyfill: failed to require fs-extra');
+			                                        console.warn('Smart polyfill: failed to require fs');
 			                                    }
 			                                }
 			                            }
@@ -857,17 +908,44 @@ System.register(['cc'], (function (exports, module) {
 			                            const readFileSync$7 = realMod$7.readFileSync || function() { return ''; };
 			                            const writeFileSync$7 = realMod$7.writeFileSync || function() {};
 			                            const remove$7 = realMod$7.remove || async function() {};
-			                            const readJSON$7 = realMod$7.readJSON || async function() { return {}; };
-			                            const statSync$7 = realMod$7.statSync || function() { return { isFile: () => false, isDirectory: () => false }; };
+			                            const readJSON$7 = realMod$7.readJSON || async function() { return { chunks: {}, entries: {} }; };
+			                            const readJson$7 = realMod$7.readJson || async function() { return { chunks: {}, entries: {} }; };
+			                            const statSync$7 = realMod$7.statSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const stat$7 = realMod$7.stat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstat$7 = realMod$7.lstat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstatSync$7 = realMod$7.lstatSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const mkdir$7 = realMod$7.mkdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const mkdirSync$7 = realMod$7.mkdirSync || function() {};
+			                            const rmdir$7 = realMod$7.rmdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const rmdirSync$7 = realMod$7.rmdirSync || function() {};
+			                            const realpath$7 = realMod$7.realpath || function(p, o, cb) { 
+			                                var fn = typeof o === 'function' ? o : cb; 
+			                                if (typeof fn === 'function') fn(null, p); 
+			                            };
+			                            const realpathSync$7 = realMod$7.realpathSync || function(p) { return p; };
+			                            const utimes$7 = realMod$7.utimes || function(p, a, m, cb) { cb && cb(null); };
+			                            const utimesSync$7 = realMod$7.utimesSync || function() {};
 			                            
-			                            var _smartFsExtra = new Proxy({}, {
+			                            var _smartFs = new Proxy({}, {
 			                                get(target, prop) {
 			                                    if (prop === 'existsSync') return existsSync$7;
 			                                    if (prop === 'readFileSync') return readFileSync$7;
 			                                    if (prop === 'writeFileSync') return writeFileSync$7;
 			                                    if (prop === 'remove') return remove$7;
 			                                    if (prop === 'readJSON') return readJSON$7;
+			                                    if (prop === 'readJson') return readJson$7;
 			                                    if (prop === 'statSync') return statSync$7;
+			                                    if (prop === 'stat') return stat$7;
+			                                    if (prop === 'lstat') return lstat$7;
+			                                    if (prop === 'lstatSync') return lstatSync$7;
+			                                    if (prop === 'mkdir') return mkdir$7;
+			                                    if (prop === 'mkdirSync') return mkdirSync$7;
+			                                    if (prop === 'rmdir') return rmdir$7;
+			                                    if (prop === 'rmdirSync') return rmdirSync$7;
+			                                    if (prop === 'realpath') return realpath$7;
+			                                    if (prop === 'realpathSync') return realpathSync$7;
+			                                    if (prop === 'utimes') return utimes$7;
+			                                    if (prop === 'utimesSync') return utimesSync$7;
 			                                    
 			                                    if (realMod$7 && prop in realMod$7) {
 			                                        return realMod$7[prop];
@@ -881,14 +959,125 @@ System.register(['cc'], (function (exports, module) {
 			                                }
 			                            });
 
-			var _smartFsExtra$1 = /*#__PURE__*/Object.freeze({
+			var _smartFs$1 = /*#__PURE__*/Object.freeze({
 				__proto__: null,
 				existsSync: existsSync$7,
 				readFileSync: readFileSync$7,
 				writeFileSync: writeFileSync$7,
 				remove: remove$7,
 				readJSON: readJSON$7,
+				readJson: readJson$7,
 				statSync: statSync$7,
+				stat: stat$7,
+				lstat: lstat$7,
+				lstatSync: lstatSync$7,
+				mkdir: mkdir$7,
+				mkdirSync: mkdirSync$7,
+				rmdir: rmdir$7,
+				rmdirSync: rmdirSync$7,
+				realpath: realpath$7,
+				realpathSync: realpathSync$7,
+				utimes: utimes$7,
+				utimesSync: utimesSync$7,
+				'default': _smartFs
+			});
+
+			var require$$0$5 = /*@__PURE__*/getAugmentedNamespace(_smartFs$1);
+
+			let realMod$6 = {};
+			                            const isBrowser$6 = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+			                            const isNode$6 = typeof process !== 'undefined' && process.versions && process.versions.node;
+			                            // Allow explicit override via global flag
+			                            const useRealNode$6 = (isNode$6 && !isBrowser$6 && globalThis.__ENABLE_NODE_BUILTINS__ !== false) || globalThis.__ENABLE_NODE_BUILTINS__ === true;
+			                            
+			                            if (useRealNode$6) {
+			                                // Dynamic require to hide it from static analysis
+			                                const req = typeof require !== 'undefined' ? require : (typeof _cc_require !== 'undefined' ? _cc_require : null);
+			                                if (req) {
+			                                    try {
+			                                        const modName = 'fs-extra';
+			                                        realMod$6 = req(modName);
+			                                    } catch(e) {
+			                                        console.warn('Smart polyfill: failed to require fs-extra');
+			                                    }
+			                                }
+			                            }
+			                            
+			                            const existsSync$6 = realMod$6.existsSync || function() { return false; };
+			                            const readFileSync$6 = realMod$6.readFileSync || function() { return ''; };
+			                            const writeFileSync$6 = realMod$6.writeFileSync || function() {};
+			                            const remove$6 = realMod$6.remove || async function() {};
+			                            const readJSON$6 = realMod$6.readJSON || async function() { return { chunks: {}, entries: {} }; };
+			                            const readJson$6 = realMod$6.readJson || async function() { return { chunks: {}, entries: {} }; };
+			                            const statSync$6 = realMod$6.statSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const stat$6 = realMod$6.stat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstat$6 = realMod$6.lstat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstatSync$6 = realMod$6.lstatSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const mkdir$6 = realMod$6.mkdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const mkdirSync$6 = realMod$6.mkdirSync || function() {};
+			                            const rmdir$6 = realMod$6.rmdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const rmdirSync$6 = realMod$6.rmdirSync || function() {};
+			                            const realpath$6 = realMod$6.realpath || function(p, o, cb) { 
+			                                var fn = typeof o === 'function' ? o : cb; 
+			                                if (typeof fn === 'function') fn(null, p); 
+			                            };
+			                            const realpathSync$6 = realMod$6.realpathSync || function(p) { return p; };
+			                            const utimes$6 = realMod$6.utimes || function(p, a, m, cb) { cb && cb(null); };
+			                            const utimesSync$6 = realMod$6.utimesSync || function() {};
+			                            
+			                            var _smartFsExtra = new Proxy({}, {
+			                                get(target, prop) {
+			                                    if (prop === 'existsSync') return existsSync$6;
+			                                    if (prop === 'readFileSync') return readFileSync$6;
+			                                    if (prop === 'writeFileSync') return writeFileSync$6;
+			                                    if (prop === 'remove') return remove$6;
+			                                    if (prop === 'readJSON') return readJSON$6;
+			                                    if (prop === 'readJson') return readJson$6;
+			                                    if (prop === 'statSync') return statSync$6;
+			                                    if (prop === 'stat') return stat$6;
+			                                    if (prop === 'lstat') return lstat$6;
+			                                    if (prop === 'lstatSync') return lstatSync$6;
+			                                    if (prop === 'mkdir') return mkdir$6;
+			                                    if (prop === 'mkdirSync') return mkdirSync$6;
+			                                    if (prop === 'rmdir') return rmdir$6;
+			                                    if (prop === 'rmdirSync') return rmdirSync$6;
+			                                    if (prop === 'realpath') return realpath$6;
+			                                    if (prop === 'realpathSync') return realpathSync$6;
+			                                    if (prop === 'utimes') return utimes$6;
+			                                    if (prop === 'utimesSync') return utimesSync$6;
+			                                    
+			                                    if (realMod$6 && prop in realMod$6) {
+			                                        return realMod$6[prop];
+			                                    }
+			                                    
+			                                    // Fallback for missing methods
+			                                    if (typeof prop === 'string') {
+			                                        return function() {};
+			                                    }
+			                                    return undefined;
+			                                }
+			                            });
+
+			var _smartFsExtra$1 = /*#__PURE__*/Object.freeze({
+				__proto__: null,
+				existsSync: existsSync$6,
+				readFileSync: readFileSync$6,
+				writeFileSync: writeFileSync$6,
+				remove: remove$6,
+				readJSON: readJSON$6,
+				readJson: readJson$6,
+				statSync: statSync$6,
+				stat: stat$6,
+				lstat: lstat$6,
+				lstatSync: lstatSync$6,
+				mkdir: mkdir$6,
+				mkdirSync: mkdirSync$6,
+				rmdir: rmdir$6,
+				rmdirSync: rmdirSync$6,
+				realpath: realpath$6,
+				realpathSync: realpathSync$6,
+				utimes: utimes$6,
+				utimesSync: utimesSync$6,
 				'default': _smartFsExtra
 			});
 
@@ -980,43 +1169,70 @@ System.register(['cc'], (function (exports, module) {
 
 			var uuid$1 = {};
 
-			let realMod$6 = {};
-			                            const isBrowser$6 = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-			                            const isNode$6 = typeof process !== 'undefined' && process.versions && process.versions.node;
+			let realMod$5 = {};
+			                            const isBrowser$5 = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+			                            const isNode$5 = typeof process !== 'undefined' && process.versions && process.versions.node;
 			                            // Allow explicit override via global flag
-			                            const useRealNode$6 = (isNode$6 && !isBrowser$6 && globalThis.__ENABLE_NODE_BUILTINS__ !== false) || globalThis.__ENABLE_NODE_BUILTINS__ === true;
+			                            const useRealNode$5 = (isNode$5 && !isBrowser$5 && globalThis.__ENABLE_NODE_BUILTINS__ !== false) || globalThis.__ENABLE_NODE_BUILTINS__ === true;
 			                            
-			                            if (useRealNode$6) {
+			                            if (useRealNode$5) {
 			                                // Dynamic require to hide it from static analysis
 			                                const req = typeof require !== 'undefined' ? require : (typeof _cc_require !== 'undefined' ? _cc_require : null);
 			                                if (req) {
 			                                    try {
 			                                        const modName = 'crypto';
-			                                        realMod$6 = req(modName);
+			                                        realMod$5 = req(modName);
 			                                    } catch(e) {
 			                                        console.warn('Smart polyfill: failed to require crypto');
 			                                    }
 			                                }
 			                            }
 			                            
-			                            const existsSync$6 = realMod$6.existsSync || function() { return false; };
-			                            const readFileSync$6 = realMod$6.readFileSync || function() { return ''; };
-			                            const writeFileSync$6 = realMod$6.writeFileSync || function() {};
-			                            const remove$6 = realMod$6.remove || async function() {};
-			                            const readJSON$6 = realMod$6.readJSON || async function() { return {}; };
-			                            const statSync$6 = realMod$6.statSync || function() { return { isFile: () => false, isDirectory: () => false }; };
+			                            const existsSync$5 = realMod$5.existsSync || function() { return false; };
+			                            const readFileSync$5 = realMod$5.readFileSync || function() { return ''; };
+			                            const writeFileSync$5 = realMod$5.writeFileSync || function() {};
+			                            const remove$5 = realMod$5.remove || async function() {};
+			                            const readJSON$5 = realMod$5.readJSON || async function() { return { chunks: {}, entries: {} }; };
+			                            const readJson$5 = realMod$5.readJson || async function() { return { chunks: {}, entries: {} }; };
+			                            const statSync$5 = realMod$5.statSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const stat$5 = realMod$5.stat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstat$5 = realMod$5.lstat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstatSync$5 = realMod$5.lstatSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const mkdir$5 = realMod$5.mkdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const mkdirSync$5 = realMod$5.mkdirSync || function() {};
+			                            const rmdir$5 = realMod$5.rmdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const rmdirSync$5 = realMod$5.rmdirSync || function() {};
+			                            const realpath$5 = realMod$5.realpath || function(p, o, cb) { 
+			                                var fn = typeof o === 'function' ? o : cb; 
+			                                if (typeof fn === 'function') fn(null, p); 
+			                            };
+			                            const realpathSync$5 = realMod$5.realpathSync || function(p) { return p; };
+			                            const utimes$5 = realMod$5.utimes || function(p, a, m, cb) { cb && cb(null); };
+			                            const utimesSync$5 = realMod$5.utimesSync || function() {};
 			                            
 			                            var _smartCrypto = new Proxy({}, {
 			                                get(target, prop) {
-			                                    if (prop === 'existsSync') return existsSync$6;
-			                                    if (prop === 'readFileSync') return readFileSync$6;
-			                                    if (prop === 'writeFileSync') return writeFileSync$6;
-			                                    if (prop === 'remove') return remove$6;
-			                                    if (prop === 'readJSON') return readJSON$6;
-			                                    if (prop === 'statSync') return statSync$6;
+			                                    if (prop === 'existsSync') return existsSync$5;
+			                                    if (prop === 'readFileSync') return readFileSync$5;
+			                                    if (prop === 'writeFileSync') return writeFileSync$5;
+			                                    if (prop === 'remove') return remove$5;
+			                                    if (prop === 'readJSON') return readJSON$5;
+			                                    if (prop === 'readJson') return readJson$5;
+			                                    if (prop === 'statSync') return statSync$5;
+			                                    if (prop === 'stat') return stat$5;
+			                                    if (prop === 'lstat') return lstat$5;
+			                                    if (prop === 'lstatSync') return lstatSync$5;
+			                                    if (prop === 'mkdir') return mkdir$5;
+			                                    if (prop === 'mkdirSync') return mkdirSync$5;
+			                                    if (prop === 'rmdir') return rmdir$5;
+			                                    if (prop === 'rmdirSync') return rmdirSync$5;
+			                                    if (prop === 'realpath') return realpath$5;
+			                                    if (prop === 'realpathSync') return realpathSync$5;
+			                                    if (prop === 'utimes') return utimes$5;
+			                                    if (prop === 'utimesSync') return utimesSync$5;
 			                                    
-			                                    if (realMod$6 && prop in realMod$6) {
-			                                        return realMod$6[prop];
+			                                    if (realMod$5 && prop in realMod$5) {
+			                                        return realMod$5[prop];
 			                                    }
 			                                    
 			                                    // Fallback for missing methods
@@ -1029,12 +1245,24 @@ System.register(['cc'], (function (exports, module) {
 
 			var _smartCrypto$1 = /*#__PURE__*/Object.freeze({
 				__proto__: null,
-				existsSync: existsSync$6,
-				readFileSync: readFileSync$6,
-				writeFileSync: writeFileSync$6,
-				remove: remove$6,
-				readJSON: readJSON$6,
-				statSync: statSync$6,
+				existsSync: existsSync$5,
+				readFileSync: readFileSync$5,
+				writeFileSync: writeFileSync$5,
+				remove: remove$5,
+				readJSON: readJSON$5,
+				readJson: readJson$5,
+				statSync: statSync$5,
+				stat: stat$5,
+				lstat: lstat$5,
+				lstatSync: lstatSync$5,
+				mkdir: mkdir$5,
+				mkdirSync: mkdirSync$5,
+				rmdir: rmdir$5,
+				rmdirSync: rmdirSync$5,
+				realpath: realpath$5,
+				realpathSync: realpathSync$5,
+				utimes: utimes$5,
+				utimesSync: utimesSync$5,
 				'default': _smartCrypto
 			});
 
@@ -1315,7 +1543,7 @@ System.register(['cc'], (function (exports, module) {
 
 			var uuidExports = uuid.exports;
 
-			var __importDefault$d = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
+			var __importDefault$g = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
 			    return (mod && mod.__esModule) ? mod : { "default": mod };
 			};
 			Object.defineProperty(uuid$1, "__esModule", { value: true });
@@ -1328,7 +1556,7 @@ System.register(['cc'], (function (exports, module) {
 			uuid$1.generate = generate;
 			uuid$1.nameToSubId = nameToSubId;
 			const crypto_1 = require$$0$4;
-			const node_uuid_1 = __importDefault$d(uuidExports);
+			const node_uuid_1 = __importDefault$g(uuidExports);
 			const Base64KeyChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 			const AsciiTo64 = new Array(128);
 			for (let i = 0; i < 128; ++i) {
@@ -1852,10 +2080,10 @@ System.register(['cc'], (function (exports, module) {
 			    return parseFloat((Math.round(val * Math.pow(10, num)) / Math.pow(10, num)).toFixed(num));
 			}
 
-			var parse$2 = {};
+			var parse$4 = {};
 
-			Object.defineProperty(parse$2, "__esModule", { value: true });
-			parse$2.compareVersion = compareVersion;
+			Object.defineProperty(parse$4, "__esModule", { value: true });
+			parse$4.compareVersion = compareVersion;
 			/**
 			 * return result of versionMax > versionMin，其中仅支持纯数字版本，最高支持三位数版本号：333.666.345
 			 * @example (3.6.2, 3.7.0) => false; (3.9.0, 3.8.0) => true; (3.8.0, 3.8.0) => false;
@@ -1874,43 +2102,70 @@ System.register(['cc'], (function (exports, module) {
 
 			var process$1 = {};
 
-			let realMod$5 = {};
-			                            const isBrowser$5 = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-			                            const isNode$5 = typeof process !== 'undefined' && process.versions && process.versions.node;
+			let realMod$4 = {};
+			                            const isBrowser$4 = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+			                            const isNode$4 = typeof process !== 'undefined' && process.versions && process.versions.node;
 			                            // Allow explicit override via global flag
-			                            const useRealNode$5 = (isNode$5 && !isBrowser$5 && globalThis.__ENABLE_NODE_BUILTINS__ !== false) || globalThis.__ENABLE_NODE_BUILTINS__ === true;
+			                            const useRealNode$4 = (isNode$4 && !isBrowser$4 && globalThis.__ENABLE_NODE_BUILTINS__ !== false) || globalThis.__ENABLE_NODE_BUILTINS__ === true;
 			                            
-			                            if (useRealNode$5) {
+			                            if (useRealNode$4) {
 			                                // Dynamic require to hide it from static analysis
 			                                const req = typeof require !== 'undefined' ? require : (typeof _cc_require !== 'undefined' ? _cc_require : null);
 			                                if (req) {
 			                                    try {
 			                                        const modName = 'child_process';
-			                                        realMod$5 = req(modName);
+			                                        realMod$4 = req(modName);
 			                                    } catch(e) {
 			                                        console.warn('Smart polyfill: failed to require child_process');
 			                                    }
 			                                }
 			                            }
 			                            
-			                            const existsSync$5 = realMod$5.existsSync || function() { return false; };
-			                            const readFileSync$5 = realMod$5.readFileSync || function() { return ''; };
-			                            const writeFileSync$5 = realMod$5.writeFileSync || function() {};
-			                            const remove$5 = realMod$5.remove || async function() {};
-			                            const readJSON$5 = realMod$5.readJSON || async function() { return {}; };
-			                            const statSync$5 = realMod$5.statSync || function() { return { isFile: () => false, isDirectory: () => false }; };
+			                            const existsSync$4 = realMod$4.existsSync || function() { return false; };
+			                            const readFileSync$4 = realMod$4.readFileSync || function() { return ''; };
+			                            const writeFileSync$4 = realMod$4.writeFileSync || function() {};
+			                            const remove$4 = realMod$4.remove || async function() {};
+			                            const readJSON$4 = realMod$4.readJSON || async function() { return { chunks: {}, entries: {} }; };
+			                            const readJson$4 = realMod$4.readJson || async function() { return { chunks: {}, entries: {} }; };
+			                            const statSync$4 = realMod$4.statSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const stat$4 = realMod$4.stat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstat$4 = realMod$4.lstat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstatSync$4 = realMod$4.lstatSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const mkdir$4 = realMod$4.mkdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const mkdirSync$4 = realMod$4.mkdirSync || function() {};
+			                            const rmdir$4 = realMod$4.rmdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const rmdirSync$4 = realMod$4.rmdirSync || function() {};
+			                            const realpath$4 = realMod$4.realpath || function(p, o, cb) { 
+			                                var fn = typeof o === 'function' ? o : cb; 
+			                                if (typeof fn === 'function') fn(null, p); 
+			                            };
+			                            const realpathSync$4 = realMod$4.realpathSync || function(p) { return p; };
+			                            const utimes$4 = realMod$4.utimes || function(p, a, m, cb) { cb && cb(null); };
+			                            const utimesSync$4 = realMod$4.utimesSync || function() {};
 			                            
 			                            var _smartChild_process = new Proxy({}, {
 			                                get(target, prop) {
-			                                    if (prop === 'existsSync') return existsSync$5;
-			                                    if (prop === 'readFileSync') return readFileSync$5;
-			                                    if (prop === 'writeFileSync') return writeFileSync$5;
-			                                    if (prop === 'remove') return remove$5;
-			                                    if (prop === 'readJSON') return readJSON$5;
-			                                    if (prop === 'statSync') return statSync$5;
+			                                    if (prop === 'existsSync') return existsSync$4;
+			                                    if (prop === 'readFileSync') return readFileSync$4;
+			                                    if (prop === 'writeFileSync') return writeFileSync$4;
+			                                    if (prop === 'remove') return remove$4;
+			                                    if (prop === 'readJSON') return readJSON$4;
+			                                    if (prop === 'readJson') return readJson$4;
+			                                    if (prop === 'statSync') return statSync$4;
+			                                    if (prop === 'stat') return stat$4;
+			                                    if (prop === 'lstat') return lstat$4;
+			                                    if (prop === 'lstatSync') return lstatSync$4;
+			                                    if (prop === 'mkdir') return mkdir$4;
+			                                    if (prop === 'mkdirSync') return mkdirSync$4;
+			                                    if (prop === 'rmdir') return rmdir$4;
+			                                    if (prop === 'rmdirSync') return rmdirSync$4;
+			                                    if (prop === 'realpath') return realpath$4;
+			                                    if (prop === 'realpathSync') return realpathSync$4;
+			                                    if (prop === 'utimes') return utimes$4;
+			                                    if (prop === 'utimesSync') return utimesSync$4;
 			                                    
-			                                    if (realMod$5 && prop in realMod$5) {
-			                                        return realMod$5[prop];
+			                                    if (realMod$4 && prop in realMod$4) {
+			                                        return realMod$4[prop];
 			                                    }
 			                                    
 			                                    // Fallback for missing methods
@@ -1923,12 +2178,24 @@ System.register(['cc'], (function (exports, module) {
 
 			var _smartChild_process$1 = /*#__PURE__*/Object.freeze({
 				__proto__: null,
-				existsSync: existsSync$5,
-				readFileSync: readFileSync$5,
-				writeFileSync: writeFileSync$5,
-				remove: remove$5,
-				readJSON: readJSON$5,
-				statSync: statSync$5,
+				existsSync: existsSync$4,
+				readFileSync: readFileSync$4,
+				writeFileSync: writeFileSync$4,
+				remove: remove$4,
+				readJSON: readJSON$4,
+				readJson: readJson$4,
+				statSync: statSync$4,
+				stat: stat$4,
+				lstat: lstat$4,
+				lstatSync: lstatSync$4,
+				mkdir: mkdir$4,
+				mkdirSync: mkdirSync$4,
+				rmdir: rmdir$4,
+				rmdirSync: rmdirSync$4,
+				realpath: realpath$4,
+				realpathSync: realpathSync$4,
+				utimes: utimes$4,
+				utimesSync: utimesSync$4,
 				'default': _smartChild_process
 			});
 
@@ -2046,7 +2313,7 @@ System.register(['cc'], (function (exports, module) {
 			const Path = __importStar$5(path);
 			const Url$1 = __importStar$5(url$1);
 			const Math$1 = __importStar$5(math);
-			const Parse = __importStar$5(parse$2);
+			const Parse = __importStar$5(parse$4);
 			const Process = __importStar$5(process$1);
 			utils$7.default = {
 			    UUID,
@@ -3236,14 +3503,14 @@ System.register(['cc'], (function (exports, module) {
 			        return result;
 			    };
 			})();
-			var __importDefault$c = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
+			var __importDefault$f = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
 			    return (mod && mod.__esModule) ? mod : { "default": mod };
 			};
 			Object.defineProperty(node$3, "__esModule", { value: true });
 			const events_1$2 = events;
 			const ObjectWalker = __importStar$3(objectWalker);
-			const utils_1$a = __importDefault$c(utils$7);
-			const node_path_manager_1$1 = __importDefault$c(nodePathManager);
+			const utils_1$a = __importDefault$f(utils$7);
+			const node_path_manager_1$1 = __importDefault$f(nodePathManager);
 			const lodash = require$$2$3;
 			class NodeManager extends events_1$2.EventEmitter {
 			    // 当前在场景树中的节点集合,包括在层级管理器中隐藏的
@@ -3493,12 +3760,12 @@ System.register(['cc'], (function (exports, module) {
 
 			var component$4 = {};
 
-			var __importDefault$b = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
+			var __importDefault$e = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
 			    return (mod && mod.__esModule) ? mod : { "default": mod };
 			};
 			Object.defineProperty(component$4, "__esModule", { value: true });
 			const events_1$1 = events;
-			const node_path_manager_1 = __importDefault$b(nodePathManager);
+			const node_path_manager_1 = __importDefault$e(nodePathManager);
 			class ComponentManager extends events_1$1.EventEmitter {
 			    allow = false;
 			    // ---- 组件菜单相关 ----
@@ -6517,13 +6784,19 @@ System.register(['cc'], (function (exports, module) {
 
 			var index = /*@__PURE__*/getDefaultExportFromCjs(editorExtends);
 
-			var EditorExtendsLocal = /*#__PURE__*/_mergeNamespaces({
+			var EditorExtendsLocalImport = /*#__PURE__*/_mergeNamespaces({
 				__proto__: null,
 				'default': index
 			}, [editorExtends]);
-			exports('EditorExtends', EditorExtendsLocal);
 
-			globalThis.EditorExtends = EditorExtendsLocal;
+			const EditorExtendsLocal = exports('EditorExtends', { ...EditorExtendsLocalImport });
+			                    if (EditorExtendsLocal.UuidUtils) {
+			                        const U = EditorExtendsLocal.UuidUtils;
+			                        U.decompressUuid = U.decompressUuid || U.decompressUUID;
+			                        U.compressUuid = U.compressUuid || U.compressUUID;
+			                        U.isUuid = U.isUuid || U.isUUID;
+			                    }
+			                    globalThis.EditorExtends = EditorExtendsLocal;
 
 			var serviceManager = {};
 
@@ -6709,9 +6982,9 @@ System.register(['cc'], (function (exports, module) {
 			    ReloadResult[ReloadResult["EDITOR_NOT_FOUND"] = 5] = "EDITOR_NOT_FOUND";
 			})(ReloadResult || (type$1.ReloadResult = ReloadResult = {}));
 
-			var base = {};
+			var base$1 = {};
 
-			Object.defineProperty(base, "__esModule", { value: true });
+			Object.defineProperty(base$1, "__esModule", { value: true });
 
 			var options = {};
 
@@ -6738,7 +7011,7 @@ System.register(['cc'], (function (exports, module) {
 				};
 				Object.defineProperty(exports, "__esModule", { value: true });
 				__exportStar(type$1, exports);
-				__exportStar(base, exports);
+				__exportStar(base$1, exports);
 				__exportStar(options, exports);
 				__exportStar(scene, exports);
 				
@@ -12190,16 +12463,16 @@ System.register(['cc'], (function (exports, module) {
 			}
 			utils$3.prefabUtils = new PrefabUtil();
 
-			var __importDefault$a = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
+			var __importDefault$d = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
 			    return (mod && mod.__esModule) ? mod : { "default": mod };
 			};
 			Object.defineProperty(utils$6, "__esModule", { value: true });
 			utils$6.sceneUtils = void 0;
 			utils$6.withTimeout = withTimeout;
-			const cc_1$e = __importDefault$a(require$$0__default);
-			const index_1$1 = __importDefault$a(requireComponent());
+			const cc_1$e = __importDefault$d(require$$0__default);
+			const index_1$1 = __importDefault$d(requireComponent());
 			const utils_1$9 = utils$3;
-			const dump_1$2 = __importDefault$a(requireDump());
+			const dump_1$2 = __importDefault$d(requireDump());
 			class SceneUtil {
 			    /** 默认超时：1分钟 */
 			    static Timeout = 60 * 1000;
@@ -12564,18 +12837,24 @@ System.register(['cc'], (function (exports, module) {
 			 * 继承 BaseEditor，实现场景相关的具体操作
 			 */
 			class SceneEditor extends base_editor_1$1.BaseEditor {
-			    async encode(entity) {
+			    async encode(simpleNode, entity) {
 			        entity = entity ?? this.entity;
 			        if (!entity) {
 			            throw new Error('encode 失败，没有打开场景');
 			        }
+			        simpleNode = simpleNode ?? true;
 			        return {
 			            ...entity.identifier,
 			            name: entity.instance.name,
 			            prefab: utils_1$7.sceneUtils.generatePrefabInfo(entity.instance['_prefab']),
 			            children: entity.instance.children
 			                .map((node) => {
-			                return utils_1$7.sceneUtils.generateNodeInfo(node, true);
+			                if (simpleNode) {
+			                    return utils_1$7.sceneUtils.generateNodeIdentifier(node);
+			                }
+			                else {
+			                    return utils_1$7.sceneUtils.generateNodeInfo(node, true);
+			                }
 			            })
 			                .filter(child => child !== null),
 			            components: entity.instance.components
@@ -12584,10 +12863,10 @@ System.register(['cc'], (function (exports, module) {
 			            })
 			        };
 			    }
-			    async open(asset) {
+			    async open(asset, simpleNode) {
 			        const identifier = this.getIdentifier(asset);
 			        if (this.entity?.identifier.assetUuid === identifier.assetUuid) {
-			            return await this.encode();
+			            return await this.encode(simpleNode);
 			        }
 			        const sceneAsset = await utils_1$7.sceneUtils.loadAny(identifier.assetUuid);
 			        const instance = await utils_1$7.sceneUtils.runScene(sceneAsset);
@@ -12595,7 +12874,7 @@ System.register(['cc'], (function (exports, module) {
 			            instance,
 			            identifier,
 			        });
-			        return this.encode();
+			        return this.encode(simpleNode);
 			    }
 			    async close() {
 			        if (!this.entity) {
@@ -12663,14 +12942,15 @@ System.register(['cc'], (function (exports, module) {
 			 */
 			class PrefabEditor extends base_editor_1.BaseEditor {
 			    virtualScene = null;
-			    async encode(entity) {
+			    async encode(simpleNode, entity) {
 			        entity = entity ?? this.entity;
 			        if (!entity) {
 			            throw new Error('encode 失败，没有打开预制体');
 			        }
-			        return utils_1$6.sceneUtils.generateNodeInfo(entity.instance, true);
+			        simpleNode = simpleNode ?? true;
+			        return utils_1$6.sceneUtils.generateNodeInfo(entity.instance, !simpleNode);
 			    }
-			    async open(asset) {
+			    async open(asset, simpleNode) {
 			        // 获取预制体标识符
 			        const identifier = this.getIdentifier(asset);
 			        // 加载预制体资源
@@ -12684,7 +12964,7 @@ System.register(['cc'], (function (exports, module) {
 			            identifier,
 			            instance
 			        });
-			        return this.encode();
+			        return this.encode(simpleNode);
 			    }
 			    async close() {
 			        if (!this.entity) {
@@ -12768,12 +13048,12 @@ System.register(['cc'], (function (exports, module) {
 			    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
 			    return c > 3 && r && Object.defineProperty(target, key, r), r;
 			};
-			var __importDefault$9 = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
+			var __importDefault$c = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
 			    return (mod && mod.__esModule) ? mod : { "default": mod };
 			};
 			Object.defineProperty(editor, "__esModule", { value: true });
 			editor.EditorService = void 0;
-			const cc_1$a = __importDefault$9(require$$0__default);
+			const cc_1$a = __importDefault$c(require$$0__default);
 			const core_1$9 = core;
 			const common_1$3 = common$1;
 			const editors_1 = editors;
@@ -12873,7 +13153,7 @@ System.register(['cc'], (function (exports, module) {
 			        return editor ? editor.getRootNode() : null;
 			    }
 			    async open(params) {
-			        const { urlOrUUID } = params;
+			        const { urlOrUUID, simpleNode = true } = params;
 			        const assetInfo = await this.queryAssetInfo(urlOrUUID);
 			        if (!assetInfo) {
 			            throw new Error(`通过 ${urlOrUUID} 无法打开，查询不到该资源信息`);
@@ -12919,7 +13199,7 @@ System.register(['cc'], (function (exports, module) {
 			                editor = this.createEditor(assetInfo.type);
 			                this.editorMap.set(uuid, editor);
 			            }
-			            const encode = await editor.open(assetInfo);
+			            const encode = await editor.open(assetInfo, simpleNode);
 			            // 设置当前打开的编辑器
 			            this.currentEditorUuid = assetInfo.uuid;
 			            this.emit('editor:open');
@@ -13534,7 +13814,7 @@ System.register(['cc'], (function (exports, module) {
 			    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
 			    return c > 3 && r && Object.defineProperty(target, key, r), r;
 			};
-			var __importDefault$8 = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
+			var __importDefault$b = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
 			    return (mod && mod.__esModule) ? mod : { "default": mod };
 			};
 			Object.defineProperty(node$1, "__esModule", { value: true });
@@ -13546,7 +13826,7 @@ System.register(['cc'], (function (exports, module) {
 			const node_create_1 = nodeCreate;
 			const node_utils_1$3 = nodeUtils;
 			const utils_1$5 = utils$6;
-			const node_type_config_1 = __importDefault$8(nodeTypeConfig);
+			const node_type_config_1 = __importDefault$b(nodeTypeConfig);
 			const NodeMgr$1 = EditorExtends.Node;
 			/**
 			 * 子进程节点处理器
@@ -18114,7 +18394,7 @@ System.register(['cc'], (function (exports, module) {
 			    };
 			};
 
-			var parse$1 = function (str, opts) {
+			var parse$3 = function (str, opts) {
 			    var options = normalizeParseOptions(opts);
 
 			    if (str === '' || str === null || typeof str === 'undefined') {
@@ -18141,12 +18421,12 @@ System.register(['cc'], (function (exports, module) {
 			};
 
 			var stringify = stringify_1;
-			var parse = parse$1;
+			var parse$2 = parse$3;
 			var formats = formats$3;
 
 			var lib = {
 			    formats: formats,
-			    parse: parse,
+			    parse: parse$2,
 			    stringify: stringify
 			};
 
@@ -18918,31 +19198,87 @@ System.register(['cc'], (function (exports, module) {
 			  if (host) { this.hostname = host; }
 			};
 
-			url.parse = urlParse;
-			url.resolve = urlResolve;
-			url.resolveObject = urlResolveObject;
-			url.format = urlFormat;
+			var parse$1 = url.parse = urlParse;
+			var resolve$1 = url.resolve = urlResolve;
+			var resolveObject = url.resolveObject = urlResolveObject;
+			var format$1 = url.format = urlFormat;
 
-			url.Url = Url;
+			var Url_1 = url.Url = Url;
 
-			var i18n$1 = {};
+			var _url = /*#__PURE__*/_mergeNamespaces({
+				__proto__: null,
+				parse: parse$1,
+				resolve: resolve$1,
+				resolveObject: resolveObject,
+				format: format$1,
+				Url: Url_1,
+				'default': url
+			}, [url]);
 
-			Object.defineProperty(i18n$1, "__esModule", { value: true });
-			i18n$1.i18nTranslate = void 0;
-			let i18n;
-			function i18nTranslate(textName, params) {
+			const URL$1 = url.URL || window.URL;
+			                                const URLSearchParams = url.URLSearchParams || window.URLSearchParams;
+			                                const parse = parse$1;
+			                                const format = format$1;
+			                                const resolve = resolve$1;
+			                                
+			                                function pathToFileURL(p) {
+			                                    let resolved = p.replace(/\\/g, '/');
+			                                    // Handle Windows drive letters: D:/... -> /D:/...
+			                                    if (resolved.match(/^[a-zA-Z]:/)) resolved = '/' + resolved;
+			                                    if (!resolved.startsWith('/')) resolved = '/' + resolved;
+			                                    return new URL$1('file://' + encodeURI(resolved).replace(/#/g, '%23').replace(/\?/g, '%3F'));
+			                                }
+			                                
+			                                function fileURLToPath(u) {
+			                                    if (typeof u === 'string') u = new URL$1(u);
+			                                    if (u.protocol !== 'file:') return u.href;
+			                                    let p = decodeURIComponent(u.pathname);
+			                                    if (p.match(/^\/[a-zA-Z]:/)) {
+			                                        p = p.substring(1).replace(/\//g, '\\');
+			                                    }
+			                                    return p;
+			                                }
+			                                
+			                                var _smartUrl = {
+			                                    ..._url,
+			                                    URL: URL$1,
+			                                    URLSearchParams,
+			                                    pathToFileURL,
+			                                    fileURLToPath
+			                                };
+
+			var _smartUrl$1 = /*#__PURE__*/Object.freeze({
+				__proto__: null,
+				URL: URL$1,
+				URLSearchParams: URLSearchParams,
+				parse: parse,
+				format: format,
+				resolve: resolve,
+				pathToFileURL: pathToFileURL,
+				fileURLToPath: fileURLToPath,
+				'default': _smartUrl
+			});
+
+			var require$$2 = /*@__PURE__*/getAugmentedNamespace(_smartUrl$1);
+
+			var i18n$3 = {};
+
+			Object.defineProperty(i18n$3, "__esModule", { value: true });
+			i18n$3.i18nTranslate = void 0;
+			let i18n$2;
+			function i18nTranslate$1(textName, params) {
 			    const prefix = 'lib-programming';
-			    if (i18n === undefined) {
+			    if (i18n$2 === undefined) {
 			        try {
-			            i18n = globalThis.Editor.I18n;
-			            i18n.register('zh', prefix, languages.zh);
-			            i18n.register('en', prefix, languages.en);
+			            i18n$2 = globalThis.Editor.I18n;
+			            i18n$2.register('zh', prefix, languages$1.zh);
+			            i18n$2.register('en', prefix, languages$1.en);
 			        }
 			        catch (_a) {
-			            i18n = null;
+			            i18n$2 = null;
 			        }
 			    }
-			    const result = i18n === null || i18n === void 0 ? void 0 : i18n.t(`${prefix}.${textName}`, params);
+			    const result = i18n$2 === null || i18n$2 === void 0 ? void 0 : i18n$2.t(`${prefix}.${textName}`, params);
 			    if (!result) {
 			        return `(i18n needed)${textName}: ${JSON.stringify(params)}`;
 			    }
@@ -18950,8 +19286,8 @@ System.register(['cc'], (function (exports, module) {
 			        return result;
 			    }
 			}
-			i18n$1.i18nTranslate = i18nTranslate;
-			const languages = {
+			i18n$3.i18nTranslate = i18nTranslate$1;
+			const languages$1 = {
 			    en: {
 			        'resolve_error_invalid_module_specifier': 'Invalid module specifier {specifier}',
 			        'resolve_error_invalid_package_configuration': 'Invalid package configuration at {packageURL}',
@@ -19015,43 +19351,70 @@ System.register(['cc'], (function (exports, module) {
 			    },
 			};
 
-			let realMod$4 = {};
-			                            const isBrowser$4 = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-			                            const isNode$4 = typeof process !== 'undefined' && process.versions && process.versions.node;
+			let realMod$3 = {};
+			                            const isBrowser$3 = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+			                            const isNode$3 = typeof process !== 'undefined' && process.versions && process.versions.node;
 			                            // Allow explicit override via global flag
-			                            const useRealNode$4 = (isNode$4 && !isBrowser$4 && globalThis.__ENABLE_NODE_BUILTINS__ !== false) || globalThis.__ENABLE_NODE_BUILTINS__ === true;
+			                            const useRealNode$3 = (isNode$3 && !isBrowser$3 && globalThis.__ENABLE_NODE_BUILTINS__ !== false) || globalThis.__ENABLE_NODE_BUILTINS__ === true;
 			                            
-			                            if (useRealNode$4) {
+			                            if (useRealNode$3) {
 			                                // Dynamic require to hide it from static analysis
 			                                const req = typeof require !== 'undefined' ? require : (typeof _cc_require !== 'undefined' ? _cc_require : null);
 			                                if (req) {
 			                                    try {
 			                                        const modName = 'cc/mods-mgr';
-			                                        realMod$4 = req(modName);
+			                                        realMod$3 = req(modName);
 			                                    } catch(e) {
 			                                        console.warn('Smart polyfill: failed to require cc/mods-mgr');
 			                                    }
 			                                }
 			                            }
 			                            
-			                            const existsSync$4 = realMod$4.existsSync || function() { return false; };
-			                            const readFileSync$4 = realMod$4.readFileSync || function() { return ''; };
-			                            const writeFileSync$4 = realMod$4.writeFileSync || function() {};
-			                            const remove$4 = realMod$4.remove || async function() {};
-			                            const readJSON$4 = realMod$4.readJSON || async function() { return {}; };
-			                            const statSync$4 = realMod$4.statSync || function() { return { isFile: () => false, isDirectory: () => false }; };
+			                            const existsSync$3 = realMod$3.existsSync || function() { return false; };
+			                            const readFileSync$3 = realMod$3.readFileSync || function() { return ''; };
+			                            const writeFileSync$3 = realMod$3.writeFileSync || function() {};
+			                            const remove$3 = realMod$3.remove || async function() {};
+			                            const readJSON$3 = realMod$3.readJSON || async function() { return { chunks: {}, entries: {} }; };
+			                            const readJson$3 = realMod$3.readJson || async function() { return { chunks: {}, entries: {} }; };
+			                            const statSync$3 = realMod$3.statSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const stat$3 = realMod$3.stat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstat$3 = realMod$3.lstat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstatSync$3 = realMod$3.lstatSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const mkdir$3 = realMod$3.mkdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const mkdirSync$3 = realMod$3.mkdirSync || function() {};
+			                            const rmdir$3 = realMod$3.rmdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const rmdirSync$3 = realMod$3.rmdirSync || function() {};
+			                            const realpath$3 = realMod$3.realpath || function(p, o, cb) { 
+			                                var fn = typeof o === 'function' ? o : cb; 
+			                                if (typeof fn === 'function') fn(null, p); 
+			                            };
+			                            const realpathSync$3 = realMod$3.realpathSync || function(p) { return p; };
+			                            const utimes$3 = realMod$3.utimes || function(p, a, m, cb) { cb && cb(null); };
+			                            const utimesSync$3 = realMod$3.utimesSync || function() {};
 			                            
 			                            var modsMgr = new Proxy({}, {
 			                                get(target, prop) {
-			                                    if (prop === 'existsSync') return existsSync$4;
-			                                    if (prop === 'readFileSync') return readFileSync$4;
-			                                    if (prop === 'writeFileSync') return writeFileSync$4;
-			                                    if (prop === 'remove') return remove$4;
-			                                    if (prop === 'readJSON') return readJSON$4;
-			                                    if (prop === 'statSync') return statSync$4;
+			                                    if (prop === 'existsSync') return existsSync$3;
+			                                    if (prop === 'readFileSync') return readFileSync$3;
+			                                    if (prop === 'writeFileSync') return writeFileSync$3;
+			                                    if (prop === 'remove') return remove$3;
+			                                    if (prop === 'readJSON') return readJSON$3;
+			                                    if (prop === 'readJson') return readJson$3;
+			                                    if (prop === 'statSync') return statSync$3;
+			                                    if (prop === 'stat') return stat$3;
+			                                    if (prop === 'lstat') return lstat$3;
+			                                    if (prop === 'lstatSync') return lstatSync$3;
+			                                    if (prop === 'mkdir') return mkdir$3;
+			                                    if (prop === 'mkdirSync') return mkdirSync$3;
+			                                    if (prop === 'rmdir') return rmdir$3;
+			                                    if (prop === 'rmdirSync') return rmdirSync$3;
+			                                    if (prop === 'realpath') return realpath$3;
+			                                    if (prop === 'realpathSync') return realpathSync$3;
+			                                    if (prop === 'utimes') return utimes$3;
+			                                    if (prop === 'utimesSync') return utimesSync$3;
 			                                    
-			                                    if (realMod$4 && prop in realMod$4) {
-			                                        return realMod$4[prop];
+			                                    if (realMod$3 && prop in realMod$3) {
+			                                        return realMod$3[prop];
 			                                    }
 			                                    
 			                                    // Fallback for missing methods
@@ -19064,27 +19427,39 @@ System.register(['cc'], (function (exports, module) {
 
 			var modsMgr$1 = /*#__PURE__*/Object.freeze({
 				__proto__: null,
-				existsSync: existsSync$4,
-				readFileSync: readFileSync$4,
-				writeFileSync: writeFileSync$4,
-				remove: remove$4,
-				readJSON: readJSON$4,
-				statSync: statSync$4,
+				existsSync: existsSync$3,
+				readFileSync: readFileSync$3,
+				writeFileSync: writeFileSync$3,
+				remove: remove$3,
+				readJSON: readJSON$3,
+				readJson: readJson$3,
+				statSync: statSync$3,
+				stat: stat$3,
+				lstat: lstat$3,
+				lstatSync: lstatSync$3,
+				mkdir: mkdir$3,
+				mkdirSync: mkdirSync$3,
+				rmdir: rmdir$3,
+				rmdirSync: rmdirSync$3,
+				realpath: realpath$3,
+				realpathSync: realpathSync$3,
+				utimes: utimes$3,
+				utimesSync: utimesSync$3,
 				'default': modsMgr
 			});
 
-			var require$$3 = /*@__PURE__*/getAugmentedNamespace(modsMgr$1);
+			var require$$3$1 = /*@__PURE__*/getAugmentedNamespace(modsMgr$1);
 
 			/// <reference path="../../@types/systemjs/systemjs.d.ts"/>
 			/// <reference path="../../@types/systemjs/extras/named-register.d.ts"/>
-			var __importDefault$7 = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
+			var __importDefault$a = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
 			    return (mod && mod.__esModule) ? mod : { "default": mod };
 			};
 			Object.defineProperty(editorSystemjs, "__esModule", { value: true });
 			editorSystemjs.globalEditorSystem = editorSystemjs.ExecutorSystem = void 0;
 			const out_1 = out;
-			const url_1$2 = __importDefault$7(url);
-			const i18n_1$1 = i18n$1;
+			const url_1$3 = __importDefault$a(require$$2);
+			const i18n_1$1 = i18n$3;
 			class ExecutorSystem {
 			    constructor() {
 			        this._registry = Object.create(null);
@@ -19196,7 +19571,7 @@ System.register(['cc'], (function (exports, module) {
 			        let path;
 			        if (url.startsWith('file:')) {
 			            try {
-			                path = url_1$2.default.fileURLToPath(url);
+			                path = url_1$3.default.fileURLToPath(url);
 			            }
 			            catch (_a) { }
 			        }
@@ -19207,7 +19582,7 @@ System.register(['cc'], (function (exports, module) {
 			            return [[], (exportBindings) => {
 			                    return {
 			                        execute: () => {
-			                            const modsMgr = require$$3;
+			                            const modsMgr = require$$3$1;
 			                            const mod = modsMgr.syncImport(id);
 			                            exportBindings(mod);
 			                        },
@@ -19241,67 +19616,108 @@ System.register(['cc'], (function (exports, module) {
 			ExecutorSystem.protocolHeadModsMgr = 'mods-mgr:';
 			editorSystemjs.globalEditorSystem = new ExecutorSystem();
 
-			let realMod$3 = {};
-			                            const isBrowser$3 = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-			                            const isNode$3 = typeof process !== 'undefined' && process.versions && process.versions.node;
-			                            // Allow explicit override via global flag
-			                            const useRealNode$3 = (isNode$3 && !isBrowser$3 && globalThis.__ENABLE_NODE_BUILTINS__ !== false) || globalThis.__ENABLE_NODE_BUILTINS__ === true;
-			                            
-			                            if (useRealNode$3) {
-			                                // Dynamic require to hide it from static analysis
-			                                const req = typeof require !== 'undefined' ? require : (typeof _cc_require !== 'undefined' ? _cc_require : null);
-			                                if (req) {
-			                                    try {
-			                                        const modName = '@cocos/creator-programming-quick-pack/lib/loader';
-			                                        realMod$3 = req(modName);
-			                                    } catch(e) {
-			                                        console.warn('Smart polyfill: failed to require @cocos/creator-programming-quick-pack/lib/loader');
-			                                    }
-			                                }
-			                            }
-			                            
-			                            const existsSync$3 = realMod$3.existsSync || function() { return false; };
-			                            const readFileSync$3 = realMod$3.readFileSync || function() { return ''; };
-			                            const writeFileSync$3 = realMod$3.writeFileSync || function() {};
-			                            const remove$3 = realMod$3.remove || async function() {};
-			                            const readJSON$3 = realMod$3.readJSON || async function() { return {}; };
-			                            const statSync$3 = realMod$3.statSync || function() { return { isFile: () => false, isDirectory: () => false }; };
-			                            
-			                            var loader = new Proxy({}, {
-			                                get(target, prop) {
-			                                    if (prop === 'existsSync') return existsSync$3;
-			                                    if (prop === 'readFileSync') return readFileSync$3;
-			                                    if (prop === 'writeFileSync') return writeFileSync$3;
-			                                    if (prop === 'remove') return remove$3;
-			                                    if (prop === 'readJSON') return readJSON$3;
-			                                    if (prop === 'statSync') return statSync$3;
-			                                    
-			                                    if (realMod$3 && prop in realMod$3) {
-			                                        return realMod$3[prop];
-			                                    }
-			                                    
-			                                    // Fallback for missing methods
-			                                    if (typeof prop === 'string') {
-			                                        return function() {};
-			                                    }
-			                                    return undefined;
-			                                }
-			                            });
+			var loader = {};
 
-			var loader$1 = /*#__PURE__*/Object.freeze({
-				__proto__: null,
-				existsSync: existsSync$3,
-				readFileSync: readFileSync$3,
-				writeFileSync: writeFileSync$3,
-				remove: remove$3,
-				readJSON: readJSON$3,
-				statSync: statSync$3,
-				'default': loader
-			});
+			var loaderContext = {};
 
-			var require$$2 = /*@__PURE__*/getAugmentedNamespace(loader$1);
+			Object.defineProperty(loaderContext, "__esModule", { value: true });
+			loaderContext.LoaderContext = void 0;
+			class LoaderContext {
+			    constructor(workspace) {
+			        this.workspace = workspace;
+			    }
+			    serialize() {
+			        return {
+			            workspace: this.workspace,
+			        };
+			    }
+			    static deserialize(serialized) {
+			        return new LoaderContext(serialized.workspace);
+			    }
+			}
+			loaderContext.LoaderContext = LoaderContext;
 
-			var packModInstantiation = {};
+			var base = {};
+
+			var __importDefault$9 = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
+			    return (mod && mod.__esModule) ? mod : { "default": mod };
+			};
+			Object.defineProperty(base, "__esModule", { value: true });
+			base.ChunkIOBase = void 0;
+			const path_1$2 = __importDefault$9(pathBrowserify);
+			const fs_extra_1$1 = __importDefault$9(require$$2$2);
+			class ChunkIOBase {
+			    constructor({ chunkHomePath, }) {
+			        this._build = {
+			            chunks: {},
+			            entries: {},
+			        };
+			        this._chunkHomePath = path_1$2.default.normalize(chunkHomePath);
+			    }
+			    removeEntry(errFile) {
+			        if (!errFile)
+			            return;
+			        const chunkId = this._build.entries[errFile];
+			        delete this._build.entries[errFile];
+			        if (!chunkId)
+			            return;
+			        //remove depends on chunkId
+			        const chunks = this._build.chunks;
+			        for (const [uid, chunk] of Object.entries(chunks)) {
+			            const imports = chunk.imports;
+			            const importsEntries = Object.entries(imports);
+			            if (importsEntries.length === 0) {
+			                continue;
+			            }
+			            for (const [specifier, { resolved, messages }] of importsEntries) {
+			                if (resolved.type === 'chunk' && resolved.id === chunkId) {
+			                    delete imports[specifier];
+			                    continue;
+			                }
+			            }
+			        }
+			        delete chunks[chunkId];
+			    }
+			    serializeRecord() {
+			        return this._build;
+			    }
+			    deserializeRecord(json) {
+			        this._build = json;
+			    }
+			    clear() {
+			        try {
+			            fs_extra_1$1.default.removeSync(this._chunkHomePath);
+			        }
+			        catch (err) {
+			        }
+			    }
+			    _calculateChunkCodeFileName(chunkId) {
+			        return path_1$2.default.join(this._chunkHomePath, this.calculateChunkCodeFileRelativePath(chunkId));
+			    }
+			    calculateChunkCodeFileRelativePath(chunkId) {
+			        return `${chunkId.slice(0, 2)}/${chunkId}.js`;
+			    }
+			    queryAllTimestamps() {
+			        const result = {};
+			        for (const [chunkId, { timestamp }] of Object.entries(this._build.chunks)) {
+			            const relativePath = this.calculateChunkCodeFileRelativePath(chunkId);
+			            result[relativePath] = timestamp;
+			        }
+			        return result;
+			    }
+			}
+			base.ChunkIOBase = ChunkIOBase;
+
+			var i18n$1 = {};
+
+			var util = {};
+
+			var isBufferBrowser = function isBuffer(arg) {
+			  return arg && typeof arg === 'object'
+			    && typeof arg.copy === 'function'
+			    && typeof arg.fill === 'function'
+			    && typeof arg.readUInt8 === 'function';
+			};
 
 			let realMod$2 = {};
 			                            const isBrowser$2 = typeof window !== 'undefined' && typeof window.document !== 'undefined';
@@ -19314,10 +19730,10 @@ System.register(['cc'], (function (exports, module) {
 			                                const req = typeof require !== 'undefined' ? require : (typeof _cc_require !== 'undefined' ? _cc_require : null);
 			                                if (req) {
 			                                    try {
-			                                        const modName = 'vm';
+			                                        const modName = 'inherits';
 			                                        realMod$2 = req(modName);
 			                                    } catch(e) {
-			                                        console.warn('Smart polyfill: failed to require vm');
+			                                        console.warn('Smart polyfill: failed to require inherits');
 			                                    }
 			                                }
 			                            }
@@ -19326,17 +19742,44 @@ System.register(['cc'], (function (exports, module) {
 			                            const readFileSync$2 = realMod$2.readFileSync || function() { return ''; };
 			                            const writeFileSync$2 = realMod$2.writeFileSync || function() {};
 			                            const remove$2 = realMod$2.remove || async function() {};
-			                            const readJSON$2 = realMod$2.readJSON || async function() { return {}; };
-			                            const statSync$2 = realMod$2.statSync || function() { return { isFile: () => false, isDirectory: () => false }; };
+			                            const readJSON$2 = realMod$2.readJSON || async function() { return { chunks: {}, entries: {} }; };
+			                            const readJson$2 = realMod$2.readJson || async function() { return { chunks: {}, entries: {} }; };
+			                            const statSync$2 = realMod$2.statSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const stat$2 = realMod$2.stat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstat$2 = realMod$2.lstat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstatSync$2 = realMod$2.lstatSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const mkdir$2 = realMod$2.mkdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const mkdirSync$2 = realMod$2.mkdirSync || function() {};
+			                            const rmdir$2 = realMod$2.rmdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const rmdirSync$2 = realMod$2.rmdirSync || function() {};
+			                            const realpath$2 = realMod$2.realpath || function(p, o, cb) { 
+			                                var fn = typeof o === 'function' ? o : cb; 
+			                                if (typeof fn === 'function') fn(null, p); 
+			                            };
+			                            const realpathSync$2 = realMod$2.realpathSync || function(p) { return p; };
+			                            const utimes$2 = realMod$2.utimes || function(p, a, m, cb) { cb && cb(null); };
+			                            const utimesSync$2 = realMod$2.utimesSync || function() {};
 			                            
-			                            var _smartVm = new Proxy({}, {
+			                            var _smartInherits = new Proxy({}, {
 			                                get(target, prop) {
 			                                    if (prop === 'existsSync') return existsSync$2;
 			                                    if (prop === 'readFileSync') return readFileSync$2;
 			                                    if (prop === 'writeFileSync') return writeFileSync$2;
 			                                    if (prop === 'remove') return remove$2;
 			                                    if (prop === 'readJSON') return readJSON$2;
+			                                    if (prop === 'readJson') return readJson$2;
 			                                    if (prop === 'statSync') return statSync$2;
+			                                    if (prop === 'stat') return stat$2;
+			                                    if (prop === 'lstat') return lstat$2;
+			                                    if (prop === 'lstatSync') return lstatSync$2;
+			                                    if (prop === 'mkdir') return mkdir$2;
+			                                    if (prop === 'mkdirSync') return mkdirSync$2;
+			                                    if (prop === 'rmdir') return rmdir$2;
+			                                    if (prop === 'rmdirSync') return rmdirSync$2;
+			                                    if (prop === 'realpath') return realpath$2;
+			                                    if (prop === 'realpathSync') return realpathSync$2;
+			                                    if (prop === 'utimes') return utimes$2;
+			                                    if (prop === 'utimesSync') return utimesSync$2;
 			                                    
 			                                    if (realMod$2 && prop in realMod$2) {
 			                                        return realMod$2[prop];
@@ -19350,20 +19793,937 @@ System.register(['cc'], (function (exports, module) {
 			                                }
 			                            });
 
-			var _smartVm$1 = /*#__PURE__*/Object.freeze({
+			var _smartInherits$1 = /*#__PURE__*/Object.freeze({
 				__proto__: null,
 				existsSync: existsSync$2,
 				readFileSync: readFileSync$2,
 				writeFileSync: writeFileSync$2,
 				remove: remove$2,
 				readJSON: readJSON$2,
+				readJson: readJson$2,
 				statSync: statSync$2,
-				'default': _smartVm
+				stat: stat$2,
+				lstat: lstat$2,
+				lstatSync: lstatSync$2,
+				mkdir: mkdir$2,
+				mkdirSync: mkdirSync$2,
+				rmdir: rmdir$2,
+				rmdirSync: rmdirSync$2,
+				realpath: realpath$2,
+				realpathSync: realpathSync$2,
+				utimes: utimes$2,
+				utimesSync: utimesSync$2,
+				'default': _smartInherits
 			});
 
-			var require$$0$1 = /*@__PURE__*/getAugmentedNamespace(_smartVm$1);
+			var require$$1 = /*@__PURE__*/getAugmentedNamespace(_smartInherits$1);
 
-			var asserts$1 = {};
+			(function (exports) {
+				// Copyright Joyent, Inc. and other Node contributors.
+				//
+				// Permission is hereby granted, free of charge, to any person obtaining a
+				// copy of this software and associated documentation files (the
+				// "Software"), to deal in the Software without restriction, including
+				// without limitation the rights to use, copy, modify, merge, publish,
+				// distribute, sublicense, and/or sell copies of the Software, and to permit
+				// persons to whom the Software is furnished to do so, subject to the
+				// following conditions:
+				//
+				// The above copyright notice and this permission notice shall be included
+				// in all copies or substantial portions of the Software.
+				//
+				// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+				// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+				// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+				// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+				// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+				// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+				// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+				var formatRegExp = /%[sdj%]/g;
+				exports.format = function(f) {
+				  if (!isString(f)) {
+				    var objects = [];
+				    for (var i = 0; i < arguments.length; i++) {
+				      objects.push(inspect(arguments[i]));
+				    }
+				    return objects.join(' ');
+				  }
+
+				  var i = 1;
+				  var args = arguments;
+				  var len = args.length;
+				  var str = String(f).replace(formatRegExp, function(x) {
+				    if (x === '%%') return '%';
+				    if (i >= len) return x;
+				    switch (x) {
+				      case '%s': return String(args[i++]);
+				      case '%d': return Number(args[i++]);
+				      case '%j':
+				        try {
+				          return JSON.stringify(args[i++]);
+				        } catch (_) {
+				          return '[Circular]';
+				        }
+				      default:
+				        return x;
+				    }
+				  });
+				  for (var x = args[i]; i < len; x = args[++i]) {
+				    if (isNull(x) || !isObject(x)) {
+				      str += ' ' + x;
+				    } else {
+				      str += ' ' + inspect(x);
+				    }
+				  }
+				  return str;
+				};
+
+
+				// Mark that a method should not be used.
+				// Returns a modified function which warns once by default.
+				// If --no-deprecation is set, then it is a no-op.
+				exports.deprecate = function(fn, msg) {
+				  // Allow for deprecating things in the process of starting up.
+				  if (isUndefined(commonjsGlobal.process)) {
+				    return function() {
+				      return exports.deprecate(fn, msg).apply(this, arguments);
+				    };
+				  }
+
+				  if (process.noDeprecation === true) {
+				    return fn;
+				  }
+
+				  var warned = false;
+				  function deprecated() {
+				    if (!warned) {
+				      if (process.throwDeprecation) {
+				        throw new Error(msg);
+				      } else if (process.traceDeprecation) {
+				        console.trace(msg);
+				      } else {
+				        console.error(msg);
+				      }
+				      warned = true;
+				    }
+				    return fn.apply(this, arguments);
+				  }
+
+				  return deprecated;
+				};
+
+
+				var debugs = {};
+				var debugEnviron;
+				exports.debuglog = function(set) {
+				  if (isUndefined(debugEnviron))
+				    debugEnviron = process.env.NODE_DEBUG || '';
+				  set = set.toUpperCase();
+				  if (!debugs[set]) {
+				    if (new RegExp('\\b' + set + '\\b', 'i').test(debugEnviron)) {
+				      var pid = process.pid;
+				      debugs[set] = function() {
+				        var msg = exports.format.apply(exports, arguments);
+				        console.error('%s %d: %s', set, pid, msg);
+				      };
+				    } else {
+				      debugs[set] = function() {};
+				    }
+				  }
+				  return debugs[set];
+				};
+
+
+				/**
+				 * Echos the value of a value. Trys to print the value out
+				 * in the best way possible given the different types.
+				 *
+				 * @param {Object} obj The object to print out.
+				 * @param {Object} opts Optional options object that alters the output.
+				 */
+				/* legacy: obj, showHidden, depth, colors*/
+				function inspect(obj, opts) {
+				  // default options
+				  var ctx = {
+				    seen: [],
+				    stylize: stylizeNoColor
+				  };
+				  // legacy...
+				  if (arguments.length >= 3) ctx.depth = arguments[2];
+				  if (arguments.length >= 4) ctx.colors = arguments[3];
+				  if (isBoolean(opts)) {
+				    // legacy...
+				    ctx.showHidden = opts;
+				  } else if (opts) {
+				    // got an "options" object
+				    exports._extend(ctx, opts);
+				  }
+				  // set default options
+				  if (isUndefined(ctx.showHidden)) ctx.showHidden = false;
+				  if (isUndefined(ctx.depth)) ctx.depth = 2;
+				  if (isUndefined(ctx.colors)) ctx.colors = false;
+				  if (isUndefined(ctx.customInspect)) ctx.customInspect = true;
+				  if (ctx.colors) ctx.stylize = stylizeWithColor;
+				  return formatValue(ctx, obj, ctx.depth);
+				}
+				exports.inspect = inspect;
+
+
+				// http://en.wikipedia.org/wiki/ANSI_escape_code#graphics
+				inspect.colors = {
+				  'bold' : [1, 22],
+				  'italic' : [3, 23],
+				  'underline' : [4, 24],
+				  'inverse' : [7, 27],
+				  'white' : [37, 39],
+				  'grey' : [90, 39],
+				  'black' : [30, 39],
+				  'blue' : [34, 39],
+				  'cyan' : [36, 39],
+				  'green' : [32, 39],
+				  'magenta' : [35, 39],
+				  'red' : [31, 39],
+				  'yellow' : [33, 39]
+				};
+
+				// Don't use 'blue' not visible on cmd.exe
+				inspect.styles = {
+				  'special': 'cyan',
+				  'number': 'yellow',
+				  'boolean': 'yellow',
+				  'undefined': 'grey',
+				  'null': 'bold',
+				  'string': 'green',
+				  'date': 'magenta',
+				  // "name": intentionally not styling
+				  'regexp': 'red'
+				};
+
+
+				function stylizeWithColor(str, styleType) {
+				  var style = inspect.styles[styleType];
+
+				  if (style) {
+				    return '\u001b[' + inspect.colors[style][0] + 'm' + str +
+				           '\u001b[' + inspect.colors[style][1] + 'm';
+				  } else {
+				    return str;
+				  }
+				}
+
+
+				function stylizeNoColor(str, styleType) {
+				  return str;
+				}
+
+
+				function arrayToHash(array) {
+				  var hash = {};
+
+				  array.forEach(function(val, idx) {
+				    hash[val] = true;
+				  });
+
+				  return hash;
+				}
+
+
+				function formatValue(ctx, value, recurseTimes) {
+				  // Provide a hook for user-specified inspect functions.
+				  // Check that value is an object with an inspect function on it
+				  if (ctx.customInspect &&
+				      value &&
+				      isFunction(value.inspect) &&
+				      // Filter out the util module, it's inspect function is special
+				      value.inspect !== exports.inspect &&
+				      // Also filter out any prototype objects using the circular check.
+				      !(value.constructor && value.constructor.prototype === value)) {
+				    var ret = value.inspect(recurseTimes, ctx);
+				    if (!isString(ret)) {
+				      ret = formatValue(ctx, ret, recurseTimes);
+				    }
+				    return ret;
+				  }
+
+				  // Primitive types cannot have properties
+				  var primitive = formatPrimitive(ctx, value);
+				  if (primitive) {
+				    return primitive;
+				  }
+
+				  // Look up the keys of the object.
+				  var keys = Object.keys(value);
+				  var visibleKeys = arrayToHash(keys);
+
+				  if (ctx.showHidden) {
+				    keys = Object.getOwnPropertyNames(value);
+				  }
+
+				  // IE doesn't make error fields non-enumerable
+				  // http://msdn.microsoft.com/en-us/library/ie/dww52sbt(v=vs.94).aspx
+				  if (isError(value)
+				      && (keys.indexOf('message') >= 0 || keys.indexOf('description') >= 0)) {
+				    return formatError(value);
+				  }
+
+				  // Some type of object without properties can be shortcutted.
+				  if (keys.length === 0) {
+				    if (isFunction(value)) {
+				      var name = value.name ? ': ' + value.name : '';
+				      return ctx.stylize('[Function' + name + ']', 'special');
+				    }
+				    if (isRegExp(value)) {
+				      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
+				    }
+				    if (isDate(value)) {
+				      return ctx.stylize(Date.prototype.toString.call(value), 'date');
+				    }
+				    if (isError(value)) {
+				      return formatError(value);
+				    }
+				  }
+
+				  var base = '', array = false, braces = ['{', '}'];
+
+				  // Make Array say that they are Array
+				  if (isArray(value)) {
+				    array = true;
+				    braces = ['[', ']'];
+				  }
+
+				  // Make functions say that they are functions
+				  if (isFunction(value)) {
+				    var n = value.name ? ': ' + value.name : '';
+				    base = ' [Function' + n + ']';
+				  }
+
+				  // Make RegExps say that they are RegExps
+				  if (isRegExp(value)) {
+				    base = ' ' + RegExp.prototype.toString.call(value);
+				  }
+
+				  // Make dates with properties first say the date
+				  if (isDate(value)) {
+				    base = ' ' + Date.prototype.toUTCString.call(value);
+				  }
+
+				  // Make error with message first say the error
+				  if (isError(value)) {
+				    base = ' ' + formatError(value);
+				  }
+
+				  if (keys.length === 0 && (!array || value.length == 0)) {
+				    return braces[0] + base + braces[1];
+				  }
+
+				  if (recurseTimes < 0) {
+				    if (isRegExp(value)) {
+				      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
+				    } else {
+				      return ctx.stylize('[Object]', 'special');
+				    }
+				  }
+
+				  ctx.seen.push(value);
+
+				  var output;
+				  if (array) {
+				    output = formatArray(ctx, value, recurseTimes, visibleKeys, keys);
+				  } else {
+				    output = keys.map(function(key) {
+				      return formatProperty(ctx, value, recurseTimes, visibleKeys, key, array);
+				    });
+				  }
+
+				  ctx.seen.pop();
+
+				  return reduceToSingleString(output, base, braces);
+				}
+
+
+				function formatPrimitive(ctx, value) {
+				  if (isUndefined(value))
+				    return ctx.stylize('undefined', 'undefined');
+				  if (isString(value)) {
+				    var simple = '\'' + JSON.stringify(value).replace(/^"|"$/g, '')
+				                                             .replace(/'/g, "\\'")
+				                                             .replace(/\\"/g, '"') + '\'';
+				    return ctx.stylize(simple, 'string');
+				  }
+				  if (isNumber(value))
+				    return ctx.stylize('' + value, 'number');
+				  if (isBoolean(value))
+				    return ctx.stylize('' + value, 'boolean');
+				  // For some reason typeof null is "object", so special case here.
+				  if (isNull(value))
+				    return ctx.stylize('null', 'null');
+				}
+
+
+				function formatError(value) {
+				  return '[' + Error.prototype.toString.call(value) + ']';
+				}
+
+
+				function formatArray(ctx, value, recurseTimes, visibleKeys, keys) {
+				  var output = [];
+				  for (var i = 0, l = value.length; i < l; ++i) {
+				    if (hasOwnProperty(value, String(i))) {
+				      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
+				          String(i), true));
+				    } else {
+				      output.push('');
+				    }
+				  }
+				  keys.forEach(function(key) {
+				    if (!key.match(/^\d+$/)) {
+				      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
+				          key, true));
+				    }
+				  });
+				  return output;
+				}
+
+
+				function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
+				  var name, str, desc;
+				  desc = Object.getOwnPropertyDescriptor(value, key) || { value: value[key] };
+				  if (desc.get) {
+				    if (desc.set) {
+				      str = ctx.stylize('[Getter/Setter]', 'special');
+				    } else {
+				      str = ctx.stylize('[Getter]', 'special');
+				    }
+				  } else {
+				    if (desc.set) {
+				      str = ctx.stylize('[Setter]', 'special');
+				    }
+				  }
+				  if (!hasOwnProperty(visibleKeys, key)) {
+				    name = '[' + key + ']';
+				  }
+				  if (!str) {
+				    if (ctx.seen.indexOf(desc.value) < 0) {
+				      if (isNull(recurseTimes)) {
+				        str = formatValue(ctx, desc.value, null);
+				      } else {
+				        str = formatValue(ctx, desc.value, recurseTimes - 1);
+				      }
+				      if (str.indexOf('\n') > -1) {
+				        if (array) {
+				          str = str.split('\n').map(function(line) {
+				            return '  ' + line;
+				          }).join('\n').substr(2);
+				        } else {
+				          str = '\n' + str.split('\n').map(function(line) {
+				            return '   ' + line;
+				          }).join('\n');
+				        }
+				      }
+				    } else {
+				      str = ctx.stylize('[Circular]', 'special');
+				    }
+				  }
+				  if (isUndefined(name)) {
+				    if (array && key.match(/^\d+$/)) {
+				      return str;
+				    }
+				    name = JSON.stringify('' + key);
+				    if (name.match(/^"([a-zA-Z_][a-zA-Z_0-9]*)"$/)) {
+				      name = name.substr(1, name.length - 2);
+				      name = ctx.stylize(name, 'name');
+				    } else {
+				      name = name.replace(/'/g, "\\'")
+				                 .replace(/\\"/g, '"')
+				                 .replace(/(^"|"$)/g, "'");
+				      name = ctx.stylize(name, 'string');
+				    }
+				  }
+
+				  return name + ': ' + str;
+				}
+
+
+				function reduceToSingleString(output, base, braces) {
+				  var length = output.reduce(function(prev, cur) {
+				    if (cur.indexOf('\n') >= 0) ;
+				    return prev + cur.replace(/\u001b\[\d\d?m/g, '').length + 1;
+				  }, 0);
+
+				  if (length > 60) {
+				    return braces[0] +
+				           (base === '' ? '' : base + '\n ') +
+				           ' ' +
+				           output.join(',\n  ') +
+				           ' ' +
+				           braces[1];
+				  }
+
+				  return braces[0] + base + ' ' + output.join(', ') + ' ' + braces[1];
+				}
+
+
+				// NOTE: These type checking functions intentionally don't use `instanceof`
+				// because it is fragile and can be easily faked with `Object.create()`.
+				function isArray(ar) {
+				  return Array.isArray(ar);
+				}
+				exports.isArray = isArray;
+
+				function isBoolean(arg) {
+				  return typeof arg === 'boolean';
+				}
+				exports.isBoolean = isBoolean;
+
+				function isNull(arg) {
+				  return arg === null;
+				}
+				exports.isNull = isNull;
+
+				function isNullOrUndefined(arg) {
+				  return arg == null;
+				}
+				exports.isNullOrUndefined = isNullOrUndefined;
+
+				function isNumber(arg) {
+				  return typeof arg === 'number';
+				}
+				exports.isNumber = isNumber;
+
+				function isString(arg) {
+				  return typeof arg === 'string';
+				}
+				exports.isString = isString;
+
+				function isSymbol(arg) {
+				  return typeof arg === 'symbol';
+				}
+				exports.isSymbol = isSymbol;
+
+				function isUndefined(arg) {
+				  return arg === void 0;
+				}
+				exports.isUndefined = isUndefined;
+
+				function isRegExp(re) {
+				  return isObject(re) && objectToString(re) === '[object RegExp]';
+				}
+				exports.isRegExp = isRegExp;
+
+				function isObject(arg) {
+				  return typeof arg === 'object' && arg !== null;
+				}
+				exports.isObject = isObject;
+
+				function isDate(d) {
+				  return isObject(d) && objectToString(d) === '[object Date]';
+				}
+				exports.isDate = isDate;
+
+				function isError(e) {
+				  return isObject(e) &&
+				      (objectToString(e) === '[object Error]' || e instanceof Error);
+				}
+				exports.isError = isError;
+
+				function isFunction(arg) {
+				  return typeof arg === 'function';
+				}
+				exports.isFunction = isFunction;
+
+				function isPrimitive(arg) {
+				  return arg === null ||
+				         typeof arg === 'boolean' ||
+				         typeof arg === 'number' ||
+				         typeof arg === 'string' ||
+				         typeof arg === 'symbol' ||  // ES6 symbol
+				         typeof arg === 'undefined';
+				}
+				exports.isPrimitive = isPrimitive;
+
+				exports.isBuffer = isBufferBrowser;
+
+				function objectToString(o) {
+				  return Object.prototype.toString.call(o);
+				}
+
+
+				function pad(n) {
+				  return n < 10 ? '0' + n.toString(10) : n.toString(10);
+				}
+
+
+				var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
+				              'Oct', 'Nov', 'Dec'];
+
+				// 26 Feb 16:19:34
+				function timestamp() {
+				  var d = new Date();
+				  var time = [pad(d.getHours()),
+				              pad(d.getMinutes()),
+				              pad(d.getSeconds())].join(':');
+				  return [d.getDate(), months[d.getMonth()], time].join(' ');
+				}
+
+
+				// log is just a thin wrapper to console.log that prepends a timestamp
+				exports.log = function() {
+				  console.log('%s - %s', timestamp(), exports.format.apply(exports, arguments));
+				};
+
+
+				/**
+				 * Inherit the prototype methods from one constructor into another.
+				 *
+				 * The Function.prototype.inherits from lang.js rewritten as a standalone
+				 * function (not on Function.prototype). NOTE: If this file is to be loaded
+				 * during bootstrapping this function needs to be rewritten using some native
+				 * functions as prototype setup using normal JavaScript does not work as
+				 * expected during bootstrapping (see mirror.js in r114903).
+				 *
+				 * @param {function} ctor Constructor function which needs to inherit the
+				 *     prototype.
+				 * @param {function} superCtor Constructor function to inherit prototype from.
+				 */
+				exports.inherits = require$$1;
+
+				exports._extend = function(origin, add) {
+				  // Don't do anything if add isn't an object
+				  if (!add || !isObject(add)) return origin;
+
+				  var keys = Object.keys(add);
+				  var i = keys.length;
+				  while (i--) {
+				    origin[keys[i]] = add[keys[i]];
+				  }
+				  return origin;
+				};
+
+				function hasOwnProperty(obj, prop) {
+				  return Object.prototype.hasOwnProperty.call(obj, prop);
+				} 
+			} (util));
+
+			var __importDefault$8 = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
+			    return (mod && mod.__esModule) ? mod : { "default": mod };
+			};
+			Object.defineProperty(i18n$1, "__esModule", { value: true });
+			i18n$1.i18nTranslate = void 0;
+			const util_1$1 = __importDefault$8(util);
+			let i18n;
+			function i18nTranslate(textName, params) {
+			    const prefix = 'lib-programming';
+			    if (i18n === undefined) {
+			        try {
+			            i18n = globalThis.Editor.I18n;
+			            i18n.register('zh', prefix, languages.zh);
+			            i18n.register('en', prefix, languages.en);
+			        }
+			        catch (_a) {
+			            i18n = null;
+			        }
+			    }
+			    const result = i18n === null || i18n === void 0 ? void 0 : i18n.t(`${prefix}.${textName}`, params);
+			    if (!result) {
+			        return `(i18n needed)${textName}: ${JSON.stringify(params, (_key, value) => {
+            return value instanceof Error
+                ? util_1$1.default.format(value)
+                : value;
+        })}`;
+			    }
+			    else {
+			        return result;
+			    }
+			}
+			i18n$1.i18nTranslate = i18nTranslate;
+			const languages = {
+			    en: {
+			        'resolve_error_invalid_module_specifier': 'Invalid module specifier {specifier}',
+			        'resolve_error_invalid_package_configuration': 'Invalid package configuration at {packageURL}',
+			        'resolve_error_invalid_package_target': 'Invalid package target at {packageURL}',
+			        'resolve_error_package_path_not_exported': 'Subpath "{subpath}" is not exported in package {packageURL}',
+			        'resolve_error_package_imports_not_defined': 'Package imports of package {packageURL} do not define the specifier {specifier}.',
+			        'resolve_error_module_not_found': 'Module "{specifier}" not found for {parentURL}',
+			        'resolve_unsupported_directory_import': 'Directory import is not supported',
+			        'import_map_parse_error': 'Import map parse error',
+			        'import_map_null_entry_error': 'Import map null entry touched',
+			        'import_map_import_match_error': 'Import map match error',
+			        'import_map_back_tracking_error': 'Import map can not backtrack above its prefix {prefix}',
+			        'modLo_can_not_be_base_url_error': 'The resolved URL {url} must not be in "cannot-be-a-base-URL" state',
+			        'modLo_cjs_interop_error': 'Cannot access CommonJS module {url} from the source module: {error}',
+			        'modLo_cjs_module_not_file_error': 'CommonJS module {url} is not file module',
+			        'modLo_access_denied_error': 'Can not load module {url}. Cause: ',
+			        'modLo_access_denied_error_default_reason': 'Unknown module.',
+			        'modLo_access_denied_error_unsupported_node_builtins': 'Node.js builtin modules are not provided by Cocos Creator.',
+			        'modLo_access_denied_error_db_not_mounted': 'The asset database {domain} is not mounted. Please check to see if related plugin is enabled.',
+			        'modLo_fetch_file_error': 'Error when fetching file {path}: {cause}',
+			        'quick_pack_could_not_resolve_entry': 'Could not resolve entry {specifier}',
+			        'quick_pack_failed_to_load': 'Failed to load module {url}: {cause}.',
+			        'quick_pack_failed_to_resolve': 'Failed to resolve {specifier} from {parentURL}, treat it as external dependency.\nWhich is caused by: {cause}',
+			        'load_error_hint_node_builtin': 'Seems like you\'re attempted to import a Node.js builtin module. ' +
+			            'Note, Node.js builtin modules are not integrated within Creator.',
+			        'resolve_error_hint_extension': 'Did you forget the extension? Please note that you can not omit extension in module specifier.',
+			        'quick_pack_loader_resource_not_found_error': 'Packed resource {id} not found.',
+			        'executor_failed_to_resolve': 'Failed to resolve {specifier} from {parentURL}.',
+			        'executor_system_js_origin': '<origin>',
+			        'executor_system_js_no_module_registered': 'Invalid module {url}: there ain\'t no module registered. This might be an internal error.',
+			        'executor_failed_to_instantiate': 'Failed to instantiate {url} from {firstParentURL}.',
+			        'executor_pack_mod_instantiation_error_host_resolve_error': 'The host could not resolve code chunk {url}\ncaused by\n{reason}',
+			        'executor_pack_mod_instantiation_error_host_execute_error': 'Error occurred when executing code chunk {url}\ncaused by\n{reason}',
+			    },
+			    zh: {
+			        'resolve_error_invalid_module_specifier': '无效的模块说明符：{specifier}',
+			        'resolve_error_invalid_package_configuration': '{packageURL} 的配置是无效的',
+			        'resolve_error_invalid_package_target': '{packageURL} 的 target 配置是无效的',
+			        'resolve_error_package_path_not_exported': '子路径 "{subpath}" 未在 {packageURL} 中导出',
+			        'resolve_error_package_imports_not_defined': '包 {packageURL} 许可的导入中不包含 {specifier}',
+			        'resolve_error_module_not_found': '以 {parentURL} 为起点找不到模块 "{specifier}"',
+			        'resolve_unsupported_directory_import': '不支持目录导入',
+			        'import_map_parse_error': 'Import map 解析错误',
+			        'import_map_null_entry_error': 'Import map 空项目',
+			        'import_map_import_match_error': 'Import map 匹配错误',
+			        'import_map_back_tracking_error': '不能回溯至它的前缀 {prefix}',
+			        'modLo_can_not_be_base_url_error': '解析出的 URL {url} 不能为 "cannot-be-a-base-URL" 状态',
+			        'modLo_cjs_interop_error': '不允许从源模块中访问 CommonJS 模块 {url}，因为 {error}',
+			        'modLo_cjs_module_not_file_error': 'CommonJS 模块 {url} 不是文件模块',
+			        'modLo_access_denied_error': '无法加载模块 {url}，这是因为：',
+			        'modLo_access_denied_error_default_reason': '未知来源的模块。',
+			        'modLo_access_denied_error_unsupported_node_builtins': 'Cocos Creator 不提供 Node.js 内置模块。',
+			        'modLo_access_denied_error_db_not_mounted': '资产数据库 {domain} 未挂载，请检查相关的插件是否正确启用。',
+			        'modLo_fetch_file_error': '在加载模块文件 {path} 时发生错误：{cause}',
+			        'quick_pack_could_not_resolve_entry': '无法解析入口 {specifier}。',
+			        'quick_pack_failed_to_load': '无法加载模块 {url} ：{cause}.',
+			        'quick_pack_failed_to_resolve': '无法从 {parentURL} 解析出模块 {specifier}，已将其视为外部模块。\n这是因为：{cause}',
+			        'load_error_hint_node_builtin': '你似乎意图导入 Node.js 内置模块，但请注意 Creator 并未集成 Node.js 内置模块。',
+			        'resolve_error_hint_extension': '你是否遗漏了扩展名？请注意你不能在模块说明符中省略扩展名。',
+			        'quick_pack_loader_resource_not_found_error': '未发现打包后的资源：{id}',
+			        'executor_failed_to_resolve': '无法从 {parentURL} 解析出模块 {specifier}。',
+			        'executor_system_js_origin': '<原点>',
+			        'executor_system_js_no_module_registered': '{url} 是无效的模块：脚本中未包含模块的注册。这可能是内部错误。',
+			        'executor_failed_to_instantiate': '无法实例化模块 {url} （起点是 {firstParentURL}）。',
+			        'executor_pack_mod_instantiation_error_host_resolve_error': '宿主无法解析代码块 {url}\n这是因为\n{reason}',
+			        'executor_pack_mod_instantiation_error_host_execute_error': '在执行代码块 {url} 时发生错误\n这是因为\n{reason}',
+			    },
+			};
+
+			var middleware = {};
+
+			var constants = {};
+
+			Object.defineProperty(constants, "__esModule", { value: true });
+			constants.CHUNK_HOME_RELATIVE_URL = constants.RESOLUTION_DETAIL_MAP_RELATIVE_URL = constants.IMPORT_MAP_RELATIVE_URL = void 0;
+			constants.IMPORT_MAP_RELATIVE_URL = 'import-map.json';
+			constants.RESOLUTION_DETAIL_MAP_RELATIVE_URL = 'resolution-detail-map.json';
+			constants.CHUNK_HOME_RELATIVE_URL = 'chunks/';
+
+			const _lockfile = {
+			                                    lock: async () => (async () => {}),
+			                                    unlock: async () => {},
+			                                    check: async () => false
+			                                };
+			                                const lock = _lockfile.lock;
+			                                const unlock = _lockfile.unlock;
+			                                const check = _lockfile.check;
+
+			var _smartProperLockfile = /*#__PURE__*/Object.freeze({
+				__proto__: null,
+				'default': _lockfile,
+				lock: lock,
+				unlock: unlock,
+				check: check
+			});
+
+			var require$$3 = /*@__PURE__*/getAugmentedNamespace(_smartProperLockfile);
+
+			var __importDefault$7 = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
+			    return (mod && mod.__esModule) ? mod : { "default": mod };
+			};
+			Object.defineProperty(middleware, "__esModule", { value: true });
+			middleware.QuickPackMiddleware = void 0;
+			const path_1$1 = __importDefault$7(pathBrowserify);
+			const url_1$2 = require$$2;
+			const constants_1 = constants;
+			const proper_lockfile_1 = __importDefault$7(require$$3);
+			class QuickPackMiddleware {
+			    constructor(workspace) {
+			        this._workspace = workspace;
+			        this._workspaceURL = (0, url_1$2.pathToFileURL)(path_1$1.default.join(workspace, path_1$1.default.sep));
+			    }
+			    get workspace() {
+			        return this._workspace;
+			    }
+			    get workspaceURL() {
+			        return this._workspaceURL;
+			    }
+			    get mainRecordPath() {
+			        return path_1$1.default.join(this._workspace, 'main-record.json');
+			    }
+			    get assemblyRecordPath() {
+			        return path_1$1.default.join(this._workspace, 'assembly-record.json');
+			    }
+			    get chunkHomePath() {
+			        return (0, url_1$2.fileURLToPath)(new url_1$2.URL(constants_1.CHUNK_HOME_RELATIVE_URL, this._workspaceURL));
+			    }
+			    get importMapPath() {
+			        return (0, url_1$2.fileURLToPath)(new url_1$2.URL(constants_1.IMPORT_MAP_RELATIVE_URL, this._workspaceURL));
+			    }
+			    get resolutionDetailMapPath() {
+			        return (0, url_1$2.fileURLToPath)(new url_1$2.URL(constants_1.RESOLUTION_DETAIL_MAP_RELATIVE_URL, this._workspaceURL));
+			    }
+			    async lock(maxRetryTime = Infinity) {
+			        return proper_lockfile_1.default.lock(this._workspace, { retries: { maxRetryTime }, stale: 5000 });
+			    }
+			    async unlock() {
+			        return proper_lockfile_1.default.unlock(this._workspace);
+			    }
+			}
+			middleware.QuickPackMiddleware = QuickPackMiddleware;
+
+			(function (exports) {
+				var __importDefault = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
+				    return (mod && mod.__esModule) ? mod : { "default": mod };
+				};
+				Object.defineProperty(exports, "__esModule", { value: true });
+				exports.QuickPackLoaderContext = exports.QuickPackLoader = exports.ResourceNotFoundError = void 0;
+				const loader_context_1 = loaderContext;
+				Object.defineProperty(exports, "QuickPackLoaderContext", { enumerable: true, get: function () { return loader_context_1.LoaderContext; } });
+				const base_1 = base;
+				const url_1 = require$$2;
+				const i18n_1 = i18n$1;
+				const middleware_1 = middleware;
+				const fs_extra_1 = __importDefault(require$$2$2);
+				const constants_1 = constants;
+				class ResourceNotFoundError extends Error {
+				    constructor(id) {
+				        super((0, i18n_1.i18nTranslate)('quick_pack_loader_resource_not_found_error', { id }));
+				    }
+				}
+				exports.ResourceNotFoundError = ResourceNotFoundError;
+				const baseURL = new window.URL('pack:///');
+				class QuickPackLoader {
+				    constructor(context, options = {}) {
+				        this._timestampsCache = {};
+				        this._middleware = new middleware_1.QuickPackMiddleware(context.workspace);
+				        this._chunkReader = new base_1.ChunkIOBase({ chunkHomePath: this._middleware.chunkHomePath });
+				    }
+				    get importMapURL() {
+				        return constants_1.IMPORT_MAP_RELATIVE_URL;
+				    }
+				    get resolutionDetailMapURL() {
+				        return constants_1.RESOLUTION_DETAIL_MAP_RELATIVE_URL;
+				    }
+				    async lock(maxRetryTime = Infinity) {
+				        return this._middleware.lock(maxRetryTime);
+				    }
+				    async unlock() {
+				        return this._middleware.unlock();
+				    }
+				    async loadAny(url) {
+				        // First, normalize it
+				        const absolute = new window.URL(url, baseURL);
+				        absolute.search = ''; // Discard any search params
+				        switch (absolute.href) {
+				            case new window.URL(constants_1.IMPORT_MAP_RELATIVE_URL, baseURL).href:
+				                return {
+				                    type: 'json',
+				                    json: await this.loadImportMap(),
+				                };
+				            case new window.URL(constants_1.RESOLUTION_DETAIL_MAP_RELATIVE_URL, baseURL).href:
+				                return {
+				                    type: 'json',
+				                    json: await this.loadResolutionDetailMap(),
+				                };
+				            default:
+				                return {
+				                    type: 'chunk',
+				                    chunk: await this.loadChunk(url),
+				                };
+				        }
+				    }
+				    /**
+				     * Loads the import map.
+				     * @returns The import map object.
+				     */
+				    async loadImportMap() {
+				        return fs_extra_1.default.readJson(this._middleware.importMapPath);
+				    }
+				    /**
+				     * Loads the resolution detail map.
+				     * @returns The resolution detail map object.
+				     */
+				    async loadResolutionDetailMap() {
+				        return fs_extra_1.default.readJson(this._middleware.resolutionDetailMapPath);
+				    }
+				    /**
+				     * Load specific chunk.
+				     * @param url The URL of the chunk, if relative, would be resolved from `this.baseURL`.
+				     * @returns The chunk info.
+				     */
+				    async loadChunk(url) {
+				        const resourceId = this.getChunkId(url);
+				        return this.loadChunkFromId(resourceId);
+				    }
+				    /**
+				     * Gets the opacity, unique ID of the chunk, to query timestamp or load the chunk.
+				     * @param url URL of the chunk.
+				     * @returns The chunk ID.
+				     */
+				    getChunkId(url) {
+				        // First, normalize it
+				        const absolute = new window.URL(url, baseURL);
+				        absolute.search = ''; // Discard any search params
+				        // Next, deduce a relative reference from it
+				        const baseHref = baseURL.href;
+				        const href = absolute.href;
+				        let normalizedReference = '';
+				        if (href.startsWith(baseHref)) {
+				            normalizedReference = href.slice(baseHref.length);
+				        }
+				        if (!normalizedReference) {
+				            throw new Error(`Bad pack resource URL: ${url}`);
+				        }
+				        return normalizedReference;
+				    }
+				    /**
+				     * Load specific chunk.
+				     * @param id The chunk ID.
+				     * @returns The chunk ID.
+				     */
+				    async loadChunkFromId(id) {
+				        const file = (0, url_1.fileURLToPath)(new window.URL(id, this._middleware.workspaceURL));
+				        return {
+				            type: 'file',
+				            path: file,
+				        };
+				    }
+				    /**
+				     * 获取指定资源的 mtime 时间戳。若不存在则返回负值。
+				     */
+				    queryTimestamp(resource) {
+				        var _a;
+				        return (_a = this._timestampsCache[resource]) !== null && _a !== void 0 ? _a : -1;
+				    }
+				    /**
+				     * 获取指定所有资源的 mtime 时间戳。不存在的资源将返回负值。
+				     */
+				    queryTimestamps(resources) {
+				        return resources.map((resource) => { var _a; return (_a = this._timestampsCache[resource]) !== null && _a !== void 0 ? _a : -1; });
+				    }
+				    async reload() {
+				        const serializedAssemblyRecord = await fs_extra_1.default.readJson(this._middleware.assemblyRecordPath);
+				        this._chunkReader.deserializeRecord(serializedAssemblyRecord);
+				        this._timestampsCache = Object.entries(this._chunkReader.queryAllTimestamps()).reduce((result, [chunkRelativeURL, timestamp]) => {
+				            result[`${constants_1.CHUNK_HOME_RELATIVE_URL}${chunkRelativeURL}`] = timestamp;
+				            return result;
+				        }, {});
+				    }
+				}
+				exports.QuickPackLoader = QuickPackLoader;
+				
+			} (loader));
+
+			var packModInstantiation = {};
 
 			let realMod$1 = {};
 			                            const isBrowser$1 = typeof window !== 'undefined' && typeof window.document !== 'undefined';
@@ -19376,10 +20736,10 @@ System.register(['cc'], (function (exports, module) {
 			                                const req = typeof require !== 'undefined' ? require : (typeof _cc_require !== 'undefined' ? _cc_require : null);
 			                                if (req) {
 			                                    try {
-			                                        const modName = 'assert';
+			                                        const modName = 'vm';
 			                                        realMod$1 = req(modName);
 			                                    } catch(e) {
-			                                        console.warn('Smart polyfill: failed to require assert');
+			                                        console.warn('Smart polyfill: failed to require vm');
 			                                    }
 			                                }
 			                            }
@@ -19388,17 +20748,44 @@ System.register(['cc'], (function (exports, module) {
 			                            const readFileSync$1 = realMod$1.readFileSync || function() { return ''; };
 			                            const writeFileSync$1 = realMod$1.writeFileSync || function() {};
 			                            const remove$1 = realMod$1.remove || async function() {};
-			                            const readJSON$1 = realMod$1.readJSON || async function() { return {}; };
-			                            const statSync$1 = realMod$1.statSync || function() { return { isFile: () => false, isDirectory: () => false }; };
+			                            const readJSON$1 = realMod$1.readJSON || async function() { return { chunks: {}, entries: {} }; };
+			                            const readJson$1 = realMod$1.readJson || async function() { return { chunks: {}, entries: {} }; };
+			                            const statSync$1 = realMod$1.statSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const stat$1 = realMod$1.stat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstat$1 = realMod$1.lstat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstatSync$1 = realMod$1.lstatSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const mkdir$1 = realMod$1.mkdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const mkdirSync$1 = realMod$1.mkdirSync || function() {};
+			                            const rmdir$1 = realMod$1.rmdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const rmdirSync$1 = realMod$1.rmdirSync || function() {};
+			                            const realpath$1 = realMod$1.realpath || function(p, o, cb) { 
+			                                var fn = typeof o === 'function' ? o : cb; 
+			                                if (typeof fn === 'function') fn(null, p); 
+			                            };
+			                            const realpathSync$1 = realMod$1.realpathSync || function(p) { return p; };
+			                            const utimes$1 = realMod$1.utimes || function(p, a, m, cb) { cb && cb(null); };
+			                            const utimesSync$1 = realMod$1.utimesSync || function() {};
 			                            
-			                            var _smartAssert = new Proxy({}, {
+			                            var _smartVm = new Proxy({}, {
 			                                get(target, prop) {
 			                                    if (prop === 'existsSync') return existsSync$1;
 			                                    if (prop === 'readFileSync') return readFileSync$1;
 			                                    if (prop === 'writeFileSync') return writeFileSync$1;
 			                                    if (prop === 'remove') return remove$1;
 			                                    if (prop === 'readJSON') return readJSON$1;
+			                                    if (prop === 'readJson') return readJson$1;
 			                                    if (prop === 'statSync') return statSync$1;
+			                                    if (prop === 'stat') return stat$1;
+			                                    if (prop === 'lstat') return lstat$1;
+			                                    if (prop === 'lstatSync') return lstatSync$1;
+			                                    if (prop === 'mkdir') return mkdir$1;
+			                                    if (prop === 'mkdirSync') return mkdirSync$1;
+			                                    if (prop === 'rmdir') return rmdir$1;
+			                                    if (prop === 'rmdirSync') return rmdirSync$1;
+			                                    if (prop === 'realpath') return realpath$1;
+			                                    if (prop === 'realpathSync') return realpathSync$1;
+			                                    if (prop === 'utimes') return utimes$1;
+			                                    if (prop === 'utimesSync') return utimesSync$1;
 			                                    
 			                                    if (realMod$1 && prop in realMod$1) {
 			                                        return realMod$1[prop];
@@ -19412,14 +20799,127 @@ System.register(['cc'], (function (exports, module) {
 			                                }
 			                            });
 
-			var _smartAssert$1 = /*#__PURE__*/Object.freeze({
+			var _smartVm$1 = /*#__PURE__*/Object.freeze({
 				__proto__: null,
 				existsSync: existsSync$1,
 				readFileSync: readFileSync$1,
 				writeFileSync: writeFileSync$1,
 				remove: remove$1,
 				readJSON: readJSON$1,
+				readJson: readJson$1,
 				statSync: statSync$1,
+				stat: stat$1,
+				lstat: lstat$1,
+				lstatSync: lstatSync$1,
+				mkdir: mkdir$1,
+				mkdirSync: mkdirSync$1,
+				rmdir: rmdir$1,
+				rmdirSync: rmdirSync$1,
+				realpath: realpath$1,
+				realpathSync: realpathSync$1,
+				utimes: utimes$1,
+				utimesSync: utimesSync$1,
+				'default': _smartVm
+			});
+
+			var require$$0$1 = /*@__PURE__*/getAugmentedNamespace(_smartVm$1);
+
+			var asserts$1 = {};
+
+			let realMod = {};
+			                            const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+			                            const isNode = typeof process !== 'undefined' && process.versions && process.versions.node;
+			                            // Allow explicit override via global flag
+			                            const useRealNode = (isNode && !isBrowser && globalThis.__ENABLE_NODE_BUILTINS__ !== false) || globalThis.__ENABLE_NODE_BUILTINS__ === true;
+			                            
+			                            if (useRealNode) {
+			                                // Dynamic require to hide it from static analysis
+			                                const req = typeof require !== 'undefined' ? require : (typeof _cc_require !== 'undefined' ? _cc_require : null);
+			                                if (req) {
+			                                    try {
+			                                        const modName = 'assert';
+			                                        realMod = req(modName);
+			                                    } catch(e) {
+			                                        console.warn('Smart polyfill: failed to require assert');
+			                                    }
+			                                }
+			                            }
+			                            
+			                            const existsSync = realMod.existsSync || function() { return false; };
+			                            const readFileSync = realMod.readFileSync || function() { return ''; };
+			                            const writeFileSync = realMod.writeFileSync || function() {};
+			                            const remove = realMod.remove || async function() {};
+			                            const readJSON = realMod.readJSON || async function() { return { chunks: {}, entries: {} }; };
+			                            const readJson = realMod.readJson || async function() { return { chunks: {}, entries: {} }; };
+			                            const statSync = realMod.statSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const stat = realMod.stat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstat = realMod.lstat || function(p, cb) { cb && cb(null, { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }); };
+			                            const lstatSync = realMod.lstatSync || function() { return { isFile: () => false, isDirectory: () => false, mtime: new Date(0) }; };
+			                            const mkdir = realMod.mkdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const mkdirSync = realMod.mkdirSync || function() {};
+			                            const rmdir = realMod.rmdir || function(p, o, cb) { var fn = typeof o === 'function' ? o : cb; fn && fn(null); };
+			                            const rmdirSync = realMod.rmdirSync || function() {};
+			                            const realpath = realMod.realpath || function(p, o, cb) { 
+			                                var fn = typeof o === 'function' ? o : cb; 
+			                                if (typeof fn === 'function') fn(null, p); 
+			                            };
+			                            const realpathSync = realMod.realpathSync || function(p) { return p; };
+			                            const utimes = realMod.utimes || function(p, a, m, cb) { cb && cb(null); };
+			                            const utimesSync = realMod.utimesSync || function() {};
+			                            
+			                            var _smartAssert = new Proxy({}, {
+			                                get(target, prop) {
+			                                    if (prop === 'existsSync') return existsSync;
+			                                    if (prop === 'readFileSync') return readFileSync;
+			                                    if (prop === 'writeFileSync') return writeFileSync;
+			                                    if (prop === 'remove') return remove;
+			                                    if (prop === 'readJSON') return readJSON;
+			                                    if (prop === 'readJson') return readJson;
+			                                    if (prop === 'statSync') return statSync;
+			                                    if (prop === 'stat') return stat;
+			                                    if (prop === 'lstat') return lstat;
+			                                    if (prop === 'lstatSync') return lstatSync;
+			                                    if (prop === 'mkdir') return mkdir;
+			                                    if (prop === 'mkdirSync') return mkdirSync;
+			                                    if (prop === 'rmdir') return rmdir;
+			                                    if (prop === 'rmdirSync') return rmdirSync;
+			                                    if (prop === 'realpath') return realpath;
+			                                    if (prop === 'realpathSync') return realpathSync;
+			                                    if (prop === 'utimes') return utimes;
+			                                    if (prop === 'utimesSync') return utimesSync;
+			                                    
+			                                    if (realMod && prop in realMod) {
+			                                        return realMod[prop];
+			                                    }
+			                                    
+			                                    // Fallback for missing methods
+			                                    if (typeof prop === 'string') {
+			                                        return function() {};
+			                                    }
+			                                    return undefined;
+			                                }
+			                            });
+
+			var _smartAssert$1 = /*#__PURE__*/Object.freeze({
+				__proto__: null,
+				existsSync: existsSync,
+				readFileSync: readFileSync,
+				writeFileSync: writeFileSync,
+				remove: remove,
+				readJSON: readJSON,
+				readJson: readJson,
+				statSync: statSync,
+				stat: stat,
+				lstat: lstat,
+				lstatSync: lstatSync,
+				mkdir: mkdir,
+				mkdirSync: mkdirSync,
+				rmdir: rmdir,
+				rmdirSync: rmdirSync,
+				realpath: realpath,
+				realpathSync: realpathSync,
+				utimes: utimes,
+				utimesSync: utimesSync,
 				'default': _smartAssert
 			});
 
@@ -19453,8 +20953,8 @@ System.register(['cc'], (function (exports, module) {
 			const vm_1 = __importDefault$6(require$$0$1);
 			const asserts_1 = asserts$1;
 			const fs_extra_1 = __importDefault$6(require$$2$2);
-			const i18n_1 = i18n$1;
-			const url_1$1 = url;
+			const i18n_1 = i18n$3;
+			const url_1$1 = require$$2;
 			const defaultPackModuleEvaluator = {
 			    async evaluate(file) {
 			        let moduleFileResolved;
@@ -19569,8 +21069,8 @@ System.register(['cc'], (function (exports, module) {
 			executor.Executor = void 0;
 			const path_1 = __importDefault$5(pathBrowserify);
 			const editor_systemjs_1 = editorSystemjs;
-			const url_1 = url;
-			const loader_1$1 = require$$2;
+			const url_1 = require$$2;
+			const loader_1$1 = loader;
 			const pack_mod_instantiation_1 = packModInstantiation;
 			// `'cc'` 的 URL
 			const engineIndexURL = `cce:/internal/x/cc`;
@@ -19971,7 +21471,7 @@ System.register(['cc'], (function (exports, module) {
 			script.ScriptService = void 0;
 			const cc_1$7 = __importDefault$4(require$$0__default);
 			const executor_1 = executor;
-			const loader_1 = require$$2;
+			const loader_1 = loader;
 			const rpc_1$6 = rpc;
 			const core_1$7 = core;
 			const utils_1$4 = __importDefault$4(utils$7);
@@ -20075,10 +21575,10 @@ System.register(['cc'], (function (exports, module) {
 			    async init() {
 			        // Skip packer-driver initialization in browser preview —
 			        // QuickPackLoaderContext and other Node.js dependencies are unavailable
-			        const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-			        if (isBrowser) {
-			            return;
-			        }
+			        // const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+			        // if (isBrowser) {
+			        //     return;
+			        // }
 			        EditorExtends.on('class-registered', (classConstructor, metadata, className) => {
 			            console.log('classRegistered', className);
 			            console.log('class-registered ' + cc_1$7.default.js.isChildClassOf(classConstructor, cc_1$7.default.Component));
@@ -20126,7 +21626,10 @@ System.register(['cc'], (function (exports, module) {
 			            cceModuleMap,
 			        });
 			        globalThis.self = window;
-			        this._executor.addPolyfillFile(require.resolve('@cocos/build-polyfills/prebuilt/editor/bundle'));
+			        const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+			        if (!isBrowser && typeof commonjsRequire !== 'undefined' && require.resolve) {
+			            this._executor.addPolyfillFile(require.resolve('@cocos/build-polyfills/prebuilt/editor/bundle'));
+			        }
 			        // 同步插件脚本列表
 			        await this._syncPluginScripts.nextIteration();
 			        // 重载项目与插件脚本
@@ -20213,6 +21716,25 @@ System.register(['cc'], (function (exports, module) {
 			     * @private
 			     */
 			    async _syncPluginScriptList() {
+			        const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+			        if (isBrowser) {
+			            try {
+			                const serverUrl = service_manager_1.serviceManager.getServerUrl();
+			                const res = await fetch(`${serverUrl}/assetManager/querySortedPlugins`);
+			                if (res.ok) {
+			                    const pluginScripts = await res.json();
+			                    this._executor.setPluginScripts(pluginScripts);
+			                }
+			                else {
+			                    this._executor.setPluginScripts([]);
+			                }
+			            }
+			            catch (err) {
+			                console.error('Failed to fetch plugin scripts', err);
+			                this._executor.setPluginScripts([]);
+			            }
+			            return;
+			        }
 			        return Promise.resolve(rpc_1$6.Rpc.getInstance().request('assetManager', 'querySortedPlugins', [{
 			                loadPluginInEditor: true,
 			            }]))
@@ -22235,662 +23757,6 @@ System.register(['cc'], (function (exports, module) {
 			component.componentOperation = new ComponentOperation();
 
 			var node = {};
-
-			var util = {};
-
-			var isBufferBrowser = function isBuffer(arg) {
-			  return arg && typeof arg === 'object'
-			    && typeof arg.copy === 'function'
-			    && typeof arg.fill === 'function'
-			    && typeof arg.readUInt8 === 'function';
-			};
-
-			let realMod = {};
-			                            const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-			                            const isNode = typeof process !== 'undefined' && process.versions && process.versions.node;
-			                            // Allow explicit override via global flag
-			                            const useRealNode = (isNode && !isBrowser && globalThis.__ENABLE_NODE_BUILTINS__ !== false) || globalThis.__ENABLE_NODE_BUILTINS__ === true;
-			                            
-			                            if (useRealNode) {
-			                                // Dynamic require to hide it from static analysis
-			                                const req = typeof require !== 'undefined' ? require : (typeof _cc_require !== 'undefined' ? _cc_require : null);
-			                                if (req) {
-			                                    try {
-			                                        const modName = 'inherits';
-			                                        realMod = req(modName);
-			                                    } catch(e) {
-			                                        console.warn('Smart polyfill: failed to require inherits');
-			                                    }
-			                                }
-			                            }
-			                            
-			                            const existsSync = realMod.existsSync || function() { return false; };
-			                            const readFileSync = realMod.readFileSync || function() { return ''; };
-			                            const writeFileSync = realMod.writeFileSync || function() {};
-			                            const remove = realMod.remove || async function() {};
-			                            const readJSON = realMod.readJSON || async function() { return {}; };
-			                            const statSync = realMod.statSync || function() { return { isFile: () => false, isDirectory: () => false }; };
-			                            
-			                            var _smartInherits = new Proxy({}, {
-			                                get(target, prop) {
-			                                    if (prop === 'existsSync') return existsSync;
-			                                    if (prop === 'readFileSync') return readFileSync;
-			                                    if (prop === 'writeFileSync') return writeFileSync;
-			                                    if (prop === 'remove') return remove;
-			                                    if (prop === 'readJSON') return readJSON;
-			                                    if (prop === 'statSync') return statSync;
-			                                    
-			                                    if (realMod && prop in realMod) {
-			                                        return realMod[prop];
-			                                    }
-			                                    
-			                                    // Fallback for missing methods
-			                                    if (typeof prop === 'string') {
-			                                        return function() {};
-			                                    }
-			                                    return undefined;
-			                                }
-			                            });
-
-			var _smartInherits$1 = /*#__PURE__*/Object.freeze({
-				__proto__: null,
-				existsSync: existsSync,
-				readFileSync: readFileSync,
-				writeFileSync: writeFileSync,
-				remove: remove,
-				readJSON: readJSON,
-				statSync: statSync,
-				'default': _smartInherits
-			});
-
-			var require$$1 = /*@__PURE__*/getAugmentedNamespace(_smartInherits$1);
-
-			(function (exports) {
-				// Copyright Joyent, Inc. and other Node contributors.
-				//
-				// Permission is hereby granted, free of charge, to any person obtaining a
-				// copy of this software and associated documentation files (the
-				// "Software"), to deal in the Software without restriction, including
-				// without limitation the rights to use, copy, modify, merge, publish,
-				// distribute, sublicense, and/or sell copies of the Software, and to permit
-				// persons to whom the Software is furnished to do so, subject to the
-				// following conditions:
-				//
-				// The above copyright notice and this permission notice shall be included
-				// in all copies or substantial portions of the Software.
-				//
-				// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-				// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-				// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-				// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-				// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-				// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-				// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-				var formatRegExp = /%[sdj%]/g;
-				exports.format = function(f) {
-				  if (!isString(f)) {
-				    var objects = [];
-				    for (var i = 0; i < arguments.length; i++) {
-				      objects.push(inspect(arguments[i]));
-				    }
-				    return objects.join(' ');
-				  }
-
-				  var i = 1;
-				  var args = arguments;
-				  var len = args.length;
-				  var str = String(f).replace(formatRegExp, function(x) {
-				    if (x === '%%') return '%';
-				    if (i >= len) return x;
-				    switch (x) {
-				      case '%s': return String(args[i++]);
-				      case '%d': return Number(args[i++]);
-				      case '%j':
-				        try {
-				          return JSON.stringify(args[i++]);
-				        } catch (_) {
-				          return '[Circular]';
-				        }
-				      default:
-				        return x;
-				    }
-				  });
-				  for (var x = args[i]; i < len; x = args[++i]) {
-				    if (isNull(x) || !isObject(x)) {
-				      str += ' ' + x;
-				    } else {
-				      str += ' ' + inspect(x);
-				    }
-				  }
-				  return str;
-				};
-
-
-				// Mark that a method should not be used.
-				// Returns a modified function which warns once by default.
-				// If --no-deprecation is set, then it is a no-op.
-				exports.deprecate = function(fn, msg) {
-				  // Allow for deprecating things in the process of starting up.
-				  if (isUndefined(commonjsGlobal.process)) {
-				    return function() {
-				      return exports.deprecate(fn, msg).apply(this, arguments);
-				    };
-				  }
-
-				  if (process.noDeprecation === true) {
-				    return fn;
-				  }
-
-				  var warned = false;
-				  function deprecated() {
-				    if (!warned) {
-				      if (process.throwDeprecation) {
-				        throw new Error(msg);
-				      } else if (process.traceDeprecation) {
-				        console.trace(msg);
-				      } else {
-				        console.error(msg);
-				      }
-				      warned = true;
-				    }
-				    return fn.apply(this, arguments);
-				  }
-
-				  return deprecated;
-				};
-
-
-				var debugs = {};
-				var debugEnviron;
-				exports.debuglog = function(set) {
-				  if (isUndefined(debugEnviron))
-				    debugEnviron = process.env.NODE_DEBUG || '';
-				  set = set.toUpperCase();
-				  if (!debugs[set]) {
-				    if (new RegExp('\\b' + set + '\\b', 'i').test(debugEnviron)) {
-				      var pid = process.pid;
-				      debugs[set] = function() {
-				        var msg = exports.format.apply(exports, arguments);
-				        console.error('%s %d: %s', set, pid, msg);
-				      };
-				    } else {
-				      debugs[set] = function() {};
-				    }
-				  }
-				  return debugs[set];
-				};
-
-
-				/**
-				 * Echos the value of a value. Trys to print the value out
-				 * in the best way possible given the different types.
-				 *
-				 * @param {Object} obj The object to print out.
-				 * @param {Object} opts Optional options object that alters the output.
-				 */
-				/* legacy: obj, showHidden, depth, colors*/
-				function inspect(obj, opts) {
-				  // default options
-				  var ctx = {
-				    seen: [],
-				    stylize: stylizeNoColor
-				  };
-				  // legacy...
-				  if (arguments.length >= 3) ctx.depth = arguments[2];
-				  if (arguments.length >= 4) ctx.colors = arguments[3];
-				  if (isBoolean(opts)) {
-				    // legacy...
-				    ctx.showHidden = opts;
-				  } else if (opts) {
-				    // got an "options" object
-				    exports._extend(ctx, opts);
-				  }
-				  // set default options
-				  if (isUndefined(ctx.showHidden)) ctx.showHidden = false;
-				  if (isUndefined(ctx.depth)) ctx.depth = 2;
-				  if (isUndefined(ctx.colors)) ctx.colors = false;
-				  if (isUndefined(ctx.customInspect)) ctx.customInspect = true;
-				  if (ctx.colors) ctx.stylize = stylizeWithColor;
-				  return formatValue(ctx, obj, ctx.depth);
-				}
-				exports.inspect = inspect;
-
-
-				// http://en.wikipedia.org/wiki/ANSI_escape_code#graphics
-				inspect.colors = {
-				  'bold' : [1, 22],
-				  'italic' : [3, 23],
-				  'underline' : [4, 24],
-				  'inverse' : [7, 27],
-				  'white' : [37, 39],
-				  'grey' : [90, 39],
-				  'black' : [30, 39],
-				  'blue' : [34, 39],
-				  'cyan' : [36, 39],
-				  'green' : [32, 39],
-				  'magenta' : [35, 39],
-				  'red' : [31, 39],
-				  'yellow' : [33, 39]
-				};
-
-				// Don't use 'blue' not visible on cmd.exe
-				inspect.styles = {
-				  'special': 'cyan',
-				  'number': 'yellow',
-				  'boolean': 'yellow',
-				  'undefined': 'grey',
-				  'null': 'bold',
-				  'string': 'green',
-				  'date': 'magenta',
-				  // "name": intentionally not styling
-				  'regexp': 'red'
-				};
-
-
-				function stylizeWithColor(str, styleType) {
-				  var style = inspect.styles[styleType];
-
-				  if (style) {
-				    return '\u001b[' + inspect.colors[style][0] + 'm' + str +
-				           '\u001b[' + inspect.colors[style][1] + 'm';
-				  } else {
-				    return str;
-				  }
-				}
-
-
-				function stylizeNoColor(str, styleType) {
-				  return str;
-				}
-
-
-				function arrayToHash(array) {
-				  var hash = {};
-
-				  array.forEach(function(val, idx) {
-				    hash[val] = true;
-				  });
-
-				  return hash;
-				}
-
-
-				function formatValue(ctx, value, recurseTimes) {
-				  // Provide a hook for user-specified inspect functions.
-				  // Check that value is an object with an inspect function on it
-				  if (ctx.customInspect &&
-				      value &&
-				      isFunction(value.inspect) &&
-				      // Filter out the util module, it's inspect function is special
-				      value.inspect !== exports.inspect &&
-				      // Also filter out any prototype objects using the circular check.
-				      !(value.constructor && value.constructor.prototype === value)) {
-				    var ret = value.inspect(recurseTimes, ctx);
-				    if (!isString(ret)) {
-				      ret = formatValue(ctx, ret, recurseTimes);
-				    }
-				    return ret;
-				  }
-
-				  // Primitive types cannot have properties
-				  var primitive = formatPrimitive(ctx, value);
-				  if (primitive) {
-				    return primitive;
-				  }
-
-				  // Look up the keys of the object.
-				  var keys = Object.keys(value);
-				  var visibleKeys = arrayToHash(keys);
-
-				  if (ctx.showHidden) {
-				    keys = Object.getOwnPropertyNames(value);
-				  }
-
-				  // IE doesn't make error fields non-enumerable
-				  // http://msdn.microsoft.com/en-us/library/ie/dww52sbt(v=vs.94).aspx
-				  if (isError(value)
-				      && (keys.indexOf('message') >= 0 || keys.indexOf('description') >= 0)) {
-				    return formatError(value);
-				  }
-
-				  // Some type of object without properties can be shortcutted.
-				  if (keys.length === 0) {
-				    if (isFunction(value)) {
-				      var name = value.name ? ': ' + value.name : '';
-				      return ctx.stylize('[Function' + name + ']', 'special');
-				    }
-				    if (isRegExp(value)) {
-				      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
-				    }
-				    if (isDate(value)) {
-				      return ctx.stylize(Date.prototype.toString.call(value), 'date');
-				    }
-				    if (isError(value)) {
-				      return formatError(value);
-				    }
-				  }
-
-				  var base = '', array = false, braces = ['{', '}'];
-
-				  // Make Array say that they are Array
-				  if (isArray(value)) {
-				    array = true;
-				    braces = ['[', ']'];
-				  }
-
-				  // Make functions say that they are functions
-				  if (isFunction(value)) {
-				    var n = value.name ? ': ' + value.name : '';
-				    base = ' [Function' + n + ']';
-				  }
-
-				  // Make RegExps say that they are RegExps
-				  if (isRegExp(value)) {
-				    base = ' ' + RegExp.prototype.toString.call(value);
-				  }
-
-				  // Make dates with properties first say the date
-				  if (isDate(value)) {
-				    base = ' ' + Date.prototype.toUTCString.call(value);
-				  }
-
-				  // Make error with message first say the error
-				  if (isError(value)) {
-				    base = ' ' + formatError(value);
-				  }
-
-				  if (keys.length === 0 && (!array || value.length == 0)) {
-				    return braces[0] + base + braces[1];
-				  }
-
-				  if (recurseTimes < 0) {
-				    if (isRegExp(value)) {
-				      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
-				    } else {
-				      return ctx.stylize('[Object]', 'special');
-				    }
-				  }
-
-				  ctx.seen.push(value);
-
-				  var output;
-				  if (array) {
-				    output = formatArray(ctx, value, recurseTimes, visibleKeys, keys);
-				  } else {
-				    output = keys.map(function(key) {
-				      return formatProperty(ctx, value, recurseTimes, visibleKeys, key, array);
-				    });
-				  }
-
-				  ctx.seen.pop();
-
-				  return reduceToSingleString(output, base, braces);
-				}
-
-
-				function formatPrimitive(ctx, value) {
-				  if (isUndefined(value))
-				    return ctx.stylize('undefined', 'undefined');
-				  if (isString(value)) {
-				    var simple = '\'' + JSON.stringify(value).replace(/^"|"$/g, '')
-				                                             .replace(/'/g, "\\'")
-				                                             .replace(/\\"/g, '"') + '\'';
-				    return ctx.stylize(simple, 'string');
-				  }
-				  if (isNumber(value))
-				    return ctx.stylize('' + value, 'number');
-				  if (isBoolean(value))
-				    return ctx.stylize('' + value, 'boolean');
-				  // For some reason typeof null is "object", so special case here.
-				  if (isNull(value))
-				    return ctx.stylize('null', 'null');
-				}
-
-
-				function formatError(value) {
-				  return '[' + Error.prototype.toString.call(value) + ']';
-				}
-
-
-				function formatArray(ctx, value, recurseTimes, visibleKeys, keys) {
-				  var output = [];
-				  for (var i = 0, l = value.length; i < l; ++i) {
-				    if (hasOwnProperty(value, String(i))) {
-				      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
-				          String(i), true));
-				    } else {
-				      output.push('');
-				    }
-				  }
-				  keys.forEach(function(key) {
-				    if (!key.match(/^\d+$/)) {
-				      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
-				          key, true));
-				    }
-				  });
-				  return output;
-				}
-
-
-				function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
-				  var name, str, desc;
-				  desc = Object.getOwnPropertyDescriptor(value, key) || { value: value[key] };
-				  if (desc.get) {
-				    if (desc.set) {
-				      str = ctx.stylize('[Getter/Setter]', 'special');
-				    } else {
-				      str = ctx.stylize('[Getter]', 'special');
-				    }
-				  } else {
-				    if (desc.set) {
-				      str = ctx.stylize('[Setter]', 'special');
-				    }
-				  }
-				  if (!hasOwnProperty(visibleKeys, key)) {
-				    name = '[' + key + ']';
-				  }
-				  if (!str) {
-				    if (ctx.seen.indexOf(desc.value) < 0) {
-				      if (isNull(recurseTimes)) {
-				        str = formatValue(ctx, desc.value, null);
-				      } else {
-				        str = formatValue(ctx, desc.value, recurseTimes - 1);
-				      }
-				      if (str.indexOf('\n') > -1) {
-				        if (array) {
-				          str = str.split('\n').map(function(line) {
-				            return '  ' + line;
-				          }).join('\n').substr(2);
-				        } else {
-				          str = '\n' + str.split('\n').map(function(line) {
-				            return '   ' + line;
-				          }).join('\n');
-				        }
-				      }
-				    } else {
-				      str = ctx.stylize('[Circular]', 'special');
-				    }
-				  }
-				  if (isUndefined(name)) {
-				    if (array && key.match(/^\d+$/)) {
-				      return str;
-				    }
-				    name = JSON.stringify('' + key);
-				    if (name.match(/^"([a-zA-Z_][a-zA-Z_0-9]*)"$/)) {
-				      name = name.substr(1, name.length - 2);
-				      name = ctx.stylize(name, 'name');
-				    } else {
-				      name = name.replace(/'/g, "\\'")
-				                 .replace(/\\"/g, '"')
-				                 .replace(/(^"|"$)/g, "'");
-				      name = ctx.stylize(name, 'string');
-				    }
-				  }
-
-				  return name + ': ' + str;
-				}
-
-
-				function reduceToSingleString(output, base, braces) {
-				  var length = output.reduce(function(prev, cur) {
-				    if (cur.indexOf('\n') >= 0) ;
-				    return prev + cur.replace(/\u001b\[\d\d?m/g, '').length + 1;
-				  }, 0);
-
-				  if (length > 60) {
-				    return braces[0] +
-				           (base === '' ? '' : base + '\n ') +
-				           ' ' +
-				           output.join(',\n  ') +
-				           ' ' +
-				           braces[1];
-				  }
-
-				  return braces[0] + base + ' ' + output.join(', ') + ' ' + braces[1];
-				}
-
-
-				// NOTE: These type checking functions intentionally don't use `instanceof`
-				// because it is fragile and can be easily faked with `Object.create()`.
-				function isArray(ar) {
-				  return Array.isArray(ar);
-				}
-				exports.isArray = isArray;
-
-				function isBoolean(arg) {
-				  return typeof arg === 'boolean';
-				}
-				exports.isBoolean = isBoolean;
-
-				function isNull(arg) {
-				  return arg === null;
-				}
-				exports.isNull = isNull;
-
-				function isNullOrUndefined(arg) {
-				  return arg == null;
-				}
-				exports.isNullOrUndefined = isNullOrUndefined;
-
-				function isNumber(arg) {
-				  return typeof arg === 'number';
-				}
-				exports.isNumber = isNumber;
-
-				function isString(arg) {
-				  return typeof arg === 'string';
-				}
-				exports.isString = isString;
-
-				function isSymbol(arg) {
-				  return typeof arg === 'symbol';
-				}
-				exports.isSymbol = isSymbol;
-
-				function isUndefined(arg) {
-				  return arg === void 0;
-				}
-				exports.isUndefined = isUndefined;
-
-				function isRegExp(re) {
-				  return isObject(re) && objectToString(re) === '[object RegExp]';
-				}
-				exports.isRegExp = isRegExp;
-
-				function isObject(arg) {
-				  return typeof arg === 'object' && arg !== null;
-				}
-				exports.isObject = isObject;
-
-				function isDate(d) {
-				  return isObject(d) && objectToString(d) === '[object Date]';
-				}
-				exports.isDate = isDate;
-
-				function isError(e) {
-				  return isObject(e) &&
-				      (objectToString(e) === '[object Error]' || e instanceof Error);
-				}
-				exports.isError = isError;
-
-				function isFunction(arg) {
-				  return typeof arg === 'function';
-				}
-				exports.isFunction = isFunction;
-
-				function isPrimitive(arg) {
-				  return arg === null ||
-				         typeof arg === 'boolean' ||
-				         typeof arg === 'number' ||
-				         typeof arg === 'string' ||
-				         typeof arg === 'symbol' ||  // ES6 symbol
-				         typeof arg === 'undefined';
-				}
-				exports.isPrimitive = isPrimitive;
-
-				exports.isBuffer = isBufferBrowser;
-
-				function objectToString(o) {
-				  return Object.prototype.toString.call(o);
-				}
-
-
-				function pad(n) {
-				  return n < 10 ? '0' + n.toString(10) : n.toString(10);
-				}
-
-
-				var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
-				              'Oct', 'Nov', 'Dec'];
-
-				// 26 Feb 16:19:34
-				function timestamp() {
-				  var d = new Date();
-				  var time = [pad(d.getHours()),
-				              pad(d.getMinutes()),
-				              pad(d.getSeconds())].join(':');
-				  return [d.getDate(), months[d.getMonth()], time].join(' ');
-				}
-
-
-				// log is just a thin wrapper to console.log that prepends a timestamp
-				exports.log = function() {
-				  console.log('%s - %s', timestamp(), exports.format.apply(exports, arguments));
-				};
-
-
-				/**
-				 * Inherit the prototype methods from one constructor into another.
-				 *
-				 * The Function.prototype.inherits from lang.js rewritten as a standalone
-				 * function (not on Function.prototype). NOTE: If this file is to be loaded
-				 * during bootstrapping this function needs to be rewritten using some native
-				 * functions as prototype setup using normal JavaScript does not work as
-				 * expected during bootstrapping (see mirror.js in r114903).
-				 *
-				 * @param {function} ctor Constructor function which needs to inherit the
-				 *     prototype.
-				 * @param {function} superCtor Constructor function to inherit prototype from.
-				 */
-				exports.inherits = require$$1;
-
-				exports._extend = function(origin, add) {
-				  // Don't do anything if add isn't an object
-				  if (!add || !isObject(add)) return origin;
-
-				  var keys = Object.keys(add);
-				  var i = keys.length;
-				  while (i--) {
-				    origin[keys[i]] = add[keys[i]];
-				  }
-				  return origin;
-				};
-
-				function hasOwnProperty(obj, prop) {
-				  return Object.prototype.hasOwnProperty.call(obj, prop);
-				} 
-			} (util));
 
 			var timerUtil = {};
 
@@ -25410,8 +26276,12 @@ System.register(['cc'], (function (exports, module) {
 
 			const Service = exports('Service', Service$1);
 
-			                    async function startup(config) {
-			                        const { enginePath, projectPath, serverURL, defaultConfig, modules } = config;
+			                    async function startup(options) {
+			                        const { enginePath, projectPath, serverURL, defaultConfig, modules } = options;
+			                        
+			                        if (typeof window !== 'undefined') {
+			                            window.__CC_PROJECT_PATH__ = projectPath;
+			                        }
 			                        serviceManager_1.initialize(serverURL);
 
 			                        const requiredModules = [
@@ -25457,15 +26327,15 @@ System.register(['cc'], (function (exports, module) {
 			                       // await import(engineAdapter);
 
 			                        // EditorExtends is already on globalThis now
-			                        if (editorExtends.UuidUtils) {
-			                            editorExtends.UuidUtils.compressUuid = editorExtends.UuidUtils.compressUUID;
+			                        if (EditorExtendsLocal.UuidUtils) {
+			                            EditorExtendsLocal.UuidUtils.compressUuid = EditorExtendsLocal.UuidUtils.compressUUID;
 			                        }
 			                        globalThis.cce = globalThis.cce || {};
 			                        globalThis.cce.Script = Service$1.Script;
 
 			                       // await DecoratorService.Engine.init();
-			                        if (editorExtends.init) {
-			                            await editorExtends.init();
+			                        if (EditorExtendsLocal.init) {
+			                            await EditorExtendsLocal.init();
 			                        }
 
 			                        await System.import('cc');
