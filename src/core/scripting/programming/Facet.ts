@@ -218,6 +218,15 @@ export class ProgrammingFacet {
     private async _buildSystemJs() {
         const systemJsBundleOutFile = ps.join(this._systemJsHomeDir, this._systemJsBundleFileName);
         await fs.ensureDir(ps.dirname(systemJsBundleOutFile));
+
+        // NOTE: The @cocos/rollup-plugin-typescript requires document.baseURI to resolve tslib in Node.js environment.
+        // In cocos-cli, web-adapter.js (loaded by initEngine) polyfills `document` but not `baseURI`.
+        // If `document` is defined, the rollup plugin enters a browser-only branch and fails if `baseURI` is missing.
+        if (typeof document !== 'undefined' && !document.baseURI) {
+            const { pathToFileURL } = require('url');
+            (document as any).baseURI = pathToFileURL(ps.join(process.cwd(), 'index.js')).href;
+        }
+
         await moduleSystem.build({
             out: systemJsBundleOutFile,
             minify: false,
@@ -228,8 +237,10 @@ export class ProgrammingFacet {
     }
 
     private async _resetQuickPackLoader() {
-        const context = await Editor.Message.request('programming', 'packer-driver/get-loader-context', 'preview');
-        const { QuickPackLoader } = await import('@cocos/creator-programming-quick-pack/lib/loader');
+        const { default: scripting } = await import('../index');
+        const contextSerialize = scripting.getPackerDriverLoaderContext('preview');
+        const { QuickPackLoaderContext, QuickPackLoader } = await import('@cocos/creator-programming-quick-pack/lib/loader');
+        const context = QuickPackLoaderContext.deserialize(contextSerialize!);
         const quickPackLoader = new QuickPackLoader(context);
         this._quickPackLoader = quickPackLoader;
     }

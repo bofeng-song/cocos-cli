@@ -2,10 +2,13 @@ import { join } from 'path';
 import { IBuildCommandOption, Platform } from './builder/@types/protected';
 import utils from './base/utils';
 import { newConsole } from './base/console';
-import { startServer } from '../server';
+import { startServer, getServerUrl } from '../server';
 import { GlobalConfig, GlobalPaths } from '../global';
 import scripting from './scripting';
 import { startupScene } from './scene';
+import { spawn } from 'child_process';
+import { middlewareService } from '../server/middleware';
+import ScriptingMiddleware from './scene/scripting.middleware';
 
 
 /**
@@ -60,6 +63,10 @@ export default class Launcher {
         // 在导入资源之前，初始化 scripting 模块，才能正常导入编译脚本
         const { Engine } = await import('./engine');
         await scripting.initialize(this.projectPath, GlobalPaths.enginePath, Engine.getConfig().includeModules);
+
+        const { createProgrammingFacet } = await import('./scripting/programming/FacetInstance');
+        await createProgrammingFacet(Engine.getInfo().typescript.path, scripting.projectPath, Engine.getConfig().includeModules);
+
         // 启动以及初始化资源数据库
         const { initAssetDB, startAssetDB } = await import('./assets');
         await initAssetDB();
@@ -75,8 +82,20 @@ export default class Launcher {
         // 初始化构建
         const { init: initBuilder } = await import('./builder');
         await initBuilder();
+
+        // Register scripting middleware BEFORE scene startup,
+        // because scene process needs /programming/* endpoints during init
+        middlewareService.register('scripting', ScriptingMiddleware);
+
         // 启动场景进程，需要在 Builder 之后，因为服务器路由场景还没有做前缀约束匹配范围比较广
         await startupScene(GlobalPaths.enginePath, this.projectPath);
+
+        const browserPath = process.platform === 'win32'
+            ? 'start'
+            : process.platform === 'darwin'
+                ? 'open'
+                : 'xdg-open';
+        spawn(browserPath, [getServerUrl()], { stdio: 'ignore', detached: true });
     }
 
     /**
