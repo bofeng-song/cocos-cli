@@ -5,6 +5,7 @@ import { Rpc } from '../rpc';
 import { BaseService, register } from './core';
 import { IScriptEvents, IScriptService } from '../../common';
 import utils from '../../../base/utils';
+import { serviceManager } from './service-manager';
 
 /**
  * 异步迭代。有以下特点：
@@ -130,14 +131,17 @@ export class ScriptService extends BaseService<IScriptEvents> implements IScript
                     classConstructor, 'i18n:menu.custom_script/' + className, -1);
             }
         });
-        const serializedPackLoaderContext = await Rpc.getInstance().request('programming', 'getPackerDriverLoaderContext', ['editor']);
+        const serverUrl = serviceManager.getServerUrl();
+        const serialPromise = await fetch(`${serverUrl}/programming/getPackerDriverLoaderContext/editor`);
+        const serializedPackLoaderContext = await serialPromise.json();
         if (!serializedPackLoaderContext) {
             throw new Error('packer-driver/get-loader-context is not defined');
         }
         const quickPackLoaderContext = QuickPackLoaderContext.deserialize(serializedPackLoaderContext);
 
         const { loadDynamic } = await import('cc/preload');
-        const cceModuleMap = await Rpc.getInstance().request('programming', 'queryCCEModuleMap');
+        const moduleMapPromise = await fetch(`${serverUrl}/programming/queryCCEModuleMap`);
+        const cceModuleMap = await moduleMapPromise.json();
         this._executor = await Executor.create({
             // @ts-ignore
             importEngineMod: async (id) => {
@@ -166,9 +170,12 @@ export class ScriptService extends BaseService<IScriptEvents> implements IScript
             importExceptionHandler: (...args) => this._handleImportException(...args),
             cceModuleMap,
         });
-        // eslint-disable-next-line no-undef
+
         globalThis.self = window;
-        this._executor.addPolyfillFile(require.resolve('@cocos/build-polyfills/prebuilt/editor/bundle'));
+        const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+        if (!isBrowser && typeof require !== 'undefined' && require.resolve) {
+            this._executor.addPolyfillFile(require.resolve('@cocos/build-polyfills/prebuilt/editor/bundle'));
+        }
         // 同步插件脚本列表
         await this._syncPluginScripts.nextIteration();
         // 重载项目与插件脚本
@@ -271,6 +278,24 @@ export class ScriptService extends BaseService<IScriptEvents> implements IScript
      * @private
      */
     private async _syncPluginScriptList() {
+        const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+        if (isBrowser) {
+            try {
+                const serverUrl = serviceManager.getServerUrl();
+                const res = await fetch(`${serverUrl}/assetManager/querySortedPlugins`);
+                if (res.ok) {
+                    const pluginScripts = await res.json();
+                    this._executor.setPluginScripts(pluginScripts);
+                } else {
+                    this._executor.setPluginScripts([]);
+                }
+            } catch (err) {
+                console.error('Failed to fetch plugin scripts', err);
+                this._executor.setPluginScripts([]);
+            }
+            return;
+        }
+
         return Promise.resolve(Rpc.getInstance().request('assetManager', 'querySortedPlugins', [{
             loadPluginInEditor: true,
         }]))

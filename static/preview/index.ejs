@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title><%= title %></title>
+    <meta name="viewport" content="width=device-width,user-scalable=no,initial-scale=1,minimum-scale=1,maximum-scale=1,viewport-fit=cover"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="renderer" content="webkit"/>
+    <meta name="force-rendering" content="webkit"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+    <meta name="msapplication-tap-highlight" content="no">
+    <meta name="full-screen" content="yes"/>
+    <meta name="x5-fullscreen" content="true"/>
+    <meta name="360-fullscreen" content="true"/>
+    <meta name="screen-orientation" content=""/>
+    <meta name="x5-orientation" content="">
+    <meta name="x5-page-mode" content="app">
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #333;
+        }
+        #GameCanvas {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="GameCanvas" oncontextmenu="event.preventDefault()" tabindex="0"></canvas>
+
+    <script src="/static/preview/polyfills.bundle.js" charset="utf-8"></script>
+    
+    <!-- SystemJS support. -->
+    <script src="/scripting/systemjs/system.js"></script>
+    <script src="/scripting/systemjs/extras/named-register.js"></script>
+
+    <!-- Import map that map the engine feature unit modules. -->
+    <script src="<%= engineDistPath %>/import-map.json" type="systemjs-importmap"></script>
+
+    <!-- Import map that map the entry of project module(s). -->
+    <script type="systemjs-importmap" src="<%= packImportMapURL %>"></script>
+
+    <!-- Import map that map 'cc', 'cc/env'. -->
+    <script type="systemjs-importmap">
+        <%- JSON.stringify(globalImportMap) %>
+    </script>
+    
+    <!-- Setup the detailed resolution. -->
+    <script>
+        System.setResolutionDetailMapCallback(function() {
+            var url = new URL('<%=packResolutionDetailMapURL%>', window.location);
+            return fetch(url).then(function (response) {
+                return response.json();
+            }).then(function (json) {
+                return { json, url: url.href };
+            });
+        });
+    </script>
+
+    <!-- Set CC_EDITOR before engine loads so that editor-only code paths
+         (e.g. deserialize._macros) are enabled in the preview.
+         Also provide an EditorExtends stub so the engine can reference it
+         during class registration. The real implementation is loaded later
+         by scene-bundle.js and overwrites this stub. -->
+    <script>
+        window.CC_EDITOR = true;
+        window.Editor = {
+            Message: {
+                request: function(target, method, uuid) {
+                    // query-extname: called by editor-path-replace.js during asset loading
+                    if (method === 'query-extname') {
+                        return fetch('/query-extname/' + uuid)
+                            .then(function(r) { return r.text(); })
+                            .catch(function() { return ''; });
+                    }
+                    if (method === 'query-engine-info') {
+                        return Promise.resolve({
+                            typescript: { path: '<%= enginePath %>' },
+                            native: { path: '<%= enginePath %>' },
+                        });
+                    }
+                    return Promise.resolve(null);
+                },
+            },
+        };
+        window.EditorExtends = {
+            emit: function() {},
+            on: function() {},
+            removeListener: function() {},
+            UuidUtils: {
+                uuid: function() { return ''; },
+                compressUuid: function(u) { return u; },
+                compressUUID: function(u) { return u; },
+                decompressUuid: function(u) { return u; },
+                isUuid: function() { return false; },
+            },
+            Component: {
+                addMenu: function() {},
+                removeMenu: function() {},
+                add: function() {},
+                remove: function() {},
+            },
+            Node: {
+                add: function() {},
+                remove: function() {},
+                getNode: function() { return null; },
+                emit: function() {},
+            },
+            Script: { allow: false },
+            MissingReporter: {
+                classInstance: (function() {
+                    var finder = function(type, data, owner, propName) {
+                        // Resolve class by type ID, same as cc.js.getClassById
+                        return cc && cc.js ? cc.js.getClassById(type) : null;
+                    };
+                    finder.onDereferenced = function() {};
+                    return {
+                        classFinder: finder,
+                        reportMissingClass: function() {},
+                        reset: function() {},
+                    };
+                })(),
+                class: null,
+                object: function() { return { stashByOwner: function() {} }; },
+            },
+            serialize: {
+                asAsset: function(uuid) { return uuid; },
+            },
+        };
+    </script>
+
+    <script src="<%= engineDistPath %>/bundled/index.js"></script>
+    
+    <!-- Polyfills for Scene Services -->
+    <script src="/scripting/polyfills/reflect.js"></script>
+    <script>
+        // Setup minimal Node environment shims
+        window.process = { 
+            env: { NODE_ENV: 'development' }, 
+            platform: 'browser',
+            argv: [],
+            pid: 1234,
+            on: () => {},
+            exit: () => { console.warn('process.exit called in browser'); }
+        };
+        window.module = { exports: {} };
+        window.exports = window.module.exports;
+    </script>
+    <script src="/scripting/polyfills/events.js"></script>
+    <script>
+        window.EventEmitter = window.module.exports;
+        window.events = window.module.exports;
+        window.module.exports = {}; // reset for next
+    </script>
+    <script src="/scripting/polyfills/path.js"></script>
+    <script src="/settings.js"></script>
+    <script>
+        window.path = window.module.exports;
+        window.module.exports = {};
+        
+        // Global require shim for CLI services
+        window.require = function(id) {
+            if (id === 'cc') return window.cc;
+            if (id === 'path' || id === 'node:path') return window.path;
+            if (id === 'events' || id === 'node:events') return window.events;
+            console.error('require failed for:', id);
+            return null;
+        };
+    </script>
+
+    <script>
+        window._getRenderData = function() {
+            return {
+                projectPath: '<%= projectPath %>',
+                enginePath: '<%= enginePath %>',
+                engineConfig: '<%- JSON.stringify(engineConfig) %>'
+            };
+        };
+    </script>
+
+    <script>
+        (function() {
+            const systemJSPrototype = System.constructor.prototype;
+            const originalResolve = systemJSPrototype.resolve;
+            systemJSPrototype.resolve = function(id, parentUrl) {
+                function mapQBundled(urlStr) {
+                    if (urlStr && typeof urlStr === 'string' && urlStr.startsWith('q-bundled:///')) {
+                        var rel = urlStr.substring('q-bundled:///'.length);
+                        // Decode one level of percent-encoding: %253A → %3A
+                        // SystemJS double-encodes percent chars in relative deps,
+                        // but files on disk use single-encoded names.
+                        rel = rel.replace(/%25/g, '%');
+                        var baseUrl = location.origin + '<%= engineDistPath %>/';
+                        // Web target puts everything under transform-cache
+                        var mapped = baseUrl + 'transform-cache/' + rel;
+                        return mapped;
+                    }
+                    return null;
+                }
+
+                function decodeDoubleEncoding(urlStr) {
+                    // Decode only %25XX → %XX (one level), NOT full decodeURIComponent
+                    if (urlStr && typeof urlStr === 'string' && urlStr.includes('%25')) {
+                        return urlStr.replace(/%25/g, '%');
+                    }
+                    return urlStr;
+                }
+
+                // Intercept external: and internal: specifiers BEFORE import map resolution
+                if (typeof id === 'string' && id.startsWith('external:')) {
+                    var rest = id.substring('external:'.length);
+                    var baseUrl = location.origin + '<%= engineDistPath %>/';
+                    return baseUrl + 'external/external%3A' + rest + '.js';
+                }
+                if (typeof id === 'string' && id.startsWith('internal:')) {
+                    if (id === 'internal:native') {
+                        return 'q-bundled:///fs/cocos/native-binding/impl.js';
+                    }
+                    if (id === 'internal:constants') {
+                        return 'q-bundled:///virtual/internal%3Aconstants.js';
+                    }
+                    // Generic internal: handler — try to find in registerRegistry
+                    if (this.registerRegistry) {
+                        for (var key in this.registerRegistry) {
+                            if (key.endsWith('/' + id.substring('internal:'.length))
+                                || key.endsWith('/' + id.substring('internal:'.length) + '.js')) {
+                                return key;
+                            }
+                        }
+                    }
+                }
+
+                try {
+                    // Intercept both sync and async resolutions
+                    const resolved = originalResolve.apply(this, arguments);
+                    if (resolved && typeof resolved.then === 'function') {
+                        return resolved.then(res => {
+                            if (typeof res === 'string' && res.startsWith('q-bundled:///')) {
+                                // If already registered by name, use it directly
+                                if (this.registerRegistry && this.registerRegistry[res]) {
+                                    return res;
+                                }
+                                return mapQBundled(res);
+                            }
+                            return decodeDoubleEncoding(res);
+                        });
+                    }
+                    if (typeof resolved === 'string' && resolved.startsWith('q-bundled:///')) {
+                        // If already registered by name, use it directly
+                        if (this.registerRegistry && this.registerRegistry[resolved]) {
+                            return resolved;
+                        }
+                        return mapQBundled(resolved);
+                    }
+                    // Safety: don't return non-fetchable schemes like internal:
+                    if (typeof resolved === 'string' && /^[a-z]+:/.test(resolved) && !resolved.startsWith('http') && !resolved.startsWith('q-bundled:')) {
+                        // Try registerRegistry lookup by suffix
+                        if (this.registerRegistry) {
+                            var schemeParts = resolved.split(':');
+                            var suffix = schemeParts.slice(1).join(':');
+                            for (var key in this.registerRegistry) {
+                                if (key.endsWith('/' + suffix) || key.endsWith('/' + suffix + '.js')) {
+                                    return key;
+                                }
+                            }
+                        }
+                    }
+                    return decodeDoubleEncoding(resolved);
+                } catch (e) {
+                    var mapped = mapQBundled(id);
+                    if (mapped) return mapped;
+                    throw e;
+                }
+            };
+            System.resolve = systemJSPrototype.resolve;
+        })();
+
+        // Fix the named-register interop problem:
+        // named-register intercepts System.register("name", deps, fn) and:
+        //   1) stores [deps, fn] in registerRegistry["name"]
+        //   2) calls base register([], emptyFn) — so lastRegister is empty
+        // Result: SystemJS's getRegister() returns empty registration, setters get {}
+        //
+        // Fix: Override register so named registrations call base with REAL deps+fn instead of empty.
+        // We also manually store in registerRegistry so named-register's resolve hook still works.
+        (function() {
+            const proto = System.constructor.prototype;
+            // Go past named-register's hook to reach the original SystemJS base register.
+            // We override proto.register so we are the outermost hook.
+            // When called with (name, deps, fn), call the original directly with (deps, fn).
+            const _named_register_hook = proto.register; // this is named-register's version
+
+            // Find the original pre-named-register register (the real lastRegister setter).
+            // We do this by temporary override: call named-register with anonymous args,
+            // observe what it calls, but that approach is fragile.
+            // Simpler: just define our own hook that directly calls the base.
+            // The base SystemJS register simply does: lastRegister = [deps, declare].
+            // We replicate that behavior for named registrations.
+            proto.register = function(deps, declare, execute) {
+                if (typeof deps === 'string') {
+                    // Named registration: deps=name, declare=realDepsArray, execute=realFactory
+                    // Store in registerRegistry so named-register's resolve/instantiate hooks work
+                    if (this.registerRegistry) {
+                        this.registerRegistry[deps] = [declare, execute];
+                    }
+                    // Call named-register's hook with the REAL deps array and factory
+                    // named-register will see typeof declare !== 'string' and fall through to base
+                    return _named_register_hook.call(this, declare, execute);
+                }
+                return _named_register_hook.apply(this, arguments);
+            };
+        })();
+    </script>
+    <script type="systemjs-importmap">
+        {
+            "imports": {
+                "events": "/scripting/polyfills/events",
+                "path": "/scripting/polyfills/path",
+                "url": "/scripting/polyfills/url",
+                "util": "/scripting/polyfills/util",
+                "os": "/scripting/polyfills/os",
+                "reflect-metadata": "/scripting/polyfills/reflect-metadata"
+            }
+        }
+    </script>
+
+    <!-- Web PAL overrides: replace nodejs PAL entries from editor import-map with web variants -->
+    <script type="systemjs-importmap">
+        {
+            "imports": {
+                "pal/audio":          "q-bundled:///fs/pal/audio/web/player.js",
+                "pal/system-info":    "q-bundled:///fs/pal/system-info/web/system-info.js",
+                "pal/screen-adapter": "q-bundled:///fs/pal/screen-adapter/web/screen-adapter.js",
+                "pal/input":          "q-bundled:///fs/pal/input/web/index.js",
+                "pal/env":            "q-bundled:///fs/pal/env/web/env.js",
+                "pal/pacer":          "q-bundled:///fs/pal/pacer/pacer-web.js",
+                "pal/wasm":           "q-bundled:///fs/pal/wasm/wasm-web.js",
+                "internal:native":    "q-bundled:///fs/cocos/native-binding/impl.js",
+                "internal:constants": "q-bundled:///virtual/internal%3Aconstants.js",
+                "@cocos/cannon":      "<%= engineDistPath %>/external/%40cocos/cannon.js",
+                "@cocos/dragonbones-js": "<%= engineDistPath %>/external/%40cocos/dragonbones-js.js",
+                "@cocos/box2d":       "<%= engineDistPath %>/external/%40cocos/box2d.js",
+                "external:emscripten/meshopt/meshopt_decoder.wasm.js": "<%= engineDistPath %>/external/external%3Aemscripten/meshopt/meshopt_decoder.wasm.js.js",
+                "external:emscripten/meshopt/meshopt_decoder.asm.js":  "<%= engineDistPath %>/external/external%3Aemscripten/meshopt/meshopt_decoder.asm.js.js",
+                "external:emscripten/physx/physx.release.wasm.js":     "<%= engineDistPath %>/external/external%3Aemscripten/physx/physx.release.wasm.js.js",
+                "external:emscripten/physx/physx.release.asm.js":      "<%= engineDistPath %>/external/external%3Aemscripten/physx/physx.release.asm.js.js",
+                "external:emscripten/bullet/bullet.release.wasm.js":   "<%= engineDistPath %>/external/external%3Aemscripten/bullet/bullet.release.wasm.js.js",
+                "external:emscripten/bullet/bullet.release.asm.js":    "<%= engineDistPath %>/external/external%3Aemscripten/bullet/bullet.release.asm.js.js",
+                "external:emscripten/box2d/box2d.release.wasm.js":     "<%= engineDistPath %>/external/external%3Aemscripten/box2d/box2d.release.wasm.js.js",
+                "external:emscripten/box2d/box2d.release.asm.js":      "<%= engineDistPath %>/external/external%3Aemscripten/box2d/box2d.release.asm.js.js",
+                "external:emscripten/spine/4.2/spine.wasm.js":         "<%= engineDistPath %>/external/external%3Aemscripten/spine/4.2/spine.wasm.js.js",
+                "external:emscripten/spine/3.8/spine.wasm.js":         "<%= engineDistPath %>/external/external%3Aemscripten/spine/3.8/spine.wasm.js.js",
+                "pal/minigame": "q-bundled:///fs/pal/minigame/non-minigame.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        const { projectPath, enginePath, engineConfig } = window._getRenderData();
+
+        // Save our resolve hook AND the System instance before scene-bundle overrides them.
+        // scene-bundle replaces globalThis.System with a new instance lacking registerRegistry.
+        const _preSceneBundleResolve = System.constructor.prototype.resolve;
+        const _originalSystem = System;
+
+        (async function() {
+            const currentUrl = window.location.origin;
+            console.log('server url=', currentUrl);
+
+            try {
+                // Wait for async resolution to settle
+                await new Promise(resolve => setTimeout(resolve, 500));
+                const defaultConfig = await fetch('/scripting/engine/default-config');
+                const modules = await fetch('/scripting/engine/modules');
+                const config = await defaultConfig.json();
+                const features = await modules.json();
+
+
+                console.log('[Scene] loading scene bundle');
+                const SceneBundle = await System.import('/static/preview/scene-bundle.js?t=' + Date.now());
+                const { startup } = SceneBundle;
+
+                // scene-bundle replaces globalThis.System with a new SystemJS
+                // instance that has its own registry, import maps, and closures.
+                // This causes all sorts of problems: registrations go to the
+                // wrong System, getRegister reads the wrong closure, external
+                // modules lose their exports, physics deps don't load, etc.
+                //
+                // Fix: restore the original System. All engine modules were
+                // registered on _originalSystem (via bundled/index.js), all
+                // import maps are on _originalSystem, and its getRegister
+                // closure matches its register. One System = no bridging needed.
+                globalThis.System = _originalSystem;
+
+                await startup({
+                    enginePath,
+                    projectPath,
+                    serverURL: currentUrl,
+                    defaultConfig: config,
+                    modules: features
+                });
+
+                console.log('Cocos Engine and Scene Services loaded successfully');
+
+            } catch (err) {
+                console.error('Failed to load Cocos Engine or Services:', err.stack || err);
+            }
+        })();
+    </script>
+</body>
+</html>
