@@ -18,18 +18,18 @@ export default {
                     const enginePath = Engine.getInfo().typescript.path;
                     const engineDistRelPath = relative(enginePath, facet.engineDistRoot).replace(/\\/g, '/');
                     const { default: scripting } = await import('../../core/scripting');
+                    const serverBaseUrl = `${req.protocol}://${req.get('host')}`;
                     const renderData = {
                         title: `Cocos Creator Preview - ${basename(scripting.projectPath)}`,
-                        settingsJs: '/settings.js',
                         packImportMapURL: `/scripting/x/${facet.packImportMapURL}`,
                         packResolutionDetailMapURL: `/scripting/x/${facet.packResolutionDetailMapURL}`,
                         engineDistPath: `/scripting/engine/${engineDistRelPath}`,
                         globalImportMap: await facet.getGlobalImportMap(),
                         projectPath: scripting.projectPath.replace(/\\/g, '/'),
                         enginePath: enginePath.replace(/\\/g, '/'),
-                        engineConfig: Engine.getConfig(),
+                        serverURL: serverBaseUrl
                     };
-                    const templatePath = join(GlobalPaths.workspace, 'static', 'preview', 'index.ejs');
+                    const templatePath = join(GlobalPaths.workspace, 'static', 'web', 'index.ejs');
                     const html = await ejs.renderFile(templatePath, renderData);
                     res.status(200).send(html);
                 } catch (err) {
@@ -38,17 +38,11 @@ export default {
             },
         },
         {
-            url: '/settings.js',
-            async handler(req: Request, res: Response) {
-                res.status(200).send('window._CCSettings = { "debug": true };');
-            },
-        },
-        {
-            url: '/scripting/engine/default-config',
+            url: '/scripting/engine/game-config',
             async handler(req: Request, res: Response) {
                 const { Engine } = await import('../engine');
                 const serverBaseUrl = `${req.protocol}://${req.get('host')}`;
-                const config = await Engine.getDefaultConfig(serverBaseUrl, serverBaseUrl, serverBaseUrl);
+                const config = await Engine.getGameConfig(serverBaseUrl, serverBaseUrl, serverBaseUrl);
                 res.json(config);
             },
         },
@@ -152,9 +146,9 @@ export default {
                     // Decode ONE level of percent-encoding: %253A → %3A (files on disk
                     // use single-encoded names, but SystemJS deps use double-encoded).
                     const rawPath = req.originalUrl.split('?')[0];
-                    const relPath = rawPath.substring('/scripting/engine'.length).replace(/%25/g, '%').replace(/\\/g, '/');
+                    let relPath = rawPath.substring('/scripting/engine'.length);
+                    relPath = decodeURIComponent(relPath);
                     const { default: scripting } = await import('../../core/scripting');
-
                     // Try engine root first — preserve percent-encoded dir names
                     let resourcePath = join(enginePath, relPath);
 
@@ -230,10 +224,10 @@ export default {
             },
         },
         {
-            url: /^\/static\/preview/,
+            url: /^\/static\/web/,
             async handler(req: Request, res: Response, next: NextFunction) {
-                const relPath = req.path.substring('/static/preview'.length);
-                const resourcePath = join(GlobalPaths.workspace, 'static', 'preview', relPath);
+                const relPath = req.path.substring('/static/web'.length);
+                const resourcePath = join(GlobalPaths.workspace, 'static', 'web', relPath);
                 console.log(`[Preview Server] Static resource requested: ${relPath} -> ${resourcePath}`);
                 if (await pathExists(resourcePath) && (await stat(resourcePath)).isFile()) {
                     res.sendFile(resourcePath);
@@ -261,32 +255,6 @@ export default {
                     res.sendFile(resourcePath);
                 } else {
                     console.warn(`[Preview Server] SystemJS resource not found: ${resourcePath}`);
-                    next();
-                }
-            },
-        },
-
-        {
-            url: /^\/scripting\/polyfills/,
-            async handler(req: Request, res: Response, next: NextFunction) {
-                let relPath = req.path.substring('/scripting/polyfills'.length);
-                if (relPath.endsWith('.js')) {
-                    relPath = relPath.substring(0, relPath.length - 3);
-                }
-                const polyfillMap: any = {
-                    '/events': join(GlobalPaths.workspace, 'node_modules', 'events', 'events.js'),
-                    '/path': join(GlobalPaths.workspace, 'node_modules', 'path-browserify', 'index.js'),
-                    '/url': join(GlobalPaths.workspace, 'node_modules', 'url', 'url.js'),
-                    '/util': join(GlobalPaths.workspace, 'node_modules', 'util', 'util.js'),
-                    '/os': join(GlobalPaths.workspace, 'node_modules', 'os-browserify', 'main.js'),
-                    '/reflect': join(GlobalPaths.workspace, 'node_modules', 'reflect-metadata', 'Reflect.js'),
-                    '/reflect-metadata': join(GlobalPaths.workspace, 'node_modules', 'reflect-metadata', 'Reflect.js'),
-                };
-
-                const resourcePath = polyfillMap[relPath];
-                if (resourcePath && await pathExists(resourcePath)) {
-                    res.sendFile(resourcePath);
-                } else {
                     next();
                 }
             },

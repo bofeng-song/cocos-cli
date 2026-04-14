@@ -31,7 +31,7 @@
     }
 })();
         
-System.register(['cc'], (function (exports, module) {
+System.register(['cc'], (function (exports) {
 	'use strict';
 	var require$$0$6, require$$0__default;
 	return {
@@ -55,8 +55,6 @@ System.register(['cc'], (function (exports, module) {
 				});
 				return Object.freeze(n);
 			}
-
-			exports('startup', startup);
 
 			var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -88,6 +86,8 @@ System.register(['cc'], (function (exports, module) {
 				});
 				return a;
 			}
+
+			var sceneRuntime$1 = {};
 
 			var editorExtends = {};
 
@@ -194,310 +194,317 @@ System.register(['cc'], (function (exports, module) {
 
 			var pathBrowserify = {};
 
-			(function (exports) {
-				// .dirname, .basename, and .extname methods are extracted from Node.js v8.11.1,
-				// backported and transplited with Babel, with backwards-compat fixes
+			var hasRequiredPathBrowserify;
 
-				// Copyright Joyent, Inc. and other Node contributors.
-				//
-				// Permission is hereby granted, free of charge, to any person obtaining a
-				// copy of this software and associated documentation files (the
-				// "Software"), to deal in the Software without restriction, including
-				// without limitation the rights to use, copy, modify, merge, publish,
-				// distribute, sublicense, and/or sell copies of the Software, and to permit
-				// persons to whom the Software is furnished to do so, subject to the
-				// following conditions:
-				//
-				// The above copyright notice and this permission notice shall be included
-				// in all copies or substantial portions of the Software.
-				//
-				// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-				// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-				// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-				// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-				// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-				// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-				// USE OR OTHER DEALINGS IN THE SOFTWARE.
+			function requirePathBrowserify () {
+				if (hasRequiredPathBrowserify) return pathBrowserify;
+				hasRequiredPathBrowserify = 1;
+				(function (exports) {
+					// .dirname, .basename, and .extname methods are extracted from Node.js v8.11.1,
+					// backported and transplited with Babel, with backwards-compat fixes
 
-				// resolves . and .. elements in a path array with directory names there
-				// must be no slashes, empty elements, or device names (c:\) in the array
-				// (so also no leading and trailing slashes - it does not distinguish
-				// relative and absolute paths)
-				function normalizeArray(parts, allowAboveRoot) {
-				  // if the path tries to go above the root, `up` ends up > 0
-				  var up = 0;
-				  for (var i = parts.length - 1; i >= 0; i--) {
-				    var last = parts[i];
-				    if (last === '.') {
-				      parts.splice(i, 1);
-				    } else if (last === '..') {
-				      parts.splice(i, 1);
-				      up++;
-				    } else if (up) {
-				      parts.splice(i, 1);
-				      up--;
-				    }
-				  }
+					// Copyright Joyent, Inc. and other Node contributors.
+					//
+					// Permission is hereby granted, free of charge, to any person obtaining a
+					// copy of this software and associated documentation files (the
+					// "Software"), to deal in the Software without restriction, including
+					// without limitation the rights to use, copy, modify, merge, publish,
+					// distribute, sublicense, and/or sell copies of the Software, and to permit
+					// persons to whom the Software is furnished to do so, subject to the
+					// following conditions:
+					//
+					// The above copyright notice and this permission notice shall be included
+					// in all copies or substantial portions of the Software.
+					//
+					// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+					// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+					// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+					// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+					// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+					// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+					// USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-				  // if the path is allowed to go above the root, restore leading ..s
-				  if (allowAboveRoot) {
-				    for (; up--; up) {
-				      parts.unshift('..');
-				    }
-				  }
+					// resolves . and .. elements in a path array with directory names there
+					// must be no slashes, empty elements, or device names (c:\) in the array
+					// (so also no leading and trailing slashes - it does not distinguish
+					// relative and absolute paths)
+					function normalizeArray(parts, allowAboveRoot) {
+					  // if the path tries to go above the root, `up` ends up > 0
+					  var up = 0;
+					  for (var i = parts.length - 1; i >= 0; i--) {
+					    var last = parts[i];
+					    if (last === '.') {
+					      parts.splice(i, 1);
+					    } else if (last === '..') {
+					      parts.splice(i, 1);
+					      up++;
+					    } else if (up) {
+					      parts.splice(i, 1);
+					      up--;
+					    }
+					  }
 
-				  return parts;
-				}
+					  // if the path is allowed to go above the root, restore leading ..s
+					  if (allowAboveRoot) {
+					    for (; up--; up) {
+					      parts.unshift('..');
+					    }
+					  }
 
-				// path.resolve([from ...], to)
-				// posix version
-				exports.resolve = function() {
-				  var resolvedPath = '',
-				      resolvedAbsolute = false;
+					  return parts;
+					}
 
-				  for (var i = arguments.length - 1; i >= -1 && !resolvedAbsolute; i--) {
-				    var path = (i >= 0) ? arguments[i] : process.cwd();
+					// path.resolve([from ...], to)
+					// posix version
+					exports.resolve = function() {
+					  var resolvedPath = '',
+					      resolvedAbsolute = false;
 
-				    // Skip empty and invalid entries
-				    if (typeof path !== 'string') {
-				      throw new TypeError('Arguments to path.resolve must be strings');
-				    } else if (!path) {
-				      continue;
-				    }
+					  for (var i = arguments.length - 1; i >= -1 && !resolvedAbsolute; i--) {
+					    var path = (i >= 0) ? arguments[i] : process.cwd();
 
-				    resolvedPath = path + '/' + resolvedPath;
-				    resolvedAbsolute = path.charAt(0) === '/';
-				  }
+					    // Skip empty and invalid entries
+					    if (typeof path !== 'string') {
+					      throw new TypeError('Arguments to path.resolve must be strings');
+					    } else if (!path) {
+					      continue;
+					    }
 
-				  // At this point the path should be resolved to a full absolute path, but
-				  // handle relative paths to be safe (might happen when process.cwd() fails)
+					    resolvedPath = path + '/' + resolvedPath;
+					    resolvedAbsolute = path.charAt(0) === '/';
+					  }
 
-				  // Normalize the path
-				  resolvedPath = normalizeArray(filter(resolvedPath.split('/'), function(p) {
-				    return !!p;
-				  }), !resolvedAbsolute).join('/');
+					  // At this point the path should be resolved to a full absolute path, but
+					  // handle relative paths to be safe (might happen when process.cwd() fails)
 
-				  return ((resolvedAbsolute ? '/' : '') + resolvedPath) || '.';
-				};
+					  // Normalize the path
+					  resolvedPath = normalizeArray(filter(resolvedPath.split('/'), function(p) {
+					    return !!p;
+					  }), !resolvedAbsolute).join('/');
 
-				// path.normalize(path)
-				// posix version
-				exports.normalize = function(path) {
-				  var isAbsolute = exports.isAbsolute(path),
-				      trailingSlash = substr(path, -1) === '/';
+					  return ((resolvedAbsolute ? '/' : '') + resolvedPath) || '.';
+					};
 
-				  // Normalize the path
-				  path = normalizeArray(filter(path.split('/'), function(p) {
-				    return !!p;
-				  }), !isAbsolute).join('/');
+					// path.normalize(path)
+					// posix version
+					exports.normalize = function(path) {
+					  var isAbsolute = exports.isAbsolute(path),
+					      trailingSlash = substr(path, -1) === '/';
 
-				  if (!path && !isAbsolute) {
-				    path = '.';
-				  }
-				  if (path && trailingSlash) {
-				    path += '/';
-				  }
+					  // Normalize the path
+					  path = normalizeArray(filter(path.split('/'), function(p) {
+					    return !!p;
+					  }), !isAbsolute).join('/');
 
-				  return (isAbsolute ? '/' : '') + path;
-				};
+					  if (!path && !isAbsolute) {
+					    path = '.';
+					  }
+					  if (path && trailingSlash) {
+					    path += '/';
+					  }
 
-				// posix version
-				exports.isAbsolute = function(path) {
-				  return path.charAt(0) === '/';
-				};
+					  return (isAbsolute ? '/' : '') + path;
+					};
 
-				// posix version
-				exports.join = function() {
-				  var paths = Array.prototype.slice.call(arguments, 0);
-				  return exports.normalize(filter(paths, function(p, index) {
-				    if (typeof p !== 'string') {
-				      throw new TypeError('Arguments to path.join must be strings');
-				    }
-				    return p;
-				  }).join('/'));
-				};
+					// posix version
+					exports.isAbsolute = function(path) {
+					  return path.charAt(0) === '/';
+					};
+
+					// posix version
+					exports.join = function() {
+					  var paths = Array.prototype.slice.call(arguments, 0);
+					  return exports.normalize(filter(paths, function(p, index) {
+					    if (typeof p !== 'string') {
+					      throw new TypeError('Arguments to path.join must be strings');
+					    }
+					    return p;
+					  }).join('/'));
+					};
 
 
-				// path.relative(from, to)
-				// posix version
-				exports.relative = function(from, to) {
-				  from = exports.resolve(from).substr(1);
-				  to = exports.resolve(to).substr(1);
+					// path.relative(from, to)
+					// posix version
+					exports.relative = function(from, to) {
+					  from = exports.resolve(from).substr(1);
+					  to = exports.resolve(to).substr(1);
 
-				  function trim(arr) {
-				    var start = 0;
-				    for (; start < arr.length; start++) {
-				      if (arr[start] !== '') break;
-				    }
+					  function trim(arr) {
+					    var start = 0;
+					    for (; start < arr.length; start++) {
+					      if (arr[start] !== '') break;
+					    }
 
-				    var end = arr.length - 1;
-				    for (; end >= 0; end--) {
-				      if (arr[end] !== '') break;
-				    }
+					    var end = arr.length - 1;
+					    for (; end >= 0; end--) {
+					      if (arr[end] !== '') break;
+					    }
 
-				    if (start > end) return [];
-				    return arr.slice(start, end - start + 1);
-				  }
+					    if (start > end) return [];
+					    return arr.slice(start, end - start + 1);
+					  }
 
-				  var fromParts = trim(from.split('/'));
-				  var toParts = trim(to.split('/'));
+					  var fromParts = trim(from.split('/'));
+					  var toParts = trim(to.split('/'));
 
-				  var length = Math.min(fromParts.length, toParts.length);
-				  var samePartsLength = length;
-				  for (var i = 0; i < length; i++) {
-				    if (fromParts[i] !== toParts[i]) {
-				      samePartsLength = i;
-				      break;
-				    }
-				  }
+					  var length = Math.min(fromParts.length, toParts.length);
+					  var samePartsLength = length;
+					  for (var i = 0; i < length; i++) {
+					    if (fromParts[i] !== toParts[i]) {
+					      samePartsLength = i;
+					      break;
+					    }
+					  }
 
-				  var outputParts = [];
-				  for (var i = samePartsLength; i < fromParts.length; i++) {
-				    outputParts.push('..');
-				  }
+					  var outputParts = [];
+					  for (var i = samePartsLength; i < fromParts.length; i++) {
+					    outputParts.push('..');
+					  }
 
-				  outputParts = outputParts.concat(toParts.slice(samePartsLength));
+					  outputParts = outputParts.concat(toParts.slice(samePartsLength));
 
-				  return outputParts.join('/');
-				};
+					  return outputParts.join('/');
+					};
 
-				exports.sep = '/';
-				exports.delimiter = ':';
+					exports.sep = '/';
+					exports.delimiter = ':';
 
-				exports.dirname = function (path) {
-				  if (typeof path !== 'string') path = path + '';
-				  if (path.length === 0) return '.';
-				  var code = path.charCodeAt(0);
-				  var hasRoot = code === 47 /*/*/;
-				  var end = -1;
-				  var matchedSlash = true;
-				  for (var i = path.length - 1; i >= 1; --i) {
-				    code = path.charCodeAt(i);
-				    if (code === 47 /*/*/) {
-				        if (!matchedSlash) {
-				          end = i;
-				          break;
-				        }
-				      } else {
-				      // We saw the first non-path separator
-				      matchedSlash = false;
-				    }
-				  }
+					exports.dirname = function (path) {
+					  if (typeof path !== 'string') path = path + '';
+					  if (path.length === 0) return '.';
+					  var code = path.charCodeAt(0);
+					  var hasRoot = code === 47 /*/*/;
+					  var end = -1;
+					  var matchedSlash = true;
+					  for (var i = path.length - 1; i >= 1; --i) {
+					    code = path.charCodeAt(i);
+					    if (code === 47 /*/*/) {
+					        if (!matchedSlash) {
+					          end = i;
+					          break;
+					        }
+					      } else {
+					      // We saw the first non-path separator
+					      matchedSlash = false;
+					    }
+					  }
 
-				  if (end === -1) return hasRoot ? '/' : '.';
-				  if (hasRoot && end === 1) {
-				    // return '//';
-				    // Backwards-compat fix:
-				    return '/';
-				  }
-				  return path.slice(0, end);
-				};
+					  if (end === -1) return hasRoot ? '/' : '.';
+					  if (hasRoot && end === 1) {
+					    // return '//';
+					    // Backwards-compat fix:
+					    return '/';
+					  }
+					  return path.slice(0, end);
+					};
 
-				function basename(path) {
-				  if (typeof path !== 'string') path = path + '';
+					function basename(path) {
+					  if (typeof path !== 'string') path = path + '';
 
-				  var start = 0;
-				  var end = -1;
-				  var matchedSlash = true;
-				  var i;
+					  var start = 0;
+					  var end = -1;
+					  var matchedSlash = true;
+					  var i;
 
-				  for (i = path.length - 1; i >= 0; --i) {
-				    if (path.charCodeAt(i) === 47 /*/*/) {
-				        // If we reached a path separator that was not part of a set of path
-				        // separators at the end of the string, stop now
-				        if (!matchedSlash) {
-				          start = i + 1;
-				          break;
-				        }
-				      } else if (end === -1) {
-				      // We saw the first non-path separator, mark this as the end of our
-				      // path component
-				      matchedSlash = false;
-				      end = i + 1;
-				    }
-				  }
+					  for (i = path.length - 1; i >= 0; --i) {
+					    if (path.charCodeAt(i) === 47 /*/*/) {
+					        // If we reached a path separator that was not part of a set of path
+					        // separators at the end of the string, stop now
+					        if (!matchedSlash) {
+					          start = i + 1;
+					          break;
+					        }
+					      } else if (end === -1) {
+					      // We saw the first non-path separator, mark this as the end of our
+					      // path component
+					      matchedSlash = false;
+					      end = i + 1;
+					    }
+					  }
 
-				  if (end === -1) return '';
-				  return path.slice(start, end);
-				}
+					  if (end === -1) return '';
+					  return path.slice(start, end);
+					}
 
-				// Uses a mixed approach for backwards-compatibility, as ext behavior changed
-				// in new Node.js versions, so only basename() above is backported here
-				exports.basename = function (path, ext) {
-				  var f = basename(path);
-				  if (ext && f.substr(-1 * ext.length) === ext) {
-				    f = f.substr(0, f.length - ext.length);
-				  }
-				  return f;
-				};
+					// Uses a mixed approach for backwards-compatibility, as ext behavior changed
+					// in new Node.js versions, so only basename() above is backported here
+					exports.basename = function (path, ext) {
+					  var f = basename(path);
+					  if (ext && f.substr(-1 * ext.length) === ext) {
+					    f = f.substr(0, f.length - ext.length);
+					  }
+					  return f;
+					};
 
-				exports.extname = function (path) {
-				  if (typeof path !== 'string') path = path + '';
-				  var startDot = -1;
-				  var startPart = 0;
-				  var end = -1;
-				  var matchedSlash = true;
-				  // Track the state of characters (if any) we see before our first dot and
-				  // after any path separator we find
-				  var preDotState = 0;
-				  for (var i = path.length - 1; i >= 0; --i) {
-				    var code = path.charCodeAt(i);
-				    if (code === 47 /*/*/) {
-				        // If we reached a path separator that was not part of a set of path
-				        // separators at the end of the string, stop now
-				        if (!matchedSlash) {
-				          startPart = i + 1;
-				          break;
-				        }
-				        continue;
-				      }
-				    if (end === -1) {
-				      // We saw the first non-path separator, mark this as the end of our
-				      // extension
-				      matchedSlash = false;
-				      end = i + 1;
-				    }
-				    if (code === 46 /*.*/) {
-				        // If this is our first dot, mark it as the start of our extension
-				        if (startDot === -1)
-				          startDot = i;
-				        else if (preDotState !== 1)
-				          preDotState = 1;
-				    } else if (startDot !== -1) {
-				      // We saw a non-dot and non-path separator before our dot, so we should
-				      // have a good chance at having a non-empty extension
-				      preDotState = -1;
-				    }
-				  }
+					exports.extname = function (path) {
+					  if (typeof path !== 'string') path = path + '';
+					  var startDot = -1;
+					  var startPart = 0;
+					  var end = -1;
+					  var matchedSlash = true;
+					  // Track the state of characters (if any) we see before our first dot and
+					  // after any path separator we find
+					  var preDotState = 0;
+					  for (var i = path.length - 1; i >= 0; --i) {
+					    var code = path.charCodeAt(i);
+					    if (code === 47 /*/*/) {
+					        // If we reached a path separator that was not part of a set of path
+					        // separators at the end of the string, stop now
+					        if (!matchedSlash) {
+					          startPart = i + 1;
+					          break;
+					        }
+					        continue;
+					      }
+					    if (end === -1) {
+					      // We saw the first non-path separator, mark this as the end of our
+					      // extension
+					      matchedSlash = false;
+					      end = i + 1;
+					    }
+					    if (code === 46 /*.*/) {
+					        // If this is our first dot, mark it as the start of our extension
+					        if (startDot === -1)
+					          startDot = i;
+					        else if (preDotState !== 1)
+					          preDotState = 1;
+					    } else if (startDot !== -1) {
+					      // We saw a non-dot and non-path separator before our dot, so we should
+					      // have a good chance at having a non-empty extension
+					      preDotState = -1;
+					    }
+					  }
 
-				  if (startDot === -1 || end === -1 ||
-				      // We saw a non-dot character immediately before the dot
-				      preDotState === 0 ||
-				      // The (right-most) trimmed path component is exactly '..'
-				      preDotState === 1 && startDot === end - 1 && startDot === startPart + 1) {
-				    return '';
-				  }
-				  return path.slice(startDot, end);
-				};
+					  if (startDot === -1 || end === -1 ||
+					      // We saw a non-dot character immediately before the dot
+					      preDotState === 0 ||
+					      // The (right-most) trimmed path component is exactly '..'
+					      preDotState === 1 && startDot === end - 1 && startDot === startPart + 1) {
+					    return '';
+					  }
+					  return path.slice(startDot, end);
+					};
 
-				function filter (xs, f) {
-				    if (xs.filter) return xs.filter(f);
-				    var res = [];
-				    for (var i = 0; i < xs.length; i++) {
-				        if (f(xs[i], i, xs)) res.push(xs[i]);
-				    }
-				    return res;
-				}
+					function filter (xs, f) {
+					    if (xs.filter) return xs.filter(f);
+					    var res = [];
+					    for (var i = 0; i < xs.length; i++) {
+					        if (f(xs[i], i, xs)) res.push(xs[i]);
+					    }
+					    return res;
+					}
 
-				// String.prototype.substr - negative index don't work in IE8
-				var substr = 'ab'.substr(-1) === 'b'
-				    ? function (str, start, len) { return str.substr(start, len) }
-				    : function (str, start, len) {
-				        if (start < 0) start = str.length + start;
-				        return str.substr(start, len);
-				    }
-				; 
-			} (pathBrowserify));
+					// String.prototype.substr - negative index don't work in IE8
+					var substr = 'ab'.substr(-1) === 'b'
+					    ? function (str, start, len) { return str.substr(start, len) }
+					    : function (str, start, len) {
+					        if (start < 0) start = str.length + start;
+					        return str.substr(start, len);
+					    }
+					; 
+				} (pathBrowserify));
+				return pathBrowserify;
+			}
 
 			var objectWalker = {};
 
@@ -1092,7 +1099,7 @@ System.register(['cc'], (function (exports, module) {
 				exports.removeCache = removeCache;
 				const fs_1 = require$$0$5;
 				const fs_extra_1 = require$$2$2;
-				const path_1 = pathBrowserify;
+				const path_1 = requirePathBrowserify();
 				/**
 				 * 检查文件在指定文件夹中是否存在，如果存在则通过追加数字后缀的方式生成一个唯一的文件名。
 				 * @param targetFolder 目标文件夹的路径。
@@ -1743,8 +1750,8 @@ System.register(['cc'], (function (exports, module) {
 				exports.stripExt = stripExt;
 				exports.contains = contains;
 				exports.normalize = normalize;
-				const Path = __importStar(pathBrowserify);
-				const path_1 = pathBrowserify;
+				const Path = __importStar(requirePathBrowserify());
+				const path_1 = requirePathBrowserify();
 				/**
 				 * 返回一个不含扩展名的文件名
 				 * @param path
@@ -2365,7 +2372,7 @@ System.register(['cc'], (function (exports, module) {
 				Object.defineProperty(exports, "__esModule", { value: true });
 				exports.MissingClass = exports.MissingClassReporter = void 0;
 				const _ = __importStar(require$$2$3);
-				const ps = __importStar(pathBrowserify);
+				const ps = __importStar(requirePathBrowserify());
 				const ObjectWalker = __importStar(objectWalker);
 				const assetdb = __importStar(require$$4);
 				const missing_reporter_1 = missingReporter;
@@ -2567,7 +2574,7 @@ System.register(['cc'], (function (exports, module) {
 			missingObjectReporter.MissingObjectReporter = void 0;
 			const missing_reporter_1 = missingReporter;
 			const _ = __importStar$4(require$$2$3);
-			const ps = __importStar$4(pathBrowserify);
+			const ps = __importStar$4(requirePathBrowserify());
 			const ObjectWalker$1 = __importStar$4(objectWalker);
 			const assetdb = __importStar$4(require$$4);
 			class MissingObjectReporter extends missing_reporter_1.MissingReporter {
@@ -6782,23 +6789,7 @@ System.register(['cc'], (function (exports, module) {
 				
 			} (editorExtends));
 
-			var index = /*@__PURE__*/getDefaultExportFromCjs(editorExtends);
-
-			var EditorExtendsLocalImport = /*#__PURE__*/_mergeNamespaces({
-				__proto__: null,
-				'default': index
-			}, [editorExtends]);
-
-			const EditorExtendsLocal = exports('EditorExtends', { ...EditorExtendsLocalImport });
-			                    if (EditorExtendsLocal.UuidUtils) {
-			                        const U = EditorExtendsLocal.UuidUtils;
-			                        U.decompressUuid = U.decompressUuid || U.decompressUUID;
-			                        U.compressUuid = U.compressUuid || U.compressUUID;
-			                        U.isUuid = U.isUuid || U.isUUID;
-			                    }
-			                    globalThis.EditorExtends = EditorExtendsLocal;
-
-			var serviceManager = {};
+			var serviceManager$1 = {};
 
 			var core = {};
 
@@ -7029,9 +7020,9 @@ System.register(['cc'], (function (exports, module) {
 
 			Object.defineProperty(asset$2, "__esModule", { value: true });
 
-			var engine$1 = {};
+			var engine$2 = {};
 
-			Object.defineProperty(engine$1, "__esModule", { value: true });
+			Object.defineProperty(engine$2, "__esModule", { value: true });
 
 			(function (exports) {
 				var __createBinding = (commonjsGlobal && commonjsGlobal.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -7056,7 +7047,7 @@ System.register(['cc'], (function (exports, module) {
 				__exportStar(script$1, exports);
 				__exportStar(component$3, exports);
 				__exportStar(asset$2, exports);
-				__exportStar(engine$1, exports);
+				__exportStar(engine$2, exports);
 				
 			} (common$1));
 
@@ -8583,7 +8574,7 @@ System.register(['cc'], (function (exports, module) {
 			})(Reflect$1 || (Reflect$1 = {}));
 
 			Object.defineProperty(decorator, "__esModule", { value: true });
-			var Service$1 = decorator.Service = void 0;
+			decorator.Service = void 0;
 			decorator.register = register;
 			decorator.getServiceAll = getServiceAll;
 
@@ -8601,7 +8592,7 @@ System.register(['cc'], (function (exports, module) {
 			/**
 			 * 全局代理：通过 Service.Editor.xxx() 访问
 			 */
-			Service$1 = decorator.Service = new Proxy({}, {
+			decorator.Service = new Proxy({}, {
 			    get(_, prop) {
 			        const svc = _serviceRegistry[prop];
 			        if (!svc) {
@@ -8641,8 +8632,8 @@ System.register(['cc'], (function (exports, module) {
 				
 			} (core));
 
-			Object.defineProperty(serviceManager, "__esModule", { value: true });
-			var serviceManager_1 = exports('serviceManager', serviceManager.serviceManager = serviceManager.ServiceManager = void 0);
+			Object.defineProperty(serviceManager$1, "__esModule", { value: true });
+			serviceManager$1.serviceManager = serviceManager$1.ServiceManager = void 0;
 			const core_1$b = core;
 			// 定义事件分组映射
 			const SERVICE_EVENTS_MAP = {
@@ -8708,8 +8699,8 @@ System.register(['cc'], (function (exports, module) {
 			        this.eventHandlers.clear();
 			    }
 			}
-			serviceManager.ServiceManager = ServiceManager;
-			exports('serviceManager', serviceManager_1 = serviceManager.serviceManager = new ServiceManager());
+			serviceManager$1.ServiceManager = ServiceManager;
+			serviceManager$1.serviceManager = new ServiceManager();
 
 			var service = {};
 
@@ -13057,7 +13048,7 @@ System.register(['cc'], (function (exports, module) {
 			const core_1$9 = core;
 			const common_1$3 = common$1;
 			const editors_1 = editors;
-			const service_manager_1$1 = serviceManager;
+			const service_manager_1$1 = serviceManager$1;
 			/**
 			 * EditorAsset - 统一的编辑器管理入口
 			 * 作为调度器，根据资源类型动态创建和管理编辑器实例
@@ -19644,7 +19635,7 @@ System.register(['cc'], (function (exports, module) {
 			};
 			Object.defineProperty(base, "__esModule", { value: true });
 			base.ChunkIOBase = void 0;
-			const path_1$2 = __importDefault$9(pathBrowserify);
+			const path_1$2 = __importDefault$9(requirePathBrowserify());
 			const fs_extra_1$1 = __importDefault$9(require$$2$2);
 			class ChunkIOBase {
 			    constructor({ chunkHomePath, }) {
@@ -20541,7 +20532,7 @@ System.register(['cc'], (function (exports, module) {
 			};
 			Object.defineProperty(middleware, "__esModule", { value: true });
 			middleware.QuickPackMiddleware = void 0;
-			const path_1$1 = __importDefault$7(pathBrowserify);
+			const path_1$1 = __importDefault$7(requirePathBrowserify());
 			const url_1$2 = require$$2;
 			const constants_1 = constants;
 			const proper_lockfile_1 = __importDefault$7(require$$3);
@@ -21067,7 +21058,7 @@ System.register(['cc'], (function (exports, module) {
 			};
 			Object.defineProperty(executor, "__esModule", { value: true });
 			executor.Executor = void 0;
-			const path_1 = __importDefault$5(pathBrowserify);
+			const path_1 = __importDefault$5(requirePathBrowserify());
 			const editor_systemjs_1 = editorSystemjs;
 			const url_1 = require$$2;
 			const loader_1$1 = loader;
@@ -21475,7 +21466,7 @@ System.register(['cc'], (function (exports, module) {
 			const rpc_1$6 = rpc;
 			const core_1$7 = core;
 			const utils_1$4 = __importDefault$4(utils$7);
-			const service_manager_1 = serviceManager;
+			const service_manager_1 = serviceManager$1;
 			/**
 			 * 异步迭代。有以下特点：
 			 * 1. 每次调用 `nextIteration()` 会执行一次传入的**迭代函数**；迭代函数允许是异步的，在构造函数中确定之后不能更改；
@@ -21573,12 +21564,6 @@ System.register(['cc'], (function (exports, module) {
 			        this._suspendPromise = condition;
 			    }
 			    async init() {
-			        // Skip packer-driver initialization in browser preview —
-			        // QuickPackLoaderContext and other Node.js dependencies are unavailable
-			        // const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-			        // if (isBrowser) {
-			        //     return;
-			        // }
 			        EditorExtends.on('class-registered', (classConstructor, metadata, className) => {
 			            console.log('classRegistered', className);
 			            console.log('class-registered ' + cc_1$7.default.js.isChildClassOf(classConstructor, cc_1$7.default.Component));
@@ -21723,7 +21708,7 @@ System.register(['cc'], (function (exports, module) {
 			                const res = await fetch(`${serverUrl}/assetManager/querySortedPlugins`);
 			                if (res.ok) {
 			                    const pluginScripts = await res.json();
-			                    this._executor.setPluginScripts(pluginScripts);
+			                    this._executor.setPluginScripts(pluginScripts || []);
 			                }
 			                else {
 			                    this._executor.setPluginScripts([]);
@@ -22947,7 +22932,7 @@ System.register(['cc'], (function (exports, module) {
 			    (0, core_1$4.register)('Component')
 			], ComponentService);
 
-			var engine = {};
+			var engine$1 = {};
 
 			var time = {};
 
@@ -23137,8 +23122,8 @@ System.register(['cc'], (function (exports, module) {
 			var __importDefault$1 = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
 			    return (mod && mod.__esModule) ? mod : { "default": mod };
 			};
-			Object.defineProperty(engine, "__esModule", { value: true });
-			engine.EngineService = void 0;
+			Object.defineProperty(engine$1, "__esModule", { value: true });
+			engine$1.EngineService = void 0;
 			const time_1 = __importDefault$1(time);
 			const cc_1$3 = require$$0__default;
 			const geometry_renderer_1 = geometry_renderer;
@@ -23273,8 +23258,8 @@ System.register(['cc'], (function (exports, module) {
 			        void this.repaintInEditMode();
 			    }
 			};
-			engine.EngineService = EngineService;
-			engine.EngineService = EngineService = __decorate$1([
+			engine$1.EngineService = EngineService;
+			engine$1.EngineService = EngineService = __decorate$1([
 			    (0, core_1$3.register)('Engine')
 			], EngineService);
 
@@ -26269,99 +26254,431 @@ System.register(['cc'], (function (exports, module) {
 				__exportStar(script, exports);
 				__exportStar(asset, exports);
 				__exportStar(component$1, exports);
-				__exportStar(engine, exports);
+				__exportStar(engine$1, exports);
 				__exportStar(prefab, exports);
 				
 			} (service));
 
-			const Service = exports('Service', Service$1);
+			var engine = {};
 
-			                    async function startup(options) {
-			                        const { enginePath, projectPath, serverURL, defaultConfig, modules } = options;
-			                        
-			                        if (typeof window !== 'undefined') {
-			                            window.__CC_PROJECT_PATH__ = projectPath;
-			                        }
-			                        serviceManager_1.initialize(serverURL);
+			var hasRequiredEngine;
 
-			                        const requiredModules = [
-			                                                    'cc',
-			                                                    'cc/editor/populate-internal-constants',
-			                                                    'cc/editor/serialization',
-			                                                    'cc/editor/new-gen-anim',
-			                                                    'cc/editor/embedded-player',
-			                                                    'cc/editor/reflection-probe',
-			                                                    'cc/editor/lod-group-utils',
-			                                                    'cc/editor/material',
-			                                                    'cc/editor/2d-misc',
-			                                                    'cc/editor/offline-mappings',
-			                                                    'cc/editor/custom-pipeline',
-			                                                    'cc/editor/animation-clip-migration',
-			                                                    'cc/editor/exotic-animation',
-			                                                    'cc/editor/color-utils',
-			                                                ];
-			                        // IMPORTANT: We must NOT use import() here because Rollup's
-			                        // resolveId hook aliases cc/editor/* to a cc re-export stub,
-			                        // which means the real engine side-effect modules never load
-			                        // (e.g. cc.deserialize._macros never gets populated).
-			                        //
-			                        // We also cannot use System.import() directly because it lacks
-			                        // the correct parentURL context for import-map resolution.
-			                        //
-			                        // Solution: use module.import(id), a placeholder that the
-			                        // renderChunk plugin replaces with module.import(id) — the
-			                        // SystemJS module-scoped import that has the right resolution
-			                        // context and bypasses Rollup's resolveId entirely.
-			                        for (const mod of requiredModules) {
-			                            try {
-			                                await module.import(mod);
-			                            } catch (e) {
-			                                console.error('Failed to load engine module:', mod, 'e:', e);
-			                            }
-			                        }
+			function requireEngine () {
+				if (hasRequiredEngine) return engine;
+				hasRequiredEngine = 1;
 
-			                        const baseUrl = module.meta.url.substring(0, module.meta.url.lastIndexOf('/static/preview'));
-			                        new URL('/scripting/engine/bin/.editor/web-adapter.js', baseUrl).href;
-			                       // await import(webAdapter);
-			                        new URL('/scripting/engine/bin/.editor/engine-adapter.js', baseUrl).href;
-			                       // await import(engineAdapter);
+				const { basename } = requirePathBrowserify();
+				const { EventEmitter } = events;
 
-			                        // EditorExtends is already on globalThis now
-			                        if (EditorExtendsLocal.UuidUtils) {
-			                            EditorExtendsLocal.UuidUtils.compressUuid = EditorExtendsLocal.UuidUtils.compressUUID;
-			                        }
-			                        globalThis.cce = globalThis.cce || {};
-			                        globalThis.cce.Script = Service$1.Script;
+				class Engine extends EventEmitter {
+				    constructor() {
+				        super();
+				        this.attachedObjsForEditor = {};
+				    }
 
-			                       // await DecoratorService.Engine.init();
-			                        if (EditorExtendsLocal.init) {
-			                            await EditorExtendsLocal.init();
-			                        }
+				    off() { }
 
-			                        await System.import('cc');
-			                        cc.physics.selector.runInEditor = true;
-			                        await cc.game.init(defaultConfig);
-			                        
-			                        let backend = 'builtin';
-			                        const Backends = {
-			                            'physics-cannon': 'cannon.js',
-			                            'physics-ammo': 'bullet',
-			                            'physics-builtin': 'builtin',
-			                            'physics-physx': 'physx',
-			                        };
-			                        modules.forEach((m) => {
-			                            if (m in Backends) {
-			                                backend = Backends[m];
-			                            }
-			                        });
+				    getDesignResolutionSize() {
+				        return { width: 1280, height: 760 }; // 手写的设计分辨率
+				    }
 
-			                        // 切换物理引擎
-			                        cc.physics.selector.switchTo(backend);
+				    setDesignResolutionSize() { }
+				}
 
-			                        await cc.game.run(async () => {
-			                            cc.game.pause();
-			                        });
-			                    }
+				// 适配 cc.engine
+				// todo 引擎内发送了 node-attach-to-scene 等事件
+				cc.engine = new Engine();
+
+				// 适配 _Scene
+				window._Scene = {
+				    AssetsWatcher: {
+				        start() { },
+				        initComponent() { },
+				        stop() { },
+				    },
+				    DetectConflict: {
+				        beforeAddChild() { },
+				        afterAddChild() { },
+				    },
+				};
+				cc.require = function(request, originRequire) {
+				    originRequire = originRequire || commonjsRequire;
+
+				    let m;
+				    try {
+				        const name = basename(request);
+
+				        m = cc.js.getClassByName(name);
+				        if (!m) {
+				            m = originRequire(request);
+				        }
+				    } catch (err) {
+				        console.error(`load script [${request}] failed : ${err.stack}`);
+				    }
+				    return m;
+				};
+
+				// 适配 cc._throw
+				cc._throw = cc.error;
+				return engine;
+			}
+
+			var widgetManager;
+			var hasRequiredWidgetManager;
+
+			function requireWidgetManager () {
+				if (hasRequiredWidgetManager) return widgetManager;
+				hasRequiredWidgetManager = 1;
+
+				/**
+				 * 编辑器内重写 widget 内部分方法以实现值锁定功能
+				 */
+
+				widgetManager = function(ccm) {
+				    const { Widget, UITransform, Label } = ccm;
+				    const cc = commonjsGlobal.cc;
+				    const LockFlags = {
+				        TOP: 1 << 0,
+				        MID: 1 << 1,
+				        BOT: 1 << 2,
+				        LEFT: 1 << 3,
+				        CENTER: 1 << 4,
+				        RIGHT: 1 << 5,
+				    };
+
+				    Widget.prototype.setLockTop = function(lock) {
+				        this._setLock(LockFlags.TOP, lock);
+				    };
+				    Widget.prototype.getLockTop = function() {
+				        return this._lockFlags & LockFlags.TOP;
+				    };
+
+				    Widget.prototype.setLockBottom = function(lock) {
+				        this._setLock(LockFlags.BOT, lock);
+				    };
+				    Widget.prototype.getLockBottom = function() {
+				        return this._lockFlags & LockFlags.BOT;
+				    };
+
+				    Widget.prototype.setLockLeft = function(lock) {
+				        this._setLock(LockFlags.LEFT, lock);
+				    };
+				    Widget.prototype.getLockLeft = function() {
+				        return this._lockFlags & LockFlags.LEFT;
+				    };
+
+				    Widget.prototype.setLockRight = function(lock) {
+				        this._setLock(LockFlags.RIGHT, lock);
+				    };
+				    Widget.prototype.getLockRight = function() {
+				        return this._lockFlags & LockFlags.RIGHT;
+				    };
+
+				    Widget.prototype.setLockHorizontalCenter = function(lock) {
+				        this._setLock(LockFlags.CENTER, lock);
+				    };
+				    Widget.prototype.getLockHorizontalCenter = function() {
+				        return this._lockFlags & LockFlags.CENTER;
+				    };
+
+				    Widget.prototype.setLockVerticalCenter = function(lock) {
+				        this._setLock(LockFlags.MID, lock);
+				    };
+				    Widget.prototype.getLockVerticalCenter = function() {
+				        return this._lockFlags & LockFlags.MID;
+				    };
+
+				    Widget.prototype._setLock = function(flag, isLock) {
+				        const current = (this._lockFlags & flag) > 0;
+				        if (isLock === current) {
+				            return;
+				        }
+				        if (isLock) {
+				            this._lockFlags |= flag;
+				        } else {
+				            this._lockFlags &= ~flag;
+				        }
+				    };
+
+				    Widget.prototype._adjustWidgetToAllowMovingInEditor = function(eventType) {
+				        if (!(eventType & cc.internal.TransformBit.POSITION)) {
+				            return;
+				        }
+
+				        if (cc._widgetManager.isAligning) {
+				            return;
+				        }
+
+				        const self = this;
+				        const newPos = self.node.getPosition();
+				        const oldPos = this._lastPos;
+				        const delta = new cc.Vec3(newPos);
+				        delta.subtract(oldPos);
+
+				        let target = self.node.parent;
+				        const inverseScale = new cc.Vec3(1, 1, 1);
+
+				        if (self.target) {
+				            target = self.target;
+				            cc.internal.computeInverseTransForTarget(self.node, target, new cc.Vec3(), inverseScale);
+				        }
+				        if (!target) {
+				            return;
+				        }
+
+				        const targetSize = cc.internal.getReadonlyNodeSize(target);
+				        const deltaInPercent = new cc.Vec3();
+				        if (targetSize.width !== 0 && targetSize.height !== 0) {
+				            cc.Vec3.set(deltaInPercent, delta.x / targetSize.width, delta.y / targetSize.height, deltaInPercent.z);
+				        }
+
+				        if (self.isAlignTop && !self.getLockTop()) {
+				            self._top -= (self._isAbsTop ? delta.y : deltaInPercent.y) * inverseScale.y;
+				        }
+				        if (self.isAlignBottom && !self.getLockBottom()) {
+				            self._bottom += (self._isAbsBottom ? delta.y : deltaInPercent.y) * inverseScale.y;
+				        }
+				        if (self.isAlignLeft && !self.getLockLeft()) {
+				            self._left += (self._isAbsLeft ? delta.x : deltaInPercent.x) * inverseScale.x;
+				        }
+				        if (self.isAlignRight && !self.getLockRight()) {
+				            self._right -= (self._isAbsRight ? delta.x : deltaInPercent.x) * inverseScale.x;
+				        }
+				        if (self.isAlignHorizontalCenter && !self.getLockHorizontalCenter()) {
+				            self._horizontalCenter += (self._isAbsHorizontalCenter ? delta.x : deltaInPercent.x) * inverseScale.x;
+				        }
+				        if (self.isAlignVerticalCenter && !self.getLockVerticalCenter()) {
+				            self._verticalCenter += (self._isAbsVerticalCenter ? delta.y : deltaInPercent.y) * inverseScale.y;
+				        }
+				        this._recursiveDirty();
+				        self.node.getPosition(self._lastPos);
+				    };
+
+				    Widget.prototype._adjustWidgetToAllowResizingInEditor = function() {
+				        if (cc._widgetManager.isAligning) {
+				            return;
+				        }
+
+				        const self = this;
+				        const uiTransformComp = self.node.getComponent(UITransform);
+				        if (!uiTransformComp) {
+				            return;
+				        }
+
+				        const newSize = uiTransformComp.contentSize;
+				        const oldSize = this._lastSize;
+				        const delta = new cc.Vec3(newSize.width - oldSize.width, newSize.height - oldSize.height, 0);
+
+				        let target = self.node.parent;
+				        const inverseScale = new cc.Vec3(1, 1, 1);
+				        if (self.target) {
+				            target = self.target;
+				            cc.internal.computeInverseTransForTarget(self.node, target, new cc.Vec3(), inverseScale);
+				        }
+				        if (!target) {
+				            return;
+				        }
+
+				        const targetSize = cc.internal.getReadonlyNodeSize(target);
+				        const deltaInPercent = new cc.Vec3();
+				        if (targetSize.width !== 0 && targetSize.height !== 0) {
+				            cc.Vec3.set(deltaInPercent, delta.x / targetSize.width, delta.y / targetSize.height, deltaInPercent.z);
+				        }
+
+				        const anchor = uiTransformComp.anchorPoint;
+
+				        if (self.isAlignTop && !self.getLockTop()) {
+				            self._top -= (self._isAbsTop ? delta.y : deltaInPercent.y) * (1 - anchor.y) * inverseScale.y;
+				        }
+				        if (self.isAlignBottom && !self.getLockBottom()) {
+				            self._bottom -= (self._isAbsBottom ? delta.y : deltaInPercent.y) * anchor.y * inverseScale.y;
+				        }
+				        if (self.isAlignLeft && !self.getLockLeft()) {
+				            self._left -= (self._isAbsLeft ? delta.x : deltaInPercent.x) * anchor.x * inverseScale.x;
+				        }
+				        if (self.isAlignRight && !self.getLockRight()) {
+				            self._right -= (self._isAbsRight ? delta.x : deltaInPercent.x) * (1 - anchor.x) * inverseScale.x;
+				        }
+
+				        // hack for label none mode can`t change context size
+				        const label = self.node.getComponent(Label);
+				        if (label && label.overflow === 0 && self.isAlignRight && self.isAlignLeft) {
+				            return;
+				        }
+				        this._recursiveDirty();
+				    };
+				};
+				return widgetManager;
+			}
+
+			var overwrite;
+			var hasRequiredOverwrite;
+
+			function requireOverwrite () {
+				if (hasRequiredOverwrite) return overwrite;
+				hasRequiredOverwrite = 1;
+				overwrite = function(ccm) {
+				    requireWidgetManager()(ccm);
+				};
+				return overwrite;
+			}
+
+			(function (exports) {
+				var __createBinding = (commonjsGlobal && commonjsGlobal.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+				    if (k2 === undefined) k2 = k;
+				    var desc = Object.getOwnPropertyDescriptor(m, k);
+				    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+				      desc = { enumerable: true, get: function() { return m[k]; } };
+				    }
+				    Object.defineProperty(o, k2, desc);
+				}) : (function(o, m, k, k2) {
+				    if (k2 === undefined) k2 = k;
+				    o[k2] = m[k];
+				}));
+				var __setModuleDefault = (commonjsGlobal && commonjsGlobal.__setModuleDefault) || (Object.create ? (function(o, v) {
+				    Object.defineProperty(o, "default", { enumerable: true, value: v });
+				}) : function(o, v) {
+				    o["default"] = v;
+				});
+				var __importStar = (commonjsGlobal && commonjsGlobal.__importStar) || (function () {
+				    var ownKeys = function(o) {
+				        ownKeys = Object.getOwnPropertyNames || function (o) {
+				            var ar = [];
+				            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+				            return ar;
+				        };
+				        return ownKeys(o);
+				    };
+				    return function (mod) {
+				        if (mod && mod.__esModule) return mod;
+				        var result = {};
+				        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+				        __setModuleDefault(result, mod);
+				        return result;
+				    };
+				})();
+				Object.defineProperty(exports, "__esModule", { value: true });
+				exports.Service = exports.EditorExtends = exports.serviceManager = void 0;
+				exports.startup = startup;
+				const EditorExtends = __importStar(editorExtends);
+				exports.EditorExtends = EditorExtends;
+				const service_manager_1 = serviceManager$1;
+				Object.defineProperty(exports, "serviceManager", { enumerable: true, get: function () { return service_manager_1.serviceManager; } });
+				const decorator_1 = decorator;
+
+				// Patch UuidUtils for casing compatibility
+				if (EditorExtends.UuidUtils) {
+				    const U = EditorExtends.UuidUtils;
+				    U.decompressUuid = U.decompressUuid || U.decompressUUID;
+				    U.compressUuid = U.compressUuid || U.compressUUID;
+				    U.isUuid = U.isUuid || U.isUUID;
+				    U.uuid = U.uuid || U.generate;
+				}
+				globalThis.EditorExtends = EditorExtends;
+				exports.Service = decorator_1.Service;
+				async function startup(options) {
+				    const defaultConfig = await fetch('/scripting/engine/game-config');
+				    const config = await defaultConfig.json();
+				    const modules = await fetch('/scripting/engine/modules');
+				    const features = (await modules.json());
+				    const { projectPath, serverURL, startScene } = options;
+				    if (typeof window !== 'undefined') {
+				        window.__CC_PROJECT_PATH__ = projectPath;
+				    }
+				    service_manager_1.serviceManager.initialize(serverURL);
+				    const requiredModules = [
+				        'cc',
+				        'cc/editor/populate-internal-constants',
+				        'cc/editor/serialization',
+				        'cc/editor/new-gen-anim',
+				        'cc/editor/embedded-player',
+				        'cc/editor/reflection-probe',
+				        'cc/editor/lod-group-utils',
+				        'cc/editor/material',
+				        'cc/editor/2d-misc',
+				        'cc/editor/offline-mappings',
+				        'cc/editor/custom-pipeline',
+				        'cc/editor/animation-clip-migration',
+				        'cc/editor/exotic-animation',
+				        'cc/editor/color-utils',
+				    ];
+				    // IMPORTANT: We must NOT use import() here because Rollup's
+				    // resolveId hook aliases cc/editor/* to a cc re-export stub,
+				    // which means the real engine side-effect modules never load.
+				    // We use the __moduleImport placeholder which is replaced with SystemJS's module.import().
+				    for (const mod of requiredModules) {
+				        try {
+				            await System.import(mod);
+				        }
+				        catch (e) {
+				            console.error('Failed to load engine module:', mod, 'e:', e);
+				        }
+				    }
+				    // ---- hack creator 使用的一些 engine 参数
+				    await Promise.resolve().then(() => __importStar(requireEngine()));
+				    // overwrite
+				    const overwrite = await Promise.resolve().then(() => __importStar(requireOverwrite()));
+				    const handle = overwrite.default || overwrite;
+				    if (typeof handle === 'function') {
+				        handle(cc);
+				    }
+				    globalThis.cce = globalThis.cce || {};
+				    globalThis.cce.Script = decorator_1.Service.Script;
+				    globalThis.cli = decorator_1.Service;
+				    if (EditorExtends.init) {
+				        await EditorExtends.init();
+				    }
+				    cc.physics.selector.runInEditor = true;
+				    await cc.game.init(config);
+				    let backend = 'builtin';
+				    const Backends = {
+				        'physics-cannon': 'cannon.js',
+				        'physics-ammo': 'bullet',
+				        'physics-builtin': 'builtin',
+				        'physics-physx': 'physx',
+				    };
+				    features.forEach((m) => {
+				        if (m in Backends) {
+				            backend = Backends[m];
+				        }
+				    });
+				    // 切换物理引擎
+				    cc.physics.selector.switchTo(backend);
+				    //TODO
+				    cc.view.setDesignResolutionSize(1920, 1080, cc.ResolutionPolicy.SHOW_ALL);
+				    await cc.game.run(async () => {
+				        cc.game.pause();
+				        const json = startScene;
+				        // load scene
+				        cc.assetManager.loadWithJson(json, { assetId: json[1]._id }, 
+				        // 进度条
+				        (completedCount, totalCount) => {
+				            //
+				        }, (error, sceneAsset) => {
+				            if (error) {
+				                cc.error(error);
+				                return;
+				            }
+				            const scene = sceneAsset.scene;
+				            scene._name = sceneAsset._name;
+				            cc.director.runSceneImmediate(scene, () => {
+				                cc.game.resume();
+				            });
+				        });
+				    });
+				    await cc.game.resume();
+				}
+				
+			} (sceneRuntime$1));
+
+			var sceneRuntime = /*@__PURE__*/getDefaultExportFromCjs(sceneRuntime$1);
+
+			var Bridge = /*#__PURE__*/_mergeNamespaces({
+				__proto__: null,
+				'default': sceneRuntime
+			}, [sceneRuntime$1]);
+
+			const { startup, serviceManager, EditorExtends: EditorExtends$1, Service } = Bridge; exports({ startup: startup, serviceManager: serviceManager, EditorExtends: EditorExtends$1, Service: Service });
 
 		})
 	};
