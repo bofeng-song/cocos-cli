@@ -140,7 +140,11 @@ function verifyImportMapJson(input: unknown): input is ImportMap {
         }
     }
     if ('scopes' in input) {
-        for (const value of Object.values(input)) {
+        const scopes = (input as { scopes: unknown }).scopes;
+        if (typeof scopes !== 'object' || !scopes) {
+            return false;
+        }
+        for (const value of Object.values(scopes)) {
             if (!verifySpecifierMap(value)) {
                 return false;
             }

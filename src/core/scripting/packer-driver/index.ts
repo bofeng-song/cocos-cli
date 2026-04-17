@@ -29,7 +29,6 @@ import { compressUuid } from '../../builder/worker/builder/utils';
 import { TypeScriptConfigBuilder } from '../intelligence';
 import { eventEmitter } from '../event-emitter';
 import { DBInfo } from '../@types/config-export';
-import path from 'path';
 
 const VERSION = '20';
 
@@ -294,6 +293,9 @@ export class PackerDriver {
             const projectPath = tsBuilder.getProjectPath();
             const compilerOptions = await tsBuilder.getCompilerOptions();
             const internalDbURLInfos = await tsBuilder.getInternalDbURLInfos();
+            if (self.languageService) {
+                self.languageService.dispose();
+            }
             self.languageService = new LanguageServiceAdapter(realTsConfigPath, projectPath, self.beforeEditorBuildDelegate, compilerOptions, internalDbURLInfos);
             for (const target of Object.values(this._targets)) {
                 target.updateDbInfos(this._dbInfos);
@@ -302,7 +304,7 @@ export class PackerDriver {
         };
         if (this.busy()) {
             this._beforeBuildTasks.push(() => {
-                update();
+                return update();
             });
         } else {
             await update();
@@ -393,7 +395,7 @@ export class PackerDriver {
     }
 
     public queryScriptDeps(queryPath: string): string[] {
-        const scriptPath: string = path.normalize(queryPath).replace(/\\/g, '/');
+        const scriptPath: string = ps.normalize(queryPath).replace(/\\/g, '/');
         this._transformDepsGraph();
         if (this._depsGraphCache[scriptPath]) {
             return Array.from(this._depsGraphCache[scriptPath]);
@@ -401,7 +403,7 @@ export class PackerDriver {
         return [];
     }
     public queryScriptUsers(queryPath: string): string[] {
-        const scriptPath: string = path.normalize(queryPath).replace(/\\/g, '/');
+        const scriptPath: string = ps.normalize(queryPath).replace(/\\/g, '/');
         this._transformDepsGraph();
         if (this._usedGraphCache[scriptPath]) {
             return Array.from(this._usedGraphCache[scriptPath]);
@@ -423,7 +425,7 @@ export class PackerDriver {
     private _assetChangeQueue: AssetChange[] = [];
     private _building = false;
     private _featureChanged = false;
-    private _beforeBuildTasks: (() => void)[] = [];
+    private _beforeBuildTasks: (() => Promise<void> | void)[] = [];
     private _depsGraph: Record<string, string[]> = {};
     private _needUpdateDepsCache = false;
     private _usedGraphCache: Record<string, Set<string>> = {};
@@ -505,7 +507,7 @@ export class PackerDriver {
         const beforeTasks = this._beforeBuildTasks.slice();
         this._beforeBuildTasks.length = 0;
         for (const beforeTask of beforeTasks) {
-            beforeTask();
+            await beforeTask();
         }
         await this.beforeEditorBuildDelegate.dispatch(assetChanges.filter(item => item.type === AssetActionEnum.change) as ModifiedAssetChange[]);
         const nonDTSChanges = assetChanges.filter(item => !item.filePath.endsWith('.d.ts'));
@@ -1069,6 +1071,7 @@ function matchObject(lhs: unknown, rhs: unknown) {
         } else if (typeof lhs === 'object' && lhs !== null) {
             return typeof rhs === 'object'
                 && rhs !== null
+                && Object.keys(lhs).length === Object.keys(rhs as object).length
                 && Object.keys(lhs).every((key) => matchLhs((lhs as any)[key], (rhs as any)[key]));
         } else if (lhs === null) {
             return rhs === null;

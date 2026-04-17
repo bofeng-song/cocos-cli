@@ -141,6 +141,7 @@ export class LanguageServiceAdapter {
     protected _executingCommandID: Command['id'] = '';
     protected readonly _changedFileSet: Set<string> = new Set();
     protected readonly _afterOutputTasks: (() => void)[] = [];
+    private readonly _delegateCallback: (changes: ModifiedAssetChange[]) => Promise<void>;
     constructor(
         protected readonly _tsconfigPath: FilePath,
         protected readonly _currentDirectory: FilePath,
@@ -153,11 +154,16 @@ export class LanguageServiceAdapter {
         this._parseConfigFileHost = new ParseConfigFileHostAdapter(_currentDirectory);
         this.host = new LanguageServiceHostAdapter(this._parseConfigFileHost, this._tsconfigPath, this._currentDirectory, this._compilerOptions);
         this.languageService = ts.createLanguageService(this.host, undefined, ts.LanguageServiceMode.Semantic);
-        this._beforeBuildDelegate.add(async (assetChanges) => {
+        this._delegateCallback = async (assetChanges) => {
             assetChanges.forEach(item => item.oldFilePath && item.newFilePath && this.requestRenameFile(item.oldFilePath, item.newFilePath));
             await this.finishCommand(assetChanges);
-        });
+        };
+        this._beforeBuildDelegate.add(this._delegateCallback);
 
+    }
+
+    public dispose() {
+        this._beforeBuildDelegate.remove(this._delegateCallback);
     }
 
     public isExecuting(commandID: string): boolean {
@@ -203,7 +209,7 @@ export class LanguageServiceAdapter {
 
     /** 请求更新路径 */
     public async requestRenameFile(oldFilePath: FilePath, newFilePath: FilePath): Promise<void> {
-        if (oldFilePath && newFilePath && oldFilePath.endsWith('.ts') && newFilePath.endsWith('.ts') || !extname(oldFilePath)) {
+        if ((oldFilePath && newFilePath && oldFilePath.endsWith('.ts') && newFilePath.endsWith('.ts')) || (oldFilePath && newFilePath && !extname(oldFilePath))) {
             if (oldFilePath === newFilePath) {
                 return;
             }

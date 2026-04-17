@@ -1,4 +1,3 @@
-/* eslint-disable prefer-rest-params */
 /**
  * @zh
  * 移除首个指定的数组元素。判定元素相等时相当于于使用了 `Array.prototype.indexOf`。
@@ -97,6 +96,6 @@ export class AsyncDelegate<T extends (...args: any) => (Promise<void> | void) = 
      * @returns @en The promise awaiting all async callback resolved. @zh 等待所有异步回调结束的 Promise 对象。
      */
     public dispatch(...args: Parameters<T>) {
-        return Promise.all(this._delegates.map((func) => func(...arguments)).filter(Boolean));
+        return Promise.all(this._delegates.map((func) => func(...args)).filter(Boolean));
     }
 }

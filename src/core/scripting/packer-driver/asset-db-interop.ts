@@ -63,6 +63,11 @@ export class AssetDbInterop {
     onAssetChange(
         changeInfo: AssetChangeInfo
     ) {
+        const importer = changeInfo.importer;
+        if (!(importer === 'javascript' || importer === 'typescript')) {
+            return;
+        }
+
         const filePath = resolveFileName(changeInfo.filePath);
         const uuid = changeInfo.uuid;
         const assetChange: AssetChange = {
@@ -73,11 +78,7 @@ export class AssetDbInterop {
             type: changeInfo.type === AssetActionEnum.none ? AssetActionEnum.change : changeInfo.type,
             isPluginScript: isPluginScript(changeInfo.userData),
         };
-        
-        const importer = changeInfo.importer;
-        if (!(importer === 'javascript' || importer === 'typescript')) {
-            return;
-        }
+
         let info : TypeScriptAssetInfoCache | null = null;
         if (importer === 'typescript') {
             info = mapperForTypeScriptAssetInfoCache(changeInfo);

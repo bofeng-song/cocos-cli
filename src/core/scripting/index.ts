@@ -15,38 +15,25 @@ let executor: Executor | null = null;
 class GlobalEnv {
     public async record(fn: () => Promise<void>) {
         this.clear();
-        this._queue.push(async () => {
-            const beforeKeys = Object.keys(globalThis);
-            await fn();
-            const afterKeys = Object.keys(globalThis);
-            for (const afterKey of afterKeys) {
-                if (!beforeKeys.includes(afterKey)) {
-                    this._incrementalKeys.add(afterKey);
-                }
+        const beforeKeys = Object.keys(globalThis);
+        await fn();
+        const afterKeys = Object.keys(globalThis);
+        for (const afterKey of afterKeys) {
+            if (!beforeKeys.includes(afterKey)) {
+                this._incrementalKeys.add(afterKey);
             }
-            console.debug(`Incremental keys: ${Array.from(this._incrementalKeys)}`);
-        });
-        await this.processQueue(); // 处理队列
+        }
+        console.debug(`Incremental keys: ${Array.from(this._incrementalKeys)}`);
     }
 
     private clear() {
-        this._queue.push(async () => {
-            for (const incrementalKey of this._incrementalKeys) {
-                delete (globalThis as any)[incrementalKey];
-            }
-            this._incrementalKeys.clear();
-        });
-    }
-
-    private async processQueue() {
-        while (this._queue.length > 0) {
-            const next = this._queue.shift();
-            if (next) await next(); // 执行队列中的下一个任务
+        for (const incrementalKey of this._incrementalKeys) {
+            delete (globalThis as any)[incrementalKey];
         }
+        this._incrementalKeys.clear();
     }
 
     private _incrementalKeys = new Set<string>();
-    private _queue: (() => Promise<void>)[] = [];
 }
 
 const globalEnv = new GlobalEnv();
@@ -153,7 +140,7 @@ class ScriptManager {
         this._pendingCompileTimer = setTimeout(async () => {
             if (this.isCompiling()) {
                 this.postCompileScripts(delay);
-                return taskId;
+                return;
             }
 
             this._pendingCompileTimer = null;
@@ -224,10 +211,6 @@ class ScriptManager {
                 executor.addPolyfillFile(require.resolve('@cocos/build-polyfills/prebuilt/editor/bundle'));
             }
 
-            if (!executor) {
-                console.error('Failed to init executor');
-                return;
-            }
             executor.setPluginScripts(pluginScripts || []);
             await executor.reload();
         });
