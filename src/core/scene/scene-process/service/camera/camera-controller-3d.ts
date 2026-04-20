@@ -379,7 +379,7 @@ export class CameraController3D extends CameraControllerBase {
         // 判定 pivot 模式
         let pivot = 'center';
         try {
-            const { Service } = require('./core/decorator');
+            const { Service } = require('../core/decorator');
             pivot = Service.Gizmo?.transformToolData?.pivot ?? 'center';
         } catch (e) {
             // Gizmo may not be initialized
@@ -431,7 +431,7 @@ export class CameraController3D extends CameraControllerBase {
         }
 
         try {
-            const { Service } = require('./core/decorator');
+            const { Service } = require('../core/decorator');
             Service.Engine?.repaintInEditMode?.();
         } catch (e) {
             // Engine may not be ready
@@ -455,7 +455,7 @@ export class CameraController3D extends CameraControllerBase {
             }
             this.updateGrid();
             try {
-                const { Service } = require('./core/decorator');
+                const { Service } = require('../core/decorator');
                 Service.Engine?.repaintInEditMode?.();
             } catch (e) {
                 // Engine may not be ready
@@ -513,7 +513,7 @@ export class CameraController3D extends CameraControllerBase {
         }
 
         try {
-            const { Service } = require('./core/decorator');
+            const { Service } = require('../core/decorator');
             Service.Engine?.repaintInEditMode?.();
         } catch (e) {
             // Engine may not be ready
@@ -540,7 +540,7 @@ export class CameraController3D extends CameraControllerBase {
         // 开始撤销记录
         let undoId: string | undefined;
         try {
-            const { Service } = require('./core/decorator');
+            const { Service } = require('../core/decorator');
             undoId = Service.Undo?.beginRecording?.(nodeUuids);
         } catch (e) {
             // Undo may not be ready
@@ -561,7 +561,7 @@ export class CameraController3D extends CameraControllerBase {
         // 结束撤销记录
         if (undoId) {
             try {
-                const { Service } = require('./core/decorator');
+                const { Service } = require('../core/decorator');
                 Service.Undo?.endRecording?.(undoId);
             } catch (e) {
                 // Undo may not be ready
@@ -569,7 +569,7 @@ export class CameraController3D extends CameraControllerBase {
         }
 
         try {
-            const { Service } = require('./core/decorator');
+            const { Service } = require('../core/decorator');
             Service.Engine?.repaintInEditMode?.();
         } catch (e) {
             // Engine may not be ready
@@ -603,7 +603,7 @@ export class CameraController3D extends CameraControllerBase {
         this.updateGrid();
 
         try {
-            const { Service } = require('./core/decorator');
+            const { Service } = require('../core/decorator');
             Service.Engine?.repaintInEditMode?.();
         } catch (e) {
             // Engine may not be ready
@@ -650,7 +650,7 @@ export class CameraController3D extends CameraControllerBase {
         currentMode.onMouseMove(event);
 
         try {
-            const { Service } = require('./core/decorator');
+            const { Service } = require('../core/decorator');
             Service.Engine?.repaintInEditMode?.();
         } catch (e) {
             // Engine may not be ready
@@ -681,7 +681,7 @@ export class CameraController3D extends CameraControllerBase {
         }
 
         try {
-            const { Service } = require('./core/decorator');
+            const { Service } = require('../core/decorator');
             Service.Engine?.repaintInEditMode?.();
         } catch (e) {
             // Engine may not be ready
@@ -706,7 +706,7 @@ export class CameraController3D extends CameraControllerBase {
     onResize(size: ISizeLike) {
         this.updateGrid();
         try {
-            const { Service } = require('./core/decorator');
+            const { Service } = require('../core/decorator');
             Service.Engine?.repaintInEditMode?.();
         } catch (e) {
             // Engine may not be ready
@@ -823,7 +823,7 @@ export class CameraController3D extends CameraControllerBase {
     refresh() {
         this.updateGrid();
         try {
-            const { Service } = require('./core/decorator');
+            const { Service } = require('../core/decorator');
             Service.Engine?.repaintInEditMode?.();
         } catch (e) {
             // Engine may not be ready
@@ -866,7 +866,7 @@ export class CameraController3D extends CameraControllerBase {
         });
 
         try {
-            const { Service } = require('./core/decorator');
+            const { Service } = require('../core/decorator');
             Service.Engine?.repaintInEditMode?.();
         } catch (e) {
             // Engine may not be ready
@@ -911,7 +911,7 @@ export class CameraController3D extends CameraControllerBase {
 
         // 尝试同步到 Gizmo
         try {
-            const { Service } = require('./core/decorator');
+            const { Service } = require('../core/decorator');
             if (Service.Gizmo?.transformToolData) {
                 Service.Gizmo.transformToolData.cameraOrthoHeight = newOrthoHeight;
             }
@@ -938,7 +938,7 @@ export class CameraController3D extends CameraControllerBase {
         this.updateGrid();
 
         try {
-            const { Service } = require('./core/decorator');
+            const { Service } = require('../core/decorator');
             Service.Engine?.repaintInEditMode?.();
         } catch (e) {
             // Engine may not be ready
