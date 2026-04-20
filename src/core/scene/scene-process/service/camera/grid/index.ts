@@ -126,7 +126,7 @@ class Grid {
             min = this.valueToPixelH(this.xMinRange);
         }
         if (this.xMaxRange !== undefined && this.xMaxRange !== null) {
-            max = this.valueToPixelH(this.xMaxRange);
+            max = this.valueToPixelH(this.xMaxRange) as number;
             max = Math.max(0, max - this._canvasWidth);
         }
         this.xAxisOffset = newOffset;
@@ -153,7 +153,7 @@ class Grid {
             min = this.valueToPixelV(this.yMinRange);
         }
         if (this.yMaxRange !== undefined && this.yMaxRange !== null) {
-            max = this.valueToPixelV(this.yMaxRange);
+            max = this.valueToPixelV(this.yMaxRange) as number;
             max = Math.max(0, max - this._canvasHeight);
         }
         this.yAxisOffset = newOffset;

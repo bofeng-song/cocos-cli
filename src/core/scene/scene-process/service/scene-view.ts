@@ -24,7 +24,7 @@ export class SceneViewService extends BaseService<ISceneViewEvents> implements I
 
         // Parent to editor camera node if available
         try {
-            const cameraNode = Service.Camera?.camera?.node;
+            const cameraNode = (Service as any).Camera?.camera?.node;
             if (cameraNode) {
                 lightNode.parent = cameraNode;
             }

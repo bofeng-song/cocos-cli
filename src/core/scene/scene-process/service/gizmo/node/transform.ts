@@ -88,7 +88,7 @@ class TransformGizmo extends GizmoBase<Component> {
     };
 
     init() {
-        this._gizmo.init?.();
+        (this._gizmo as any).init?.();
     }
 
     show() {

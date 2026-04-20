@@ -81,7 +81,7 @@ class TransformBaseGizmo extends GizmoBase<Component> {
         }
     }
 
-    onNodeChanged() {
+    onNodeChanged(_event?: any) {
         if (this._controller && this.updateControllerTransform) {
             this.updateControllerTransform();
         }

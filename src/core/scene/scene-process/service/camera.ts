@@ -81,7 +81,7 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
     async initFromConfig(): Promise<void> {
         try {
             const rpc = Rpc.getInstance();
-            const config = await rpc.request('sceneConfig', 'camera');
+            const config: any = await rpc.request('sceneConfig' as any, 'camera' as any, []);
             if (config) {
                 if (config.fov !== undefined) this.setCameraProperty({ fov: config.fov });
                 if (config.far !== undefined) this._controller3D.far = config.far;
@@ -109,7 +109,7 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
         };
 
         for (const [eventType, handler] of Object.entries(handlers)) {
-            Service.Operation.addListener(eventType, handler, OperationPriority.Camera);
+            Service.Operation.addListener(eventType as any, handler, OperationPriority.Camera);
         }
     }
 
