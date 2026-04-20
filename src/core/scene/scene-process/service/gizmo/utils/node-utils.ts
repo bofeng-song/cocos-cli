@@ -95,6 +95,8 @@ export function getRegionNodes(
         if (!model || !model.node || !model.enabled) continue;
         if (!(model.node.layer & mask)) continue;
         if (isEditorNode(model.node)) continue;
+        if (model.node._objFlags & CCObject.Flags.LockedInEditor) continue;
+        if (model.node._objFlags & CCObject.Flags.HideInHierarchy) continue;
 
         // Project world position to screen space
         const worldPos = model.node.getWorldPosition();

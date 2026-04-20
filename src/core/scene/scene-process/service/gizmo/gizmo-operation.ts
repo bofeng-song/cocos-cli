@@ -16,6 +16,14 @@ function getService(): any {
     }
 }
 
+function getServiceProp(name: string): any {
+    try {
+        return getService()?.[name];
+    } catch (e) {
+        return null;
+    }
+}
+
 /**
  * Create a GizmoMouseEvent from an ISceneMouseEvent
  * Note: Our GizmoMouseEvent is a plain data class, NOT extending CCEvent
@@ -54,8 +62,8 @@ class GizmoOperation {
      * Raycast against gizmo nodes
      */
     private raycastGizmos(x: number, y: number): any[] {
-        const svc = getService();
-        const gizmoRoot = svc?.Gizmo?.gizmoRootNode;
+        const gizmoSvc = getServiceProp('Gizmo');
+        const gizmoRoot = gizmoSvc?.gizmoRootNode;
         if (!gizmoRoot) return [];
 
         const results = getRaycastResultsByNodes(
@@ -67,7 +75,7 @@ class GizmoOperation {
     private _emitEventToNode(node: Node, event: GizmoMouseEvent) {
         if (event.type) {
             node.emit(event.type, event);
-            getService()?.Engine?.repaintInEditMode?.();
+            getServiceProp('Engine')?.repaintInEditMode?.();
         }
     }
 
@@ -78,8 +86,7 @@ class GizmoOperation {
     }
 
     private _onNotGizmoMouseUp(event: GizmoMouseEvent): boolean {
-        const svc = getService();
-        const isViewMode = svc?.Gizmo?.transformToolData?.viewMode === 'view';
+        const isViewMode = getServiceProp('Gizmo')?.transformToolData?.viewMode === 'view';
         if (event.leftButton && !isViewMode) {
             if (this._regionSelecting) {
                 this._regionSelecting = false;
@@ -94,8 +101,7 @@ class GizmoOperation {
         if (this._anyKeyDown) return true;
 
         const downEvent = this._noGizmoMouseDownEvent;
-        const svc = getService();
-        const isViewMode = svc?.Gizmo?.transformToolData?.viewMode === 'view';
+        const isViewMode = getServiceProp('Gizmo')?.transformToolData?.viewMode === 'view';
         if (event.leftButton && downEvent && !isViewMode) {
             const dx = event.x - downEvent.x;
             const dy = event.y - downEvent.y;
@@ -257,8 +263,7 @@ class GizmoOperation {
     // --- Node selection ---
 
     private _selectNode(event: GizmoMouseEvent) {
-        const svc = getService();
-        const camera = svc?.Camera?.getCamera?.()?.camera;
+        const camera = getServiceProp('Camera')?.getCamera?.()?.camera;
         if (!camera) return;
 
         const mask = Layers.makeMaskExclude([
@@ -268,6 +273,7 @@ class GizmoOperation {
             Layers.Enum.IGNORE_RAYCAST,
         ]);
         const nodes = getRaycastResultNodes(camera, event.x, event.y, mask);
+        const selection = getServiceProp('Selection');
 
         if (nodes.length > 0) {
             let resultNode: Node | null = null;
@@ -279,22 +285,22 @@ class GizmoOperation {
             if (!resultNode) return;
 
             if (!event.ctrlKey && !event.shiftKey) {
-                svc?.Selection?.clear?.();
+                selection?.clear?.();
             }
 
             if (event.ctrlKey) {
-                const selected = svc?.Selection?.query?.() ?? [];
+                const selected = selection?.query?.() ?? [];
                 if (selected.includes(resultNode.uuid)) {
-                    svc?.Selection?.unselect?.(resultNode.uuid);
+                    selection?.unselect?.(resultNode.uuid);
                 } else {
-                    svc?.Selection?.select?.(resultNode.uuid);
+                    selection?.select?.(resultNode.uuid);
                 }
             } else {
-                svc?.Selection?.select?.(resultNode.uuid);
+                selection?.select?.(resultNode.uuid);
             }
         } else {
             if (event.leftButton && !event.ctrlKey && !event.shiftKey) {
-                svc?.Selection?.clear?.();
+                selection?.clear?.();
             }
         }
     }
@@ -302,8 +308,7 @@ class GizmoOperation {
     private _regionSelectNode(
         left: number, right: number, top: number, bottom: number, multiple: boolean,
     ) {
-        const svc = getService();
-        const camera = svc?.Camera?.getCamera?.()?.camera;
+        const camera = getServiceProp('Camera')?.getCamera?.()?.camera;
         if (!camera) return;
 
         const mask = Layers.makeMaskExclude([
@@ -312,16 +317,19 @@ class GizmoOperation {
             Layers.Enum.EDITOR,
         ]);
         const nodes = getRegionNodes(camera, left, right, top, bottom, mask);
+        const selection = getServiceProp('Selection');
 
-        const selectSet = new Set<string>(svc?.Selection?.query?.() ?? []);
+        const selectSet = new Set<string>(selection?.query?.() ?? []);
         nodes.forEach((node: Node) => {
             if (!selectSet.has(node.uuid)) {
-                svc?.Selection?.select?.(node.uuid);
+                selection?.select?.(node.uuid);
             }
             selectSet.delete(node.uuid);
         });
-        for (const uuid of selectSet.keys()) {
-            svc?.Selection?.unselect?.(uuid);
+        if (!multiple) {
+            for (const uuid of selectSet.keys()) {
+                selection?.unselect?.(uuid);
+            }
         }
     }
 
@@ -330,12 +338,12 @@ class GizmoOperation {
     public onKeyDown(event: ISceneKeyboardEvent): boolean | void {
         if (this._regionSelecting) return false;
 
-        const svc = getService();
-        const uuids: string[] = svc?.Selection?.query?.() ?? [];
+        const selection = getServiceProp('Selection');
+        const uuids: string[] = selection?.query?.() ?? [];
         if (uuids.length > 0) {
-            const node = svc?.Scene?.getNodeByUuid?.(uuids[0]);
+            const node = getServiceProp('Scene')?.getNodeByUuid?.(uuids[0]);
             if (node) {
-                const res = svc?.Gizmo?.callAllGizmoFuncOfNode?.(node, 'onKeyDown', event);
+                const res = getServiceProp('Gizmo')?.callAllGizmoFuncOfNode?.(node, 'onKeyDown', event);
                 return res;
             }
         }
@@ -343,12 +351,12 @@ class GizmoOperation {
     }
 
     public onKeyUp(event: ISceneKeyboardEvent): boolean | void {
-        const svc = getService();
-        const uuids: string[] = svc?.Selection?.query?.() ?? [];
+        const selection = getServiceProp('Selection');
+        const uuids: string[] = selection?.query?.() ?? [];
         if (uuids.length > 0) {
-            const node = svc?.Scene?.getNodeByUuid?.(uuids[0]);
+            const node = getServiceProp('Scene')?.getNodeByUuid?.(uuids[0]);
             if (node) {
-                const res = svc?.Gizmo?.callAllGizmoFuncOfNode?.(node, 'onKeyUp', event);
+                const res = getServiceProp('Gizmo')?.callAllGizmoFuncOfNode?.(node, 'onKeyUp', event);
                 return res;
             }
         }
@@ -358,8 +366,7 @@ class GizmoOperation {
     // --- Lifecycle ---
 
     public init() {
-        const svc = getService();
-        const operationMgr = svc?.Operation;
+        const operationMgr = getServiceProp('Operation');
         if (operationMgr) {
             operationMgr.addListener('mousedown', this.onMouseDown.bind(this), OperationPriority.Gizmo);
             operationMgr.addListener('mousemove', this.onMouseMove.bind(this), OperationPriority.Gizmo);
