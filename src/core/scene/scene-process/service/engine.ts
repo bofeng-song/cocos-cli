@@ -4,6 +4,7 @@ import Time from './engine/time';
 import { director, GeometryRenderer as CCGeometryRenderer } from 'cc';
 import { GeometryRenderer, methods as GeometryMethods } from './engine/geometry_renderer';
 import { BaseService, register } from './core';
+import { Service } from './core/decorator';
 import { IEngineEvents, IEngineService } from '../../common';
 import { Rpc } from '../rpc';
 
@@ -111,6 +112,10 @@ export class EngineService extends BaseService<IEngineEvents> implements IEngine
                 this._shouldRepaintInEM = false;
                 this.tickInEditMode(Time.deltaTime);
                 this.broadcast('engine:update');
+
+                // Dispatch per-frame updates to Camera and Gizmo services
+                try { Service.Camera?.onUpdate?.(Time.deltaTime); } catch (e) { /* not registered yet */ }
+                try { Service.Gizmo?.onUpdate?.(Time.deltaTime); } catch (e) { /* not registered yet */ }
             }
             this.broadcast('engine:ticked');
         } catch (e) {
