@@ -17,6 +17,8 @@ import {
     ISelectionService,
     IPublicOperationService,
     IOperationService,
+    IPublicUndoService,
+    IUndoService,
 } from '../../common';
 
 /**
@@ -32,6 +34,7 @@ export interface IPublicServiceManager {
     Prefab: IPublicPrefabService,
     Selection: IPublicSelectionService,
     Operation: IPublicOperationService,
+    Undo: IPublicUndoService,
 }
 
 export interface IServiceManager {
@@ -44,4 +47,5 @@ export interface IServiceManager {
     Prefab: IPrefabService,
     Selection: ISelectionService,
     Operation: IOperationService,
+    Undo: IUndoService,
 }

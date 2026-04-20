@@ -8,3 +8,4 @@ export * from './engine';
 export * from './prefab';
 export * from './selection';
 export * from './operation';
+export * from './undo';
