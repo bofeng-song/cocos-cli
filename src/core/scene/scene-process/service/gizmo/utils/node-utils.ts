@@ -86,6 +86,7 @@ export function getRegionNodes(
     if (!scene) return [];
 
     const resultNodes: Node[] = [];
+    const seenNodes: Set<Node> = new Set();
     const models = scene.models;
     if (!models) return resultNodes;
 
@@ -104,7 +105,8 @@ export function getRegionNodes(
 
         if (screenPos.x >= left && screenPos.x <= right &&
             screenPos.y >= bottom && screenPos.y <= top) {
-            if (!resultNodes.includes(model.node)) {
+            if (!seenNodes.has(model.node)) {
+                seenNodes.add(model.node);
                 resultNodes.push(model.node);
             }
         }

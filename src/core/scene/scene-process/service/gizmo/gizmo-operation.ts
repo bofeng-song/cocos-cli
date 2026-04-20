@@ -382,6 +382,10 @@ class GizmoOperation {
         this._noGizmoMouseDownEvent = null;
         this._hoverInNodeMap.clear();
         this._curMouseDownInfos.length = 0;
+        this._mouseDownRaycastGizmos.length = 0;
+        this._regionSelecting = false;
+        this._gizmoMoved = false;
+        this._anyKeyDown = false;
     }
 }
 
