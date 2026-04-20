@@ -19,6 +19,8 @@ import {
     IOperationService,
     IPublicUndoService,
     IUndoService,
+    IPublicCameraService,
+    ICameraService,
 } from '../../common';
 
 /**
@@ -35,6 +37,7 @@ export interface IPublicServiceManager {
     Selection: IPublicSelectionService,
     Operation: IPublicOperationService,
     Undo: IPublicUndoService,
+    Camera: IPublicCameraService,
 }
 
 export interface IServiceManager {
@@ -48,4 +51,5 @@ export interface IServiceManager {
     Selection: ISelectionService,
     Operation: IOperationService,
     Undo: IUndoService,
+    Camera: ICameraService,
 }
