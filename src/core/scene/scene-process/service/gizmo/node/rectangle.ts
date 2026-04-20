@@ -1,6 +1,6 @@
 'use strict';
 
-import { CCObject, Mat4, Node, Quat, Size, UITransform, Vec2, Vec3 } from 'cc';
+import { CCObject, Color, Mat4, Node, Quat, Size, UITransform, Vec2, Vec3 } from 'cc';
 import type { GizmoMouseEvent } from '../utils/defines';
 import TransformBaseGizmo from './transform-base';
 import { RectangleController, RectHandleType as HandleType } from './rectangle-controller';
@@ -87,8 +87,8 @@ class RectGizmo extends TransformBaseGizmo {
             this._controller = _controller = rectCtrl;
         }
 
-        this._controller.setColor(new (cc as any).Color(0, 153, 255));
-        this._controller.setEditHandlesColor(new (cc as any).Color(0, 153, 255));
+        this._controller.setColor(new Color(0, 153, 255));
+        this._controller.setEditHandlesColor(new Color(0, 153, 255));
 
         this._controller.onControllerMouseDown = this.onControllerMouseDown.bind(this);
         this._controller.onControllerMouseMove = this.onControllerMouseMove.bind(this);

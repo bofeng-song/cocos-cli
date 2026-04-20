@@ -123,7 +123,7 @@ class ScaleGizmo extends TransformBaseGizmo {
         const keyCode = (event.key || '').toLowerCase();
 
         if (keyCode !== 'arrowleft' && keyCode !== 'arrowright' && keyCode !== 'arrowup' && keyCode !== 'arrowdown') {
-            return super.onKeyUp(event);
+            return super.onKeyDown(event);
         }
 
         const offset = event.shiftKey ? 1 : 0.1;
