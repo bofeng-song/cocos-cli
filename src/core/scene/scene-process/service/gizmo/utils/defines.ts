@@ -117,8 +117,11 @@ export interface IHandleData {
  * 编辑器版本继承自 CCEvent，此处作为独立的纯数据类
  */
 export class GizmoMouseEvent<T extends Record<string, any> = {}> {
+    type = '';
     x = 0;
     y = 0;
+    button = 0;
+    buttons = 0;
     ctrlKey = false;
     shiftKey = false;
     altKey = false;
