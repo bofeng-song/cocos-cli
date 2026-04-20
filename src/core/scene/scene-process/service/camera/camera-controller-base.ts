@@ -78,6 +78,8 @@ abstract class CameraControllerBase extends EventEmitter {
         return this._isGridVisible;
     }
 
+    set active(_value: boolean) { }
+
     rotateCameraToDir(dir: Vec3, rotateByViewDist: boolean) { }
     changeProjection() { }
     zoomUp() { }

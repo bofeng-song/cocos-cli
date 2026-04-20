@@ -315,11 +315,26 @@ export class CameraController3D extends CameraControllerBase {
 
     set active(value: boolean) {
         if (value) {
-            // 激活时更新投影、位置
             this.showGrid(true);
         } else {
             this.showGrid(false);
         }
+    }
+
+    get wanderSpeed(): number {
+        return this._wanderMode.wanderSpeed;
+    }
+
+    set wanderSpeed(value: number) {
+        this._wanderMode.wanderSpeed = value;
+    }
+
+    get enableAcceleration(): boolean {
+        return this._wanderMode.enableAcceleration;
+    }
+
+    set enableAcceleration(value: boolean) {
+        this._wanderMode.enableAcceleration = value;
     }
 
     // ---------- 模式切换 ----------

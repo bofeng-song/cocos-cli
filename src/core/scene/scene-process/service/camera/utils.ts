@@ -155,12 +155,11 @@ export class CameraUtils {
         return model;
     }
 
-    static createCamera(color: Color, parentNode: Node) {
+    static createCamera(color: Color, parentNode: Node, componentClass: typeof Camera = Camera) {
         const node = new cc.Node('Editor Camera');
         node.layer = cc.Layers.Enum.EDITOR;
         node.parent = parentNode;
-        // EditorCameraComponent will be added by CameraService after import
-        const camera = node.addComponent(Camera) as Camera;
+        const camera = node.addComponent(componentClass) as Camera;
         camera.clearFlags = Camera.ClearFlag.SKYBOX | gfx.ClearFlagBit.COLOR;
         camera.clearColor = color;
         camera.visibility = Layers.makeMaskExclude([Layers.BitMask.PROFILER, Layers.Enum.GIZMOS, Layers.Enum.SCENE_GIZMO]);

@@ -1,4 +1,4 @@
-import { Camera, Color, Vec3 } from 'cc';
+import { Color, gfx, Layers, Vec3 } from 'cc';
 import { BaseService } from './core';
 import { register, Service } from './core/decorator';
 import { CameraController2D } from './camera/camera-controller-2d';
@@ -62,8 +62,10 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
         if (!this._camera) {
             const backgroundNode = (cc as any).director?.getScene();
             if (backgroundNode) {
-                const cam = CameraUtils.createCamera(new Color(48, 48, 48, 0), backgroundNode);
-                this._camera = new EditorCameraComponent(cam);
+                const cam = CameraUtils.createCamera(
+                    new Color(48, 48, 48, 0), backgroundNode, EditorCameraComponent,
+                ) as EditorCameraComponent;
+                this._camera = cam;
                 this._controller2D.init(cam);
                 this._controller3D.init(cam);
                 this._controller3D.on('mode', (mode: CameraMoveMode) => {
@@ -96,7 +98,7 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
     }
 
     private bindOperation(): void {
-        const handlers: Record<string, Function> = {
+        const handlers: Record<string, (event: any) => any> = {
             'dblclick': (event: any) => this.onMouseDBlDown(event),
             'mousedown': (event: any) => this.onMouseDown(event),
             'mousemove': (event: any) => this.onMouseMove(event),
@@ -106,9 +108,8 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
             'keyup': (event: any) => this.onKeyUp(event),
         };
 
-        const events = ['dblclick', 'mousedown', 'mousemove', 'mouseup', 'mousewheel', 'keydown', 'keyup'] as const;
-        for (const eventType of events) {
-            Service.Operation.addListener(eventType, handlers[eventType], OperationPriority.Camera);
+        for (const [eventType, handler] of Object.entries(handlers)) {
+            Service.Operation.addListener(eventType, handler, OperationPriority.Camera);
         }
     }
 
