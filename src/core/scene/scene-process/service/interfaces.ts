@@ -23,6 +23,8 @@ import {
     ICameraService,
     IPublicGizmoService,
     IGizmoService,
+    IPublicSceneViewService,
+    ISceneViewService,
 } from '../../common';
 
 /**
@@ -41,6 +43,7 @@ export interface IPublicServiceManager {
     Undo: IPublicUndoService,
     Camera: IPublicCameraService,
     Gizmo: IPublicGizmoService,
+    SceneView: IPublicSceneViewService,
 }
 
 export interface IServiceManager {
@@ -56,4 +59,5 @@ export interface IServiceManager {
     Undo: IUndoService,
     Camera: ICameraService,
     Gizmo: IGizmoService,
+    SceneView: ISceneViewService,
 }
