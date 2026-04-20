@@ -22,6 +22,14 @@ class WanderMode extends ModeBase3D {
     private _wanderAnim = new AnimVec3(new Vec3());
     private _enableAcceleration = true;
 
+    // scratch variables to avoid per-frame allocations
+    private _euler = new Vec3();
+    private _targetVel = new Vec3();
+    private _right = new Vec3();
+    private _up = new Vec3(0, 1, 0);
+    private _forward = new Vec3();
+    private _movement = new Vec3();
+
     constructor(cameraCtrl: CameraController3D) {
         super(cameraCtrl, CameraMoveMode.WANDER);
     }
@@ -188,9 +196,8 @@ class WanderMode extends ModeBase3D {
         Quat.rotateAround(rot, rot, Vec3.UNIT_Y, -dx * this._rotateSpeed);
 
         // 清除 Z 旋转
-        const euler = new Vec3();
-        Quat.toEuler(euler, rot);
-        Quat.fromEuler(rot, euler.x, euler.y, 0);
+        Quat.toEuler(this._euler, rot);
+        Quat.fromEuler(rot, this._euler.x, this._euler.y, 0);
 
         this._cameraCtrl.node.setWorldRotation(rot);
 
@@ -200,66 +207,35 @@ class WanderMode extends ModeBase3D {
             speed *= this._movingSpeedShiftScale;
         }
 
-        // 使用 AnimVec3 平滑过渡速度
+        // 计算方向向量 (reuse scratch vars)
+        Vec3.transformQuat(this._right, Vec3.UNIT_X, rot);
+        Vec3.transformQuat(this._forward, Vec3.UNIT_Z, rot);
+        Vec3.normalize(this._right, this._right);
+        Vec3.normalize(this._forward, this._forward);
+        this._up.set(0, 1, 0);
+
         if (this._enableAcceleration) {
-            const targetVelocity = new Vec3(
+            this._targetVel.set(
                 this._velocity.x * speed,
                 this._velocity.y * speed,
                 this._velocity.z * speed,
             );
-            this._wanderAnim.target = targetVelocity;
+            this._wanderAnim.target = this._targetVel;
             this._wanderAnim.defaultSpeed = this._flyAcceleration;
             this._wanderAnim.update(deltaTime);
             const smoothVel = this._wanderAnim.value;
 
-            const right = new Vec3();
-            const up = new Vec3(0, 1, 0);
-            const forward = new Vec3();
-
-            Vec3.transformQuat(right, Vec3.UNIT_X, rot);
-            Vec3.transformQuat(forward, Vec3.UNIT_Z, rot);
-
-            Vec3.normalize(right, right);
-            Vec3.normalize(forward, forward);
-
-            const movement = new Vec3();
-            Vec3.multiplyScalar(movement, right, smoothVel.x * deltaTime);
-
-            const upMovement = new Vec3();
-            Vec3.multiplyScalar(upMovement, up, smoothVel.y * deltaTime);
-            Vec3.add(movement, movement, upMovement);
-
-            const forwardMovement = new Vec3();
-            Vec3.multiplyScalar(forwardMovement, forward, smoothVel.z * deltaTime);
-            Vec3.add(movement, movement, forwardMovement);
-
-            this._cameraCtrl.node.getWorldPosition(this._destPos);
-            Vec3.add(this._destPos, this._destPos, movement);
+            Vec3.multiplyScalar(this._movement, this._right, smoothVel.x * deltaTime);
+            Vec3.scaleAndAdd(this._movement, this._movement, this._up, smoothVel.y * deltaTime);
+            Vec3.scaleAndAdd(this._movement, this._movement, this._forward, smoothVel.z * deltaTime);
         } else {
-            const right = new Vec3();
-            const up = new Vec3(0, 1, 0);
-            const forward = new Vec3();
-
-            Vec3.transformQuat(right, Vec3.UNIT_X, rot);
-            Vec3.transformQuat(forward, Vec3.UNIT_Z, rot);
-
-            Vec3.normalize(right, right);
-            Vec3.normalize(forward, forward);
-
-            const movement = new Vec3();
-            Vec3.multiplyScalar(movement, right, this._velocity.x * speed * deltaTime);
-
-            const upMovement = new Vec3();
-            Vec3.multiplyScalar(upMovement, up, this._velocity.y * speed * deltaTime);
-            Vec3.add(movement, movement, upMovement);
-
-            const forwardMovement = new Vec3();
-            Vec3.multiplyScalar(forwardMovement, forward, this._velocity.z * speed * deltaTime);
-            Vec3.add(movement, movement, forwardMovement);
-
-            this._cameraCtrl.node.getWorldPosition(this._destPos);
-            Vec3.add(this._destPos, this._destPos, movement);
+            Vec3.multiplyScalar(this._movement, this._right, this._velocity.x * speed * deltaTime);
+            Vec3.scaleAndAdd(this._movement, this._movement, this._up, this._velocity.y * speed * deltaTime);
+            Vec3.scaleAndAdd(this._movement, this._movement, this._forward, this._velocity.z * speed * deltaTime);
         }
+
+        this._cameraCtrl.node.getWorldPosition(this._destPos);
+        Vec3.add(this._destPos, this._destPos, this._movement);
 
         this._cameraCtrl.node.setWorldPosition(this._destPos);
         this._cameraCtrl.updateGrid();

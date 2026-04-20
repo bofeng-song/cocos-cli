@@ -194,26 +194,36 @@ export class CameraController3D extends CameraControllerBase {
         const indices: number[] = [];
         let idx = 0;
 
-        // X 轴 (水平红线)
+        // X 轴 (水平红线) — mesh on XZ plane via RG32F, rotated 90° on X
         if (this.originAxisX_Visible) {
-            positions.push(minH, 0, 0, maxH, 0, 0);
-            const r = this.originAxisX_Color.r / 255;
-            const g = this.originAxisX_Color.g / 255;
-            const b = this.originAxisX_Color.b / 255;
-            colors.push(r, g, b, 1, r, g, b, 1);
-            indices.push(idx, idx + 1);
-            idx += 2;
+            const cameraPos = new Vec3();
+            this.node.getPosition(cameraPos);
+            positions.push(0, cameraPos.z);
+            positions.push(0, minV);
+            positions.push(0, cameraPos.z);
+            positions.push(0, maxV);
+            const c = this.originAxisX_Color;
+            for (let i = 0; i < 4; i++) {
+                colors.push(c.x, c.y, c.z, c.w);
+            }
+            indices.push(idx, idx + 1, idx + 2, idx + 3);
+            idx += 4;
         }
 
         // Z 轴 (水平蓝线)
         if (this.originAxisZ_Visible) {
-            positions.push(0, 0, minV, 0, 0, maxV);
-            const r = this.originAxisZ_Color.r / 255;
-            const g = this.originAxisZ_Color.g / 255;
-            const b = this.originAxisZ_Color.b / 255;
-            colors.push(r, g, b, 1, r, g, b, 1);
-            indices.push(idx, idx + 1);
-            idx += 2;
+            const cameraPos = new Vec3();
+            this.node.getPosition(cameraPos);
+            positions.push(cameraPos.x, 0);
+            positions.push(minH, 0);
+            positions.push(cameraPos.x, 0);
+            positions.push(maxH, 0);
+            const c = this.originAxisZ_Color;
+            for (let i = 0; i < 4; i++) {
+                colors.push(c.x, c.y, c.z, c.w);
+            }
+            indices.push(idx, idx + 1, idx + 2, idx + 3);
+            idx += 4;
         }
 
         // 补齐到 _maxTicks * _maxTicks
@@ -237,14 +247,19 @@ export class CameraController3D extends CameraControllerBase {
         const colors: number[] = [];
         const indices: number[] = [];
 
-        // Y 轴 (垂直绿线)
+        // Y 轴 (垂直绿线) — mesh rotated 90° on Y, RG32F maps to world Y
         if (this.originAxisY_Visible) {
-            positions.push(0, -yDist, 0, yDist);
-            const r = this.originAxisY_Color.r / 255;
-            const g = this.originAxisY_Color.g / 255;
-            const b = this.originAxisY_Color.b / 255;
-            colors.push(r, g, b, 1, r, g, b, 1);
-            indices.push(0, 1);
+            const cameraPos = new Vec3();
+            this.node.getPosition(cameraPos);
+            positions.push(0, cameraPos.z);
+            positions.push(0, -yDist);
+            positions.push(0, cameraPos.z);
+            positions.push(0, yDist);
+            const c = this.originAxisY_Color;
+            for (let i = 0; i < 4; i++) {
+                colors.push(c.x, c.y, c.z, c.w);
+            }
+            indices.push(0, 1, 2, 3);
         }
 
         // 补齐
