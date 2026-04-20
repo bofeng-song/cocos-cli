@@ -1,0 +1,455 @@
+'use strict';
+
+import { Component, js, Layers, Node } from 'cc';
+import { BaseService } from './core';
+import { register, Service } from './core/decorator';
+import { TransformToolData } from './gizmo/transform-tool';
+import GizmoDefines from './gizmo/gizmo-defines';
+import GizmoBase from './gizmo/base/gizmo-base';
+import GizmoOperation from './gizmo/gizmo-operation';
+import { create3DNode } from './gizmo/utils/engine-utils';
+import type { IGizmoEvents, IGizmoService } from '../../common';
+
+// Import component gizmo modules so they self-register via registerGizmo()
+import './gizmo/components/camera';
+import './gizmo/components/box-collider';
+import './gizmo/components/directional-light';
+
+type TGizmoType = 'icon' | 'persistent' | 'component';
+
+// WeakMaps to associate components with their gizmo instances
+const _componentGizmoMap = new WeakMap<Component, GizmoBase | null>();
+const _iconGizmoMap = new WeakMap<Component, GizmoBase | null>();
+const _persistentGizmoMap = new WeakMap<Component, GizmoBase | null>();
+
+function getGizmoMap(type: TGizmoType): WeakMap<Component, GizmoBase | null> {
+    switch (type) {
+        case 'component': return _componentGizmoMap;
+        case 'icon': return _iconGizmoMap;
+        case 'persistent': return _persistentGizmoMap;
+    }
+}
+
+function getGizmoProperty(type: TGizmoType, comp: Component): GizmoBase | null | undefined {
+    return getGizmoMap(type).get(comp);
+}
+
+function setGizmoProperty(type: TGizmoType, comp: Component, gizmo: GizmoBase | null) {
+    getGizmoMap(type).set(comp, gizmo);
+}
+
+function getGizmoDefMap(type: TGizmoType): Map<string, any> {
+    switch (type) {
+        case 'component': return GizmoDefines.components;
+        case 'icon': return GizmoDefines.iconGizmo;
+        case 'persistent': return GizmoDefines.persistentGizmo;
+    }
+}
+
+// Hack component for transform gizmo
+const _transformCompMap = new WeakMap<Node, Component>();
+
+function getTransformHackComp(node: Node): Component {
+    let comp = _transformCompMap.get(node);
+    if (!comp) {
+        comp = { node } as any;
+        _transformCompMap.set(node, comp);
+    }
+    return comp;
+}
+
+function isEditorNode(node: Node): boolean {
+    if (node.layer & Layers.Enum.GIZMOS) return true;
+    if (node.layer & Layers.Enum.SCENE_GIZMO) return true;
+    if (node.layer & Layers.Enum.EDITOR) return true;
+    return false;
+}
+
+function walkNodeComponent(node: Node, callback: (comp: Component) => void): void {
+    if (!node || isEditorNode(node)) return;
+    // Transform hack component
+    const hackComp = getTransformHackComp(node);
+    callback(hackComp);
+    // Real components
+    const components = node.components;
+    if (components) {
+        for (let i = 0; i < components.length; i++) {
+            callback(components[i]);
+        }
+    }
+}
+
+@register('Gizmo')
+export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoService {
+    gizmoRootNode!: Node;
+    foregroundNode!: Node;
+    backgroundNode!: Node;
+    transformToolData = new TransformToolData();
+
+    private _gizmoOperation!: GizmoOperation;
+    private _iconVisible = true;
+    private _selection: string[] = [];
+
+    // Pool: Map<className, GizmoBase[]>
+    private _componentPool: Map<string, GizmoBase[]> = new Map();
+    private _iconPool: Map<string, GizmoBase[]> = new Map();
+    private _persistentPool: Map<string, GizmoBase[]> = new Map();
+
+    get transformToolName(): string {
+        return this.transformToolData.toolName;
+    }
+
+    get isViewMode(): boolean {
+        return this.transformToolData.toolName === 'view' &&
+               this.transformToolData.viewMode === 'view';
+    }
+
+    // ── Lifecycle ───────────────────────────────────────────────────────────────
+
+    init(): void {
+        // Create layer nodes
+        this.foregroundNode = create3DNode('foreground');
+        this.backgroundNode = create3DNode('background');
+
+        const scene = (cc as any).director?.getScene();
+        if (scene) {
+            this.foregroundNode.parent = scene;
+            this.backgroundNode.parent = scene;
+        }
+        this.foregroundNode.layer = Layers.Enum.GIZMOS;
+        this.backgroundNode.layer = Layers.Enum.GIZMOS;
+
+        // Create gizmo root
+        this.gizmoRootNode = create3DNode('gizmoRoot');
+        this.gizmoRootNode.parent = this.foregroundNode;
+
+        // Init GizmoOperation
+        this._gizmoOperation = new GizmoOperation();
+        this._gizmoOperation.init();
+
+        // Listen for tool changes
+        this.transformToolData.on('tool-name-changed', (name: string) => {
+            this.emit('gizmo:tool-changed', name);
+        });
+
+        // Listen for camera mode changes to lock/unlock gizmo tool
+        try {
+            Service.Camera?.controller3D?.on?.('mode', (mode: number) => {
+                // 0 = IDLE, lock when not idle
+                this.transformToolData.isLocked = mode !== 0;
+            });
+        } catch (e) {
+            // Camera not ready yet
+        }
+
+        // Listen for selection events
+        try {
+            const selection = Service.Selection;
+            if (selection) {
+                selection.on?.('select', (uuid: string) => {
+                    this.onSelectionSelect(uuid);
+                });
+                selection.on?.('unselect', (uuid: string) => {
+                    this.onSelectionUnselect(uuid);
+                });
+                selection.on?.('clear', () => {
+                    this.onSelectionClear();
+                });
+            }
+        } catch (e) {
+            // Selection not ready
+        }
+    }
+
+    async initFromConfig(): Promise<void> {
+        // Load persisted tool settings (stub for CLI)
+    }
+
+    async saveConfig(): Promise<void> {
+        // Save tool settings (stub for CLI)
+    }
+
+    // ── Transform tool methods ──────────────────────────────────────────────────
+
+    changeTool(name: string): void {
+        this.transformToolData.toolName = name as any;
+    }
+
+    setCoordinate(coord: 'local' | 'global'): void {
+        this.transformToolData.coordinate = coord;
+    }
+
+    setPivot(pivot: 'pivot' | 'center'): void {
+        this.transformToolData.pivot = pivot;
+    }
+
+    lockGizmoTool(locked: boolean): void {
+        this.transformToolData.isLocked = locked;
+    }
+
+    setIconVisible(visible: boolean): void {
+        this._iconVisible = visible;
+        // Update all icon gizmos
+        for (const [, instances] of this._iconPool) {
+            for (const gizmo of instances) {
+                if ((gizmo as any).setIconGizmoVisible) {
+                    (gizmo as any).setIconGizmoVisible(visible);
+                }
+            }
+        }
+    }
+
+    // ── Pool management ─────────────────────────────────────────────────────────
+
+    private _getPool(type: TGizmoType): Map<string, GizmoBase[]> {
+        switch (type) {
+            case 'component': return this._componentPool;
+            case 'icon': return this._iconPool;
+            case 'persistent': return this._persistentPool;
+        }
+    }
+
+    private _createGizmo(type: TGizmoType, name: string): GizmoBase | null {
+        const defMap = getGizmoDefMap(type);
+        const GizmoCtor = defMap.get(name);
+        if (!GizmoCtor) return null;
+
+        const pool = this._getPool(type);
+        let instances = pool.get(name);
+        if (!instances) {
+            instances = [];
+            pool.set(name, instances);
+        }
+
+        // Reuse hidden instance
+        for (const inst of instances) {
+            if (!inst.visible()) {
+                return inst;
+            }
+        }
+
+        // Create new
+        const gizmo = new GizmoCtor(null);
+        instances.push(gizmo);
+        return gizmo;
+    }
+
+    private _showGizmo(type: TGizmoType, component: Component, _focusCreate = false): void {
+        if (!component) return;
+        const name = js.getClassName(component);
+        let gizmo = getGizmoProperty(type, component);
+        if (!gizmo) {
+            gizmo = this._createGizmo(type, name);
+            if (!gizmo) return;
+            setGizmoProperty(type, component, gizmo);
+        }
+        gizmo.target = component;
+        if (type === 'icon') {
+            if ((gizmo as any).setIconGizmoVisible) {
+                (gizmo as any).setIconGizmoVisible(this._iconVisible);
+            }
+        } else {
+            gizmo.show();
+        }
+    }
+
+    private _hideGizmo(gizmo: GizmoBase): void {
+        gizmo.hide();
+    }
+
+    private _removeGizmo(type: TGizmoType, component: Component): void {
+        const gizmo = getGizmoProperty(type, component);
+        if (gizmo) {
+            this._hideGizmo(gizmo);
+            setGizmoProperty(type, component, null);
+        }
+    }
+
+    // ── Node gizmo management ───────────────────────────────────────────────────
+
+    showAllGizmoOfNode(node: Node, recursive = false): void {
+        if (!node || isEditorNode(node)) return;
+        walkNodeComponent(node, (component: Component) => {
+            if (component.enabledInHierarchy === false) return;
+            this._showGizmo('icon', component);
+            this._showGizmo('persistent', component);
+            this._showGizmo('component', component);
+        });
+        if (recursive) {
+            node.children.forEach((child) => {
+                this.showAllGizmoOfNode(child, true);
+            });
+        }
+    }
+
+    removeAllGizmoOfNode(node: Node, recursive = false): void {
+        if (!node) return;
+        walkNodeComponent(node, (component: Component) => {
+            this._removeGizmo('component', component);
+            this._removeGizmo('icon', component);
+            this._removeGizmo('persistent', component);
+        });
+        if (recursive) {
+            node.children.forEach((child) => {
+                this.removeAllGizmoOfNode(child, true);
+            });
+        }
+    }
+
+    clearAllGizmos(): void {
+        const clearPool = (pool: Map<string, GizmoBase[]>) => {
+            for (const [, instances] of pool) {
+                for (const gizmo of instances) {
+                    gizmo.target = null;
+                    gizmo.destroy();
+                }
+            }
+            pool.clear();
+        };
+        clearPool(this._componentPool);
+        clearPool(this._iconPool);
+        clearPool(this._persistentPool);
+    }
+
+    callAllGizmoFuncOfNode(node: Node, funcName: string, ...params: any[]): boolean {
+        let stopped = false;
+        if (!node) return true;
+        walkNodeComponent(node, (component: Component) => {
+            const compGizmo = getGizmoProperty('component', component);
+            if (component && compGizmo && (compGizmo as any)[funcName]) {
+                const res = (compGizmo as any)[funcName](...params);
+                if (res === false) stopped = true;
+            }
+        });
+        return !stopped;
+    }
+
+    // ── Selection integration ───────────────────────────────────────────────────
+
+    onSelectionSelect(uuid: string): void {
+        if (this._selection.includes(uuid)) return;
+        this._selection.push(uuid);
+        try {
+            const node = Service.Scene?.getNodeByUuid?.(uuid);
+            if (node) {
+                this.showAllGizmoOfNode(node);
+                this._onNodeSelectionChanged(node, true);
+            }
+        } catch (e) {
+            // Scene not ready
+        }
+    }
+
+    onSelectionUnselect(uuid: string): void {
+        const idx = this._selection.indexOf(uuid);
+        if (idx >= 0) this._selection.splice(idx, 1);
+        try {
+            const node = Service.Scene?.getNodeByUuid?.(uuid);
+            if (node) {
+                this._onNodeSelectionChanged(node, false);
+                // Only remove component gizmos on unselect, keep icon/persistent
+                walkNodeComponent(node, (component: Component) => {
+                    this._removeGizmo('component', component);
+                });
+            }
+        } catch (e) {
+            // Scene not ready
+        }
+    }
+
+    onSelectionClear(): void {
+        const oldSelection = [...this._selection];
+        this._selection.length = 0;
+        for (const uuid of oldSelection) {
+            try {
+                const node = Service.Scene?.getNodeByUuid?.(uuid);
+                if (node) {
+                    this._onNodeSelectionChanged(node, false);
+                    walkNodeComponent(node, (component: Component) => {
+                        this._removeGizmo('component', component);
+                    });
+                }
+            } catch (e) {
+                // Scene not ready
+            }
+        }
+    }
+
+    private _onNodeSelectionChanged(node: Node, selected: boolean): void {
+        walkNodeComponent(node, (component: Component) => {
+            const iconGizmo = getGizmoProperty('icon', component);
+            if (iconGizmo && (iconGizmo as any).onNodeSelectionChanged) {
+                (iconGizmo as any).onNodeSelectionChanged(selected);
+            }
+        });
+    }
+
+    // ── Scene lifecycle (called by BaseService event hooks) ─────────────────────
+
+    onSceneOpened(): void {
+        this.clearAllGizmos();
+        this.transformToolData.toolName = 'position';
+    }
+
+    onSceneClosed(): void {
+        this.clearAllGizmos();
+    }
+
+    onNodeChanged(node: Node): void {
+        if (!node) return;
+        walkNodeComponent(node, (component: Component) => {
+            const compGizmo = getGizmoProperty('component', component);
+            if (compGizmo && compGizmo.checkVisible()) {
+                if ((compGizmo as any).onNodeChanged) {
+                    (compGizmo as any).onNodeChanged({ node });
+                }
+            }
+        });
+    }
+
+    onComponentAdded(comp: Component): void {
+        const node = comp.node;
+        if (!node) return;
+        if (this._selection.includes(node.uuid)) {
+            this.showAllGizmoOfNode(node);
+        }
+    }
+
+    onComponentRemoved(comp: Component): void {
+        this._removeGizmo('icon', comp);
+        this._removeGizmo('persistent', comp);
+        const compGizmo = getGizmoProperty('component', comp);
+        if (compGizmo) {
+            this._hideGizmo(compGizmo);
+        }
+    }
+
+    onNodeAdded(node: Node): void {
+        if (this._selection.includes(node.uuid)) {
+            this.showAllGizmoOfNode(node);
+        }
+    }
+
+    onNodeRemoved(node: Node): void {
+        this.removeAllGizmoOfNode(node, true);
+    }
+
+    // ── Update ──────────────────────────────────────────────────────────────────
+
+    onUpdate(deltaTime: number): void {
+        for (const uuid of this._selection) {
+            try {
+                const node = Service.Scene?.getNodeByUuid?.(uuid);
+                if (!node) continue;
+                walkNodeComponent(node, (component: Component) => {
+                    const compGizmo = getGizmoProperty('component', component);
+                    if (compGizmo && compGizmo.checkVisible()) {
+                        compGizmo.update(deltaTime);
+                    }
+                });
+            } catch (e) {
+                // Scene not ready
+            }
+        }
+    }
+}

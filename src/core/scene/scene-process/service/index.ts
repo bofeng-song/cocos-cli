@@ -10,3 +10,4 @@ export * from './selection';
 export * from './operation';
 export * from './undo';
 export * from './camera';
+export * from './gizmo';

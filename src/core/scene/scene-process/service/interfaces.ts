@@ -21,6 +21,8 @@ import {
     IUndoService,
     IPublicCameraService,
     ICameraService,
+    IPublicGizmoService,
+    IGizmoService,
 } from '../../common';
 
 /**
@@ -38,6 +40,7 @@ export interface IPublicServiceManager {
     Operation: IPublicOperationService,
     Undo: IPublicUndoService,
     Camera: IPublicCameraService,
+    Gizmo: IPublicGizmoService,
 }
 
 export interface IServiceManager {
@@ -52,4 +55,5 @@ export interface IServiceManager {
     Operation: IOperationService,
     Undo: IUndoService,
     Camera: ICameraService,
+    Gizmo: IGizmoService,
 }
