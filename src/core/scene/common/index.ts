@@ -7,3 +7,4 @@ export * from './component';
 export * from './asset';
 export * from './engine';
 export * from './selection';
+export * from './operation';
