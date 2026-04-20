@@ -1,4 +1,4 @@
-import { Camera, Color, ISizeLike, Node, Quat, Rect, Vec3, MeshRenderer, UITransform } from 'cc';
+import { Camera, Color, ISizeLike, Node, Quat, Rect, Vec3, MeshRenderer, UITransform, gfx } from 'cc';
 import CameraControllerBase, { EditorCameraInfo } from './camera-controller-base';
 import { CameraMoveMode, CameraUtils } from './utils';
 import FiniteStateMachine from '../utils/state-machine/finite-state-machine';
@@ -294,6 +294,7 @@ export class CameraController2D extends CameraControllerBase {
         const { positions, colors, indices } = this._updateGridData();
 
         CameraUtils.updateVBAttr(this._gridMeshComp, 'a_position', positions);
+        CameraUtils.updateVBAttr(this._gridMeshComp, gfx.AttributeName.ATTR_COLOR, colors);
         CameraUtils.updateIB(this._gridMeshComp, indices);
 
         this.updateOriginAxis();
@@ -370,6 +371,7 @@ export class CameraController2D extends CameraControllerBase {
         }
 
         CameraUtils.updateVBAttr(this._originAxisHorizontalMeshComp, 'a_position', positions);
+        CameraUtils.updateVBAttr(this._originAxisHorizontalMeshComp, gfx.AttributeName.ATTR_COLOR, colors);
         CameraUtils.updateIB(this._originAxisHorizontalMeshComp, indices);
     }
 
