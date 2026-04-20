@@ -13,6 +13,8 @@ import {
     IPublicEngineService,
     IPublicPrefabService,
     IPrefabService,
+    IPublicSelectionService,
+    ISelectionService,
 } from '../../common';
 
 /**
@@ -26,6 +28,7 @@ export interface IPublicServiceManager {
     Asset: IPublicAssetService,
     Engine: IPublicEngineService,
     Prefab: IPublicPrefabService,
+    Selection: IPublicSelectionService,
 }
 
 export interface IServiceManager {
@@ -36,4 +39,5 @@ export interface IServiceManager {
     Asset: IAssetService,
     Engine: IEngineService,
     Prefab: IPrefabService,
+    Selection: ISelectionService,
 }

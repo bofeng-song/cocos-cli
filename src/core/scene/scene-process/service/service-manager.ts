@@ -1,7 +1,7 @@
 import { getServiceAll, IServiceEvents, ServiceEvents } from './core';
-import { IEditorEvents, INodeEvents, IComponentEvents, IScriptEvents, IAssetEvents } from '../../common';
+import { IEditorEvents, INodeEvents, IComponentEvents, IScriptEvents, IAssetEvents, ISelectionEvents } from '../../common';
 
-type AllEvents = IEditorEvents & INodeEvents & IComponentEvents & IScriptEvents & IAssetEvents;
+type AllEvents = IEditorEvents & INodeEvents & IComponentEvents & IScriptEvents & IAssetEvents & ISelectionEvents;
 
 // 排除事件
 type FilteredEvents = Exclude<keyof AllEvents, 'asset-refresh'>;
@@ -42,6 +42,11 @@ const SERVICE_EVENTS_MAP: EventMap = {
 
     // Script 事件
     'script:execution-finished': 'onScriptExecutionFinished',
+
+    // Selection 事件
+    'selection:select': 'onSelectionSelect',
+    'selection:unselect': 'onSelectionUnselect',
+    'selection:clear': 'onSelectionClear',
 } as const;
 
 type ServiceEventType = typeof SERVICE_EVENTS_MAP[keyof typeof SERVICE_EVENTS_MAP];

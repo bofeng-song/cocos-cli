@@ -35,6 +35,11 @@ export interface IServiceEvents {
 
     // Script events
     onScriptExecutionFinished?(): void;
+
+    // Selection events
+    onSelectionSelect?(uuid: string, uuids: string[]): void;
+    onSelectionUnselect?(uuid: string, uuids: string[]): void;
+    onSelectionClear?(): void;
 }
 
 export class BaseService<TEvents extends Record<string, any>> {

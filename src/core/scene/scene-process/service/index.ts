@@ -6,3 +6,4 @@ export * from './asset';
 export * from './component';
 export * from './engine';
 export * from './prefab';
+export * from './selection';
