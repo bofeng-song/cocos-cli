@@ -6,12 +6,6 @@ import { ComponentProxy } from './proxy/component-proxy';
 import { AssetProxy } from './proxy/asset-proxy';
 import { EngineProxy } from './proxy/engine-proxy';
 import { PrefabProxy } from './proxy/prefab-proxy';
-import { SelectionProxy } from './proxy/selection-proxy';
-import { UndoProxy } from './proxy/undo-proxy';
-import { CameraProxy } from './proxy/camera-proxy';
-import { GizmoProxy } from './proxy/gizmo-proxy';
-import { OperationProxy } from './proxy/operation-proxy';
-import { SceneViewProxy } from './proxy/scene-view-proxy';
 
 import { assetManager } from '../../assets';
 import scriptManager from '../../scripting';
