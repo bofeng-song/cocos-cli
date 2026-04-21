@@ -1,6 +1,6 @@
 'use strict';
 
-import { Component, DirectionalLight, Layers, LightComponent, Node } from 'cc';
+import { CCObject, Component, DirectionalLight, Layers, LightComponent, Node } from 'cc';
 import { BaseService } from './core';
 import { register, Service } from './core/decorator';
 import { lightManager } from './scene-view/light-manager';
@@ -16,6 +16,7 @@ export class SceneViewService extends BaseService<ISceneViewEvents> implements I
     init(): void {
         const lightNode = new Node('SceneViewLight');
         lightNode.layer = Layers.Enum.EDITOR;
+        lightNode._objFlags |= CCObject.Flags.DontSave;
         this._lightNode = lightNode;
 
         const light = lightNode.addComponent(DirectionalLight);

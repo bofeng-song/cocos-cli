@@ -31,12 +31,6 @@ export const Scene = {
     ...AssetProxy,
     ...EngineProxy,
     ...PrefabProxy,
-    ...SelectionProxy,
-    ...UndoProxy,
-    ...CameraProxy,
-    ...GizmoProxy,
-    ...OperationProxy,
-    ...SceneViewProxy,
 
     // 场景进程
     worker: sceneWorker,

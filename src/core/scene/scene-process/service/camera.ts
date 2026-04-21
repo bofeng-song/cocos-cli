@@ -1,4 +1,4 @@
-import { Color, gfx, Layers, Vec3 } from 'cc';
+import { CCObject, Color, gfx, Layers, Node, Vec3 } from 'cc';
 import { BaseService } from './core';
 import { register, Service } from './core/decorator';
 import { CameraController2D } from './camera/camera-controller-2d';
@@ -59,22 +59,34 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
      * 场景就绪时调用，创建编辑器相机并初始化控制器
      */
     onEditorOpened(): void {
-        if (!this._camera) {
+        if (this._camera) return;
+        try {
             const backgroundNode = (cc as any).director?.getScene();
-            if (backgroundNode) {
-                const cam = CameraUtils.createCamera(
-                    new Color(48, 48, 48, 0), backgroundNode, EditorCameraComponent,
-                ) as EditorCameraComponent;
-                this._camera = cam;
-                this._controller2D.init(cam);
-                this._controller3D.init(cam);
-                this._controller3D.on('mode', (mode: CameraMoveMode) => {
-                    this.emit('camera:mode-change', mode);
-                });
-                this._controller3D.on('projection-changed', (projection: number) => {
-                    this.emit('camera:projection-changed', projection);
-                });
-            }
+            if (!backgroundNode) return;
+            const cam = CameraUtils.createCamera(
+                new Color(48, 48, 48, 0), backgroundNode, EditorCameraComponent,
+            ) as EditorCameraComponent;
+            this._camera = cam;
+            this._controller2D.init(cam);
+            this._controller3D.init(cam);
+            this._controller.active = true;
+            this._controller3D.on('mode', (mode: CameraMoveMode) => {
+                this.emit('camera:mode-change', mode);
+            });
+            this._controller3D.on('projection-changed', (projection: number) => {
+                this.emit('camera:projection-changed', projection);
+            });
+            setTimeout(() => {
+                try {
+                    this._controller.updateGrid();
+                    this._focusOnSceneContent();
+                    Service.Engine.repaintInEditMode();
+                } catch (e) {
+                    console.warn('[Camera] deferred grid update failed:', e);
+                }
+            }, 200);
+        } catch (e) {
+            console.warn('[Camera] onEditorOpened failed:', e);
         }
     }
 
@@ -126,9 +138,15 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
         if (cameraInfo) {
             this.focus(null, cameraInfo, true);
         } else {
-            const scene = (cc as any).director?.getScene();
-            if (scene) {
-                this.focus([scene.uuid], undefined, true);
+            // 与原始编辑器一致：使用 getRootNode (等同于 cce.Scene.rootNode)
+            const rootNode = Service.Editor?.getRootNode?.() as any;
+            if (rootNode?.uuid) {
+                this.focus([rootNode.uuid], undefined, true);
+            } else {
+                const scene = (cc as any).director?.getScene();
+                if (scene) {
+                    this.focus([scene.uuid], undefined, true);
+                }
             }
         }
     }
@@ -231,6 +249,42 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
 
     getCamera() {
         return this._camera?.camera;
+    }
+
+    private _focusOnSceneContent(): void {
+        // 与原始编辑器一致：使用 getRootNode (等同于 cce.Scene.rootNode)
+        const rootNode = Service.Editor?.getRootNode?.() as any;
+        const scene = rootNode || (cc as any).director?.getScene();
+        if (!scene) return;
+
+        const EditorExtends = (cc as any).EditorExtends || (globalThis as any).EditorExtends;
+        if (EditorExtends?.Node) {
+            const node = EditorExtends.Node.getNode(scene.uuid);
+            if (node) {
+                this._controller.focus([scene.uuid], undefined, true);
+                return;
+            }
+            // Scene 节点可能未注册到 _map，尝试用子节点
+            for (const child of scene.children) {
+                if (child._objFlags & CCObject.Flags.DontSave) continue;
+                const childNode = EditorExtends.Node.getNode(child.uuid);
+                if (childNode) {
+                    this._controller.focus([child.uuid], undefined, true);
+                    return;
+                }
+            }
+        }
+
+        // 降级：直接用场景子节点聚焦
+        const contentNodes: Node[] = [];
+        const dontSave = CCObject.Flags.DontSave;
+        for (const child of scene.children) {
+            if (child._objFlags & dontSave) continue;
+            contentNodes.push(child);
+        }
+        if (contentNodes.length > 0) {
+            this._controller3D.focusByNode(contentNodes, false, true);
+        }
     }
 
     /**

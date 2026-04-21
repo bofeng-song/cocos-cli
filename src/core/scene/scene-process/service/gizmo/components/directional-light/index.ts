@@ -131,6 +131,7 @@ class DirectionalLightIconGizmo extends IconGizmoBase<DirectionalLight> {
 
     createController() {
         super.createController();
+        this._controller.setTextureByUUID('9cb543ba-d152-4809-8a44-8e7bd5712123@6c48a');
     }
 }
 

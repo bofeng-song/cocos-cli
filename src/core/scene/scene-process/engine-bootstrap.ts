@@ -101,4 +101,5 @@ export async function startup(options: {
 
     await cc.game.run();
     await DecoratorService.Engine.init();
+    await serviceManager.initAllServices();
 }

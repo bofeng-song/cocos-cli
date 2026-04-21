@@ -25,17 +25,299 @@
             height: 100%;
             overflow: hidden;
             background-color: #333;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         #GameCanvas {
             width: 100%;
             height: 100%;
         }
+
+        /* ── Test Panel ── */
+        #testPanel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 280px;
+            height: 100%;
+            background: rgba(30, 30, 30, 0.92);
+            color: #ddd;
+            font-size: 12px;
+            overflow-y: auto;
+            z-index: 9999;
+            box-shadow: -2px 0 8px rgba(0,0,0,0.5);
+            transition: transform 0.2s;
+        }
+        #testPanel.collapsed {
+            transform: translateX(280px);
+        }
+        #panelToggle {
+            position: fixed;
+            top: 8px;
+            right: 8px;
+            z-index: 10000;
+            background: #444;
+            color: #ddd;
+            border: 1px solid #666;
+            border-radius: 4px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        #panelToggle:hover { background: #555; }
+
+        .panel-section {
+            border-bottom: 1px solid #444;
+            padding: 8px 12px;
+        }
+        .panel-section h3 {
+            margin: 0 0 6px 0;
+            font-size: 13px;
+            color: #8cf;
+            cursor: pointer;
+            user-select: none;
+        }
+        .panel-section h3::before {
+            content: '▾ ';
+            font-size: 10px;
+        }
+        .panel-section.folded h3::before {
+            content: '▸ ';
+        }
+        .panel-section.folded .section-body {
+            display: none;
+        }
+        .section-body {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .row label {
+            min-width: 60px;
+            color: #aaa;
+        }
+        .btn {
+            background: #3a3a3a;
+            color: #ddd;
+            border: 1px solid #555;
+            border-radius: 3px;
+            padding: 3px 8px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .btn:hover { background: #4a4a4a; border-color: #777; }
+        .btn:active { background: #555; }
+        .btn.active {
+            background: #2a6da8;
+            border-color: #4a9de8;
+            color: #fff;
+        }
+        .btn-primary {
+            background: #2a6da8;
+            border-color: #4a9de8;
+            color: #fff;
+        }
+        .btn-primary:hover { background: #3580bf; }
+        select, input[type="range"] {
+            background: #2a2a2a;
+            color: #ddd;
+            border: 1px solid #555;
+            border-radius: 3px;
+            padding: 2px 4px;
+            font-size: 11px;
+        }
+        select { flex: 1; min-width: 0; }
+        input[type="range"] { flex: 1; }
+        input[type="checkbox"] { accent-color: #4a9de8; }
+        .info-text {
+            color: #888;
+            font-size: 11px;
+            word-break: break-all;
+        }
+        .status-ok { color: #6c6; }
+        .status-warn { color: #cc6; }
+        .status-err { color: #c66; }
+        #log {
+            max-height: 100px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 10px;
+            background: #1a1a1a;
+            padding: 4px;
+            border-radius: 3px;
+        }
+        #log div { padding: 1px 0; }
     </style>
 </head>
 <body>
     <div id="GameDiv" class="wrapper">
         <div id="Cocos3dGameContainer">
             <canvas id="GameCanvas" tabindex="-1" style="background-color: '';"></canvas>
+        </div>
+    </div>
+
+    <button id="panelToggle" onclick="togglePanel()">Panel</button>
+
+    <div id="testPanel">
+        <!-- Scene -->
+        <div class="panel-section" id="sec-scene">
+            <h3 onclick="toggleSection('sec-scene')">Scene</h3>
+            <div class="section-body">
+                <div class="row">
+                    <button class="btn btn-primary" id="btnLoad" onclick="doLoadScene()">Load Scene</button>
+                    <span id="sceneStatus" class="info-text">Not loaded</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Camera -->
+        <div class="panel-section" id="sec-camera">
+            <h3 onclick="toggleSection('sec-camera')">Camera</h3>
+            <div class="section-body">
+                <div class="row">
+                    <label>Zoom</label>
+                    <button class="btn" onclick="safeCall('Camera','zoomUp')">+</button>
+                    <button class="btn" onclick="safeCall('Camera','zoomDown')">-</button>
+                    <button class="btn" onclick="safeCall('Camera','zoomReset')">Reset</button>
+                </div>
+                <div class="row">
+                    <label>Grid</label>
+                    <input type="checkbox" id="chkGrid" checked onchange="safeCall('Camera','setGridVisible', this.checked)">
+                    <span class="info-text">Show grid</span>
+                </div>
+                <div class="row">
+                    <label>Projection</label>
+                    <button class="btn" onclick="safeCall('Camera','changeProjection'); refreshState()">Toggle</button>
+                    <span id="projLabel" class="info-text">perspective</span>
+                </div>
+                <div class="row">
+                    <label>FOV</label>
+                    <input type="range" id="fovSlider" min="10" max="120" value="45"
+                           oninput="safeCall('Camera','setCameraProperty',{fov:Number(this.value)}); document.getElementById('fovVal').textContent=this.value">
+                    <span id="fovVal" class="info-text">45</span>
+                </div>
+                <div class="row">
+                    <label>Mode</label>
+                    <button class="btn" id="btn2D" onclick="set2D(true)">2D</button>
+                    <button class="btn active" id="btn3D" onclick="set2D(false)">3D</button>
+                </div>
+                <div class="row">
+                    <button class="btn" onclick="safeCall('Camera','resetCameraProperty'); refreshState()">Reset Camera</button>
+                </div>
+                <div class="row">
+                    <label>Align</label>
+                    <button class="btn" onclick="alignToSelection()">View→Node</button>
+                    <button class="btn" onclick="alignSelectionToView()">Node→View</button>
+                </div>
+                <div class="row">
+                    <label>View Axis</label>
+                    <button class="btn" onclick="rotateCam(0,0,-1,true)" title="Front (+Z → -Z)">Front</button>
+                    <button class="btn" onclick="rotateCam(0,0,1,true)" title="Back (-Z → +Z)">Back</button>
+                </div>
+                <div class="row">
+                    <label></label>
+                    <button class="btn" onclick="rotateCam(-1,0,0,true)" title="Left (+X → -X)">Left</button>
+                    <button class="btn" onclick="rotateCam(1,0,0,true)" title="Right (-X → +X)">Right</button>
+                </div>
+                <div class="row">
+                    <label></label>
+                    <button class="btn" onclick="rotateCam(0,-1,0,true)" title="Top (+Y → -Y)">Top</button>
+                    <button class="btn" onclick="rotateCam(0,1,0,true)" title="Bottom (-Y → +Y)">Bottom</button>
+                </div>
+                <div class="row">
+                    <label>Cam Pos</label>
+                    <span id="camPos" class="info-text">-</span>
+                </div>
+                <div class="row">
+                    <label>Focus</label>
+                    <button class="btn" onclick="focusSelected()">Focus Selected</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gizmo -->
+        <div class="panel-section" id="sec-gizmo">
+            <h3 onclick="toggleSection('sec-gizmo')">Gizmo</h3>
+            <div class="section-body">
+                <div class="row">
+                    <label>Tool</label>
+                    <button class="btn active" id="tool-position" onclick="setTool('position')">Pos</button>
+                    <button class="btn" id="tool-rotation" onclick="setTool('rotation')">Rot</button>
+                    <button class="btn" id="tool-scale" onclick="setTool('scale')">Scl</button>
+                    <button class="btn" id="tool-rect" onclick="setTool('rect')">Rect</button>
+                    <button class="btn" id="tool-view" onclick="setTool('view')">View</button>
+                </div>
+                <div class="row">
+                    <label>Coord</label>
+                    <button class="btn active" id="coord-local" onclick="setCoord('local')">Local</button>
+                    <button class="btn" id="coord-global" onclick="setCoord('global')">Global</button>
+                </div>
+                <div class="row">
+                    <label>Pivot</label>
+                    <button class="btn active" id="pivot-pivot" onclick="setPivot('pivot')">Pivot</button>
+                    <button class="btn" id="pivot-center" onclick="setPivot('center')">Center</button>
+                </div>
+                <div class="row">
+                    <label>Lock Tool</label>
+                    <input type="checkbox" id="chkLock" onchange="safeCall('Gizmo','lockGizmoTool', this.checked)">
+                </div>
+                <div class="row">
+                    <label>Icons</label>
+                    <input type="checkbox" id="chkIcons" checked onchange="safeCall('Gizmo','setIconVisible', this.checked)">
+                    <span class="info-text">Show gizmo icons</span>
+                </div>
+                <div class="row">
+                    <label>Current</label>
+                    <span id="toolName" class="info-text">position</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Selection -->
+        <div class="panel-section" id="sec-selection">
+            <h3 onclick="toggleSection('sec-selection')">Selection</h3>
+            <div class="section-body">
+                <div class="row">
+                    <label>Node</label>
+                    <select id="nodeList"><option value="">-- load scene first --</option></select>
+                </div>
+                <div class="row">
+                    <button class="btn" onclick="doSelect()">Select</button>
+                    <button class="btn" onclick="doUnselect()">Unselect</button>
+                    <button class="btn" onclick="safeCall('Selection','clear'); refreshState()">Clear</button>
+                    <button class="btn" onclick="refreshNodeList()">Refresh</button>
+                </div>
+                <div class="row">
+                    <label>Selected</label>
+                    <span id="selInfo" class="info-text">none</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SceneView -->
+        <div class="panel-section" id="sec-sceneview">
+            <h3 onclick="toggleSection('sec-sceneview')">SceneView</h3>
+            <div class="section-body">
+                <div class="row">
+                    <label>Scene Light</label>
+                    <input type="checkbox" id="chkLight" checked onchange="safeCall('SceneView','setSceneLightOn', this.checked)">
+                    <span class="info-text">Use scene lights</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log -->
+        <div class="panel-section" id="sec-log">
+            <h3 onclick="toggleSection('sec-log')">Log</h3>
+            <div class="section-body">
+                <div id="log"></div>
+                <button class="btn" onclick="document.getElementById('log').innerHTML=''">Clear</button>
+            </div>
         </div>
     </div>
 
@@ -47,11 +329,267 @@
     <script type="module">
         const { default: boot } = await import("/static/web/boot.js");
         await boot();
+    </script>
+    <script>
+        /* ── Helpers ── */
+        function log(msg, cls) {
+            const el = document.getElementById('log');
+            const d = document.createElement('div');
+            d.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+            if (cls) d.className = cls;
+            el.appendChild(d);
+            el.scrollTop = el.scrollHeight;
+        }
 
-        window.addEventListener('click', async () => {
-            await import("/static/web/load-scene.js");
-            window.loadScene(WebEnv.serverURL);
-        });
+        function safeCall(svc, method, ...args) {
+            try {
+                if (!window.cli) { log('cli not ready', 'status-warn'); return; }
+                const s = window.cli[svc];
+                if (!s) { log(svc + ' not registered', 'status-warn'); return; }
+                const result = s[method](...args);
+                log(svc + '.' + method + '(' + args.map(a => JSON.stringify(a)).join(',') + ')', 'status-ok');
+                try { window.cli.Engine.repaintInEditMode(); } catch (_) {}
+                return result;
+            } catch (e) {
+                log(svc + '.' + method + ' error: ' + e.message, 'status-err');
+            }
+        }
+
+        function togglePanel() {
+            document.getElementById('testPanel').classList.toggle('collapsed');
+        }
+
+        function toggleSection(id) {
+            document.getElementById(id).classList.toggle('folded');
+        }
+
+        /* ── Scene ── */
+        async function doLoadScene() {
+            const btn = document.getElementById('btnLoad');
+            const status = document.getElementById('sceneStatus');
+            btn.disabled = true;
+            status.textContent = 'Loading...';
+            status.className = 'info-text status-warn';
+            try {
+                await import("/static/web/load-scene.js");
+                await window.loadScene(WebEnv.serverURL);
+                status.textContent = 'Loaded';
+                status.className = 'info-text status-ok';
+                log('Scene loaded', 'status-ok');
+                setTimeout(() => { initPanel(); }, 500);
+            } catch (e) {
+                status.textContent = 'Failed';
+                status.className = 'info-text status-err';
+                log('Load failed: ' + e.message, 'status-err');
+            }
+            btn.disabled = false;
+        }
+        window.doLoadScene = doLoadScene;
+
+        /* ── Camera ── */
+        function set2D(is2D) {
+            try {
+                if (window.cli && window.cli.Camera) {
+                    window.cli.Camera.is2D = is2D;
+                    log('Camera.is2D = ' + is2D, 'status-ok');
+                }
+            } catch(e) { log('set2D error: ' + e.message, 'status-err'); }
+            document.getElementById('btn2D').classList.toggle('active', is2D);
+            document.getElementById('btn3D').classList.toggle('active', !is2D);
+        }
+        window.set2D = set2D;
+
+        function alignToSelection() {
+            const uuids = getSelectedUuids();
+            if (uuids.length === 0) { log('No selection for align', 'status-warn'); return; }
+            safeCall('Camera', 'alignSceneViewToNode', uuids);
+        }
+        window.alignToSelection = alignToSelection;
+
+        function alignSelectionToView() {
+            const uuids = getSelectedUuids();
+            if (uuids.length === 0) { log('No selection for align', 'status-warn'); return; }
+            safeCall('Camera', 'alignNodeToSceneView', uuids);
+        }
+        window.alignSelectionToView = alignSelectionToView;
+
+        function rotateCam(x, y, z, byDist) {
+            try {
+                if (!window.cli || !window.cli.Camera) { log('Camera not ready', 'status-warn'); return; }
+                const dir = new cc.Vec3(x, y, z);
+                window.cli.Camera.rotateCameraToDir(dir, byDist);
+                log('rotateCameraToDir(' + x + ',' + y + ',' + z + ')', 'status-ok');
+            } catch(e) { log('rotateCam error: ' + e.message, 'status-err'); }
+        }
+        window.rotateCam = rotateCam;
+
+        function focusSelected() {
+            const uuids = getSelectedUuids();
+            if (uuids.length === 0) { log('No selection to focus', 'status-warn'); return; }
+            safeCall('Camera', 'focus', uuids);
+        }
+        window.focusSelected = focusSelected;
+
+        /* ── Gizmo ── */
+        const tools = ['position', 'rotation', 'scale', 'rect', 'view'];
+
+        function setTool(name) {
+            safeCall('Gizmo', 'changeTool', name);
+            tools.forEach(t => {
+                const el = document.getElementById('tool-' + t);
+                if (el) el.classList.toggle('active', t === name);
+            });
+            document.getElementById('toolName').textContent = name;
+        }
+        window.setTool = setTool;
+
+        function setCoord(coord) {
+            safeCall('Gizmo', 'setCoordinate', coord);
+            document.getElementById('coord-local').classList.toggle('active', coord === 'local');
+            document.getElementById('coord-global').classList.toggle('active', coord === 'global');
+        }
+        window.setCoord = setCoord;
+
+        function setPivot(pivot) {
+            safeCall('Gizmo', 'setPivot', pivot);
+            document.getElementById('pivot-pivot').classList.toggle('active', pivot === 'pivot');
+            document.getElementById('pivot-center').classList.toggle('active', pivot === 'center');
+        }
+        window.setPivot = setPivot;
+
+        /* ── Selection ── */
+        function getSelectedUuids() {
+            try {
+                if (window.cli && window.cli.Selection) {
+                    return window.cli.Selection.query() || [];
+                }
+            } catch(e) {}
+            return [];
+        }
+
+        function doSelect() {
+            const sel = document.getElementById('nodeList');
+            const uuid = sel.value;
+            if (!uuid) { log('No node selected in dropdown', 'status-warn'); return; }
+            safeCall('Selection', 'select', uuid);
+            setTimeout(refreshState, 100);
+        }
+        window.doSelect = doSelect;
+
+        function doUnselect() {
+            const sel = document.getElementById('nodeList');
+            const uuid = sel.value;
+            if (!uuid) { log('No node selected in dropdown', 'status-warn'); return; }
+            safeCall('Selection', 'unselect', uuid);
+            setTimeout(refreshState, 100);
+        }
+        window.doUnselect = doUnselect;
+
+        async function refreshNodeList() {
+            const sel = document.getElementById('nodeList');
+            sel.innerHTML = '<option value="">loading...</option>';
+            try {
+                const root = await window.cli.Node.queryNode({
+                    path: '/', queryChildren: true, queryComponent: false
+                });
+                sel.innerHTML = '';
+                if (root && root.children) {
+                    flattenNodes(root.children, '', sel);
+                }
+                if (sel.options.length === 0) {
+                    sel.innerHTML = '<option value="">-- no nodes --</option>';
+                }
+                log('Node list refreshed (' + sel.options.length + ' nodes)', 'status-ok');
+            } catch(e) {
+                sel.innerHTML = '<option value="">-- error --</option>';
+                log('refreshNodeList error: ' + e.message, 'status-err');
+            }
+        }
+        window.refreshNodeList = refreshNodeList;
+
+        function flattenNodes(nodes, prefix, sel) {
+            if (!nodes) return;
+            for (const n of nodes) {
+                const name = prefix + (n.name || n.nodeId || '?');
+                const opt = document.createElement('option');
+                opt.value = n.nodeId || n.uuid || '';
+                opt.textContent = name;
+                sel.appendChild(opt);
+                if (n.children && n.children.length > 0) {
+                    flattenNodes(n.children, name + '/', sel);
+                }
+            }
+        }
+
+        /* ── State Refresh ── */
+        function refreshState() {
+            try {
+                if (!window.cli) return;
+
+                // Camera
+                try {
+                    const fov = window.cli.Camera.getCameraFov();
+                    document.getElementById('fovSlider').value = fov;
+                    document.getElementById('fovVal').textContent = Math.round(fov);
+                    const grid = window.cli.Camera.isGridVisible();
+                    document.getElementById('chkGrid').checked = grid;
+                    const is2D = window.cli.Camera.is2D;
+                    document.getElementById('btn2D').classList.toggle('active', is2D);
+                    document.getElementById('btn3D').classList.toggle('active', !is2D);
+                    const cam = window.cli.Camera.camera;
+                    if (cam && cam.node) {
+                        const p = cam.node.worldPosition;
+                        document.getElementById('camPos').textContent =
+                            'x:' + p.x.toFixed(1) + ' y:' + p.y.toFixed(1) + ' z:' + p.z.toFixed(1);
+                    }
+                } catch(e) {}
+
+                // Gizmo
+                try {
+                    const tool = window.cli.Gizmo.transformToolName;
+                    document.getElementById('toolName').textContent = tool || '?';
+                    tools.forEach(t => {
+                        const el = document.getElementById('tool-' + t);
+                        if (el) el.classList.toggle('active', t === tool);
+                    });
+                } catch(e) {}
+
+                // Selection
+                try {
+                    const sel = window.cli.Selection.query();
+                    const info = document.getElementById('selInfo');
+                    if (sel && sel.length > 0) {
+                        info.textContent = sel.length + ': ' + sel.map(u => u.substring(0, 8)).join(', ');
+                    } else {
+                        info.textContent = 'none';
+                    }
+                } catch(e) {}
+
+                // SceneView
+                try {
+                    const lightOn = window.cli.SceneView.querySceneLightOn();
+                    document.getElementById('chkLight').checked = lightOn;
+                } catch(e) {}
+
+            } catch(e) {
+                // Services not ready
+            }
+        }
+        window.refreshState = refreshState;
+
+        /* ── Init Panel ── */
+        async function initPanel() {
+            refreshState();
+            await refreshNodeList();
+            // Auto-refresh every 2s
+            setInterval(refreshState, 2000);
+        }
+        window.initPanel = initPanel;
+
+        // Expose all handlers globally
+        window.safeCall = safeCall;
+        window.togglePanel = togglePanel;
+        window.toggleSection = toggleSection;
     </script>
 </body>
 </html>

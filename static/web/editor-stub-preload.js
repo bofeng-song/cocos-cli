@@ -18,6 +18,29 @@ window.Editor = {
             return Promise.resolve(null);
         },
     },
+    Selection: {
+        getSelected: function (_type) { return []; },
+        getLastSelected: function (_type) { return ''; },
+        select: function (_type, _uuid) {},
+        unselect: function (_type, _uuid) {},
+        clear: function (_type) {},
+    },
+    Profile: {
+        load: function () { return Promise.resolve({}); },
+        getConfig: function () { return undefined; },
+        setConfig: function () {},
+    },
+    Panel: {
+        open: function () {},
+        close: function () {},
+    },
+    Utils: {
+        refreshSelectedInspector: function () {},
+    },
+    Clipboard: {
+        read: function () { return ''; },
+        write: function () {},
+    },
 };
 
 if (typeof window.require === 'undefined') {

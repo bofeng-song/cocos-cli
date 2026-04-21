@@ -51,7 +51,7 @@ class IconGizmoBase<T extends Component = Component> extends GizmoBase<T> {
         this._controller.onControllerMouseUp = this.onControllerMouseUp.bind(this);
         // 默认配置：is3DIcon=false，iconGizmoSize=64
         this._controller.is3DIcon = false;
-        this._controller.updateSize(64);
+        this._controller.updateSize(2);
         if (!this._isIconGizmoVisible) {
             this._controller.hide();
         }

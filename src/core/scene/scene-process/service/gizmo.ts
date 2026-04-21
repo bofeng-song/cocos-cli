@@ -18,9 +18,9 @@ import './gizmo/components/directional-light';
 type TGizmoType = 'icon' | 'persistent' | 'component';
 
 // WeakMaps to associate components with their gizmo instances
-const _componentGizmoMap = new WeakMap<Component, GizmoBase | null>();
-const _iconGizmoMap = new WeakMap<Component, GizmoBase | null>();
-const _persistentGizmoMap = new WeakMap<Component, GizmoBase | null>();
+const _componentGizmoMap = new WeakMap < Component, GizmoBase | null > ();
+const _iconGizmoMap = new WeakMap < Component, GizmoBase | null > ();
+const _persistentGizmoMap = new WeakMap < Component, GizmoBase | null > ();
 
 function getGizmoMap(type: TGizmoType): WeakMap<Component, GizmoBase | null> {
     switch (type) {
@@ -47,7 +47,7 @@ function getGizmoDefMap(type: TGizmoType): Map<string, any> {
 }
 
 // Hack component for transform gizmo
-const _transformCompMap = new WeakMap<Node, Component>();
+const _transformCompMap = new WeakMap < Node, Component> ();
 
 function getTransformHackComp(node: Node): Component {
     let comp: Component | undefined = _transformCompMap.get(node);
@@ -101,15 +101,24 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
 
     get isViewMode(): boolean {
         return this.transformToolData.toolName === 'view' &&
-               this.transformToolData.viewMode === 'view';
+            this.transformToolData.viewMode === 'view';
     }
 
     // ── Lifecycle ───────────────────────────────────────────────────────────────
 
     init(): void {
-        // Create layer nodes
-        this.foregroundNode = create3DNode('foreground');
-        this.backgroundNode = create3DNode('background');
+
+        // 用于编辑器绘制的背景和前景节点
+        this.foregroundNode = new cc.Node('Editor Scene Foreground');
+        this.backgroundNode = new cc.Node('Editor Scene Background');
+
+        // 编辑器使用的节点不需要存储和显示在层级管理器
+        this.foregroundNode.objFlags |= cc.Object.Flags.DontSave | cc.Object.Flags.HideInHierarchy;
+        this.backgroundNode.objFlags |= cc.Object.Flags.DontSave | cc.Object.Flags.HideInHierarchy;
+
+        // 这些节点应该是常驻节点
+        cc.director.addPersistRootNode(this.foregroundNode);
+        cc.director.addPersistRootNode(this.backgroundNode);
 
         const scene = (cc as any).director?.getScene();
         if (scene) {
@@ -386,6 +395,10 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
 
     // ── Scene lifecycle (called by BaseService event hooks) ─────────────────────
 
+    onEditorOpened(): void {
+        this._showIconGizmosForScene();
+    }
+
     onSceneOpened(): void {
         this.clearAllGizmos();
         this.transformToolData.toolName = 'position';
@@ -432,6 +445,35 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
 
     onNodeRemoved(node: Node): void {
         this.removeAllGizmoOfNode(node, true);
+    }
+
+    private _showIconGizmosForScene(): void {
+        const scene = (cc as any).director?.getScene();
+        if (!scene) return;
+        this._walkSceneForIcons(scene);
+    }
+
+    private _walkSceneForIcons(node: Node): void {
+        if (!node || isEditorNode(node)) return;
+        const components = node.components;
+        if (components) {
+            for (let i = 0; i < components.length; i++) {
+                const comp = components[i];
+                const className = js.getClassName(comp);
+                if (GizmoDefines.iconGizmo.has(className)) {
+                    this._showGizmo('icon', comp);
+                }
+                if (GizmoDefines.persistentGizmo.has(className)) {
+                    this._showGizmo('persistent', comp);
+                }
+            }
+        }
+        const children = node.children;
+        if (children) {
+            for (let i = 0; i < children.length; i++) {
+                this._walkSceneForIcons(children[i]);
+            }
+        }
     }
 
     // ── Update ──────────────────────────────────────────────────────────────────

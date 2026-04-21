@@ -1,4 +1,4 @@
-import { Camera, Color, gfx, Layers, MeshRenderer, Node, utils } from 'cc';
+import { Camera, Color, gfx, Layers, MeshRenderer, Node, utils, CCObject } from 'cc';
 
 const _maxTicks = 100;
 const vbMap = new Map();
@@ -15,7 +15,14 @@ export enum CameraMoveMode {
 export class CameraUtils {
     static updateVBAttr(comp: MeshRenderer | null, attr: string, data: number[]) {
         const model = comp && comp.model && comp.model.subModels[0];
-        if (!model || !model.inputAssembler || !model.subMesh) return;
+        if (!model || !model.inputAssembler || !model.subMesh) {
+            console.warn('[CameraUtils] updateVBAttr: model not ready', attr, {
+                hasComp: !!comp,
+                hasModel: !!(comp && comp.model),
+                subModelCount: comp?.model?.subModels?.length,
+            });
+            return;
+        }
         const { inputAssembler, subMesh } = model;
         const vbuffer = vbMap.get(subMesh) as ArrayBuffer;
         if (!vbuffer) {
@@ -35,14 +42,21 @@ export class CameraUtils {
         if (!format || !vb) return;
         utils.writeBuffer(new DataView(vbuffer as ArrayBuffer), data, format, offset, vb.stride);
         vb.update(vbuffer, vb.stride * vb.count);
-        if (subMesh.geometricInfo) {
+        if (subMesh.geometricInfo && attr === gfx.AttributeName.ATTR_POSITION) {
             subMesh.geometricInfo.positions.set(data);
         }
     }
 
     static updateIB(comp: MeshRenderer | null, data: number[]) {
         const model = comp && comp.model && comp.model.subModels[0];
-        if (!model || !model.inputAssembler || !model.subMesh) return;
+        if (!model || !model.inputAssembler || !model.subMesh) {
+            console.warn('[CameraUtils] updateIB: model not ready', {
+                hasComp: !!comp,
+                hasModel: !!(comp && comp.model),
+                subModelCount: comp?.model?.subModels?.length,
+            });
+            return;
+        }
         const { inputAssembler, subMesh } = model;
         const ibuffer = ibMap.get(subMesh) as ArrayBuffer;
         if (!ibuffer) {
@@ -106,6 +120,7 @@ export class CameraUtils {
     static createStrokeGrid(w: number, l: number, parentNode: Node) {
         const node = new cc.Node('Editor Grid');
         node.layer = cc.Layers.Enum.EDITOR | cc.Layers.Enum.IGNORE_RAYCAST;
+        node._objFlags |= CCObject.Flags.DontSave;
         node.parent = parentNode;
         const model = node.addComponent(MeshRenderer) as MeshRenderer;
         model.mesh = utils.createMesh(CameraUtils.grid(w, l, w, l));
@@ -113,13 +128,16 @@ export class CameraUtils {
         model.onEnable = () => { cb(); };
         const mtl = new cc.Material();
         mtl.initialize({ effectName: 'internal/editor/grid-stroke' });
-        model.material = mtl;
+        if (mtl.passes && mtl.passes.length > 0) {
+            model.material = mtl;
+        }
         return model;
     }
 
     static createGrid(effectName: string, parentNode: Node) {
         const node = new cc.Node(effectName);
         node.layer = cc.Layers.Enum.EDITOR | cc.Layers.Enum.IGNORE_RAYCAST;
+        node._objFlags |= CCObject.Flags.DontSave;
         node.parent = parentNode;
         node.setWorldPosition(cc.v3(0, 0, 0));
         const model = node.addComponent(MeshRenderer) as MeshRenderer;
@@ -139,6 +157,7 @@ export class CameraUtils {
         const primitiveMode = gfx.PrimitiveMode.LINE_LIST;
         const attributes = [
             { name: gfx.AttributeName.ATTR_POSITION, format: gfx.Format.RG32F },
+            { name: gfx.AttributeName.ATTR_COLOR, format: gfx.Format.RGBA32F },
         ];
         const mesh = cc.utils.createMesh({ positions, indices, colors, primitiveMode, attributes });
         const subMesh = mesh.renderingSubMeshes[0];
@@ -151,16 +170,20 @@ export class CameraUtils {
         model.mesh = mesh;
         const mtl = new cc.Material();
         mtl.initialize({ effectName, states: { primitive: primitiveMode } });
-        model.material = mtl;
+        if (mtl.passes && mtl.passes.length > 0) {
+            model.material = mtl;
+        }
         return model;
     }
 
     static createCamera(color: Color, parentNode: Node, componentClass: typeof Camera = Camera) {
         const node = new cc.Node('Editor Camera');
         node.layer = cc.Layers.Enum.EDITOR;
+        node._objFlags |= CCObject.Flags.DontSave;
         node.parent = parentNode;
         const camera = node.addComponent(componentClass) as Camera;
-        camera.clearFlags = Camera.ClearFlag.SKYBOX | gfx.ClearFlagBit.COLOR;
+        camera.priority = 1000;
+        camera.clearFlags = Camera.ClearFlag.DONT_CLEAR;
         camera.clearColor = color;
         camera.visibility = Layers.makeMaskExclude([Layers.BitMask.PROFILER, Layers.Enum.GIZMOS, Layers.Enum.SCENE_GIZMO]);
         camera.far = 100000;

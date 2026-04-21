@@ -49,11 +49,7 @@ async function startup() {
         // 初始化 engine 服务
         const { Service } = await import('./service/core/decorator');
         await Service.Engine.init();
-
-        // Initialize new services
-        try { Service.Camera?.init?.(); } catch (e) { console.warn('[Scene] Camera init failed:', e); }
-        try { Service.Gizmo?.init?.(); } catch (e) { console.warn('[Scene] Gizmo init failed:', e); }
-        try { Service.SceneView?.init?.(); } catch (e) { console.warn('[Scene] SceneView init failed:', e); }
+        await serviceManager.initAllServices();
     });
 
     console.log('[Scene] initEngine success');

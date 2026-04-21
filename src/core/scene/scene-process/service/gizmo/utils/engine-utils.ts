@@ -12,7 +12,7 @@ declare module 'cc' {
 }
 
 import {
-    Camera, Color, geometry, gfx, IVec3Like, math, MeshRenderer, Node,
+    Camera, CCObject, Color, geometry, gfx, IVec3Like, math, MeshRenderer, Node,
     primitives, utils, Vec2, Vec3, Material, Mesh, Layers, Vec4,
 } from 'cc';
 import type { IAddMeshToNodeOption, ICreateMeshOption, IMeshPrimitive, DynamicMeshPrimitive } from './defines';
@@ -66,6 +66,7 @@ function getEditorCamera(): any {
 export function create3DNode(name?: string): Node {
     const node = new (cc as any).Node(name);
     node._layer = (cc as any).Layers.Enum.GIZMOS;
+    node._objFlags |= CCObject.Flags.DontSave;
     node.modelColor = (cc as any).color();
     return node;
 }

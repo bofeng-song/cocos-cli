@@ -1,4 +1,4 @@
-import { Camera, Color, MeshRenderer, Node, Quat, Vec3, ISizeLike } from 'cc';
+import { Camera, Color, gfx, MeshRenderer, Node, Quat, Vec3, ISizeLike } from 'cc';
 import CameraControllerBase, { EditorCameraInfo } from './camera-controller-base';
 import { CameraMoveMode, CameraUtils } from './utils';
 import FiniteStateMachine from '../utils/state-machine/finite-state-machine';
@@ -35,6 +35,9 @@ function getMaxRangeOfNodes(nodes: Node[]): number {
     for (const node of nodes) {
         const dist = Vec3.distance(center, node.getWorldPosition());
         maxRange = Math.max(maxRange, dist);
+        // 递归检查子节点，与原始编辑器一致
+        const childRange = getMaxRangeOfNodes(node.children as Node[]);
+        maxRange = Math.max(maxRange, childRange);
     }
     return Math.max(maxRange, 1);
 }
@@ -117,6 +120,8 @@ export class CameraController3D extends CameraControllerBase {
         // 创建网格
         const parentNode = this.node.parent || this.node;
         this._gridMeshComp = CameraUtils.createGrid('internal/editor/grid', parentNode);
+        this._gridMeshComp.node.active = false;
+        this._gridMeshComp.node.setWorldRotationFromEuler(90, 0, 0);
 
         // 初始化原点轴
         this.initOriginAxis();
@@ -134,12 +139,24 @@ export class CameraController3D extends CameraControllerBase {
         this.updateGrid();
     }
 
+    showGrid(visible: boolean) {
+        super.showGrid(visible);
+        if (this._originAxisHorizontalMeshComp?.node) {
+            this._originAxisHorizontalMeshComp.node.active = visible;
+        }
+        if (this._originAxisVerticalMeshComp?.node) {
+            this._originAxisVerticalMeshComp.node.active = visible;
+        }
+    }
+
     // ---------- 原点轴 ----------
 
     private initOriginAxis() {
         const parentNode = this.node.parent || this.node;
         this._originAxisHorizontalMeshComp = CameraUtils.createGrid('internal/editor/grid', parentNode);
+        this._originAxisHorizontalMeshComp.node.setWorldRotationFromEuler(90, 0, 0);
         this._originAxisVerticalMeshComp = CameraUtils.createGrid('internal/editor/grid', parentNode);
+        this._originAxisVerticalMeshComp.node.setWorldRotationFromEuler(0, 90, 0);
 
         // 默认不显示原点轴 (与 base class 默认值一致)
         if (this._originAxisHorizontalMeshComp.node) {
@@ -236,6 +253,7 @@ export class CameraController3D extends CameraControllerBase {
         }
 
         CameraUtils.updateVBAttr(this._originAxisHorizontalMeshComp, 'a_position', positions);
+        CameraUtils.updateVBAttr(this._originAxisHorizontalMeshComp, gfx.AttributeName.ATTR_COLOR, colors);
         CameraUtils.updateIB(this._originAxisHorizontalMeshComp, indices);
     }
 
@@ -272,6 +290,7 @@ export class CameraController3D extends CameraControllerBase {
         }
 
         CameraUtils.updateVBAttr(this._originAxisVerticalMeshComp, 'a_position', positions);
+        CameraUtils.updateVBAttr(this._originAxisVerticalMeshComp, gfx.AttributeName.ATTR_COLOR, colors);
         CameraUtils.updateIB(this._originAxisVerticalMeshComp, indices);
     }
 
@@ -315,10 +334,16 @@ export class CameraController3D extends CameraControllerBase {
 
     set active(value: boolean) {
         if (value) {
-            this.showGrid(true);
+            this._camera.projection = 1;
+            this.node.setWorldPosition(this._curEye);
+            this.node.setWorldRotation(this._curRot);
+            this._camera.far = this.far;
+            this._camera.near = this.near;
         } else {
-            this.showGrid(false);
+            this.node.getWorldPosition(this._curEye);
+            this.node.getWorldRotation(this._curRot);
         }
+        this.showGrid(value);
     }
 
     get wanderSpeed(): number {
@@ -350,7 +375,9 @@ export class CameraController3D extends CameraControllerBase {
         this.node.setWorldPosition(this.homePos);
         this.node.setWorldRotation(this.homeRot);
 
-        // 更新 sceneViewCenter
+        Vec3.copy(this._curEye, this.homePos);
+        Quat.copy(this._curRot, this.homeRot);
+
         this.updateViewCenterByDist(-this.viewDist);
     }
 
@@ -438,25 +465,22 @@ export class CameraController3D extends CameraControllerBase {
         Vec3.multiplyScalar(targetCamPos, fwd, targetDist);
         Vec3.add(targetCamPos, targetPos, targetCamPos);
 
+        Vec3.copy(this.sceneViewCenter, targetPos);
+
         if (immediate) {
             this.node.setWorldPosition(targetCamPos);
-            Vec3.copy(this.sceneViewCenter, targetPos);
-            this.viewDist = targetDist;
+            Vec3.copy(this._curEye, targetCamPos);
+            this.viewDist = Vec3.distance(targetCamPos, this.sceneViewCenter);
             this.updateGrid();
         } else {
             const startPos = this.node.getWorldPosition().clone();
-            const startDist = this.viewDist;
 
             this._posAnim = tweenPosition(startPos, targetCamPos, 300);
             this._posAnim.step((pos: Vec3) => {
                 this.node.setWorldPosition(pos);
+                Vec3.copy(this._curEye, pos);
+                this.viewDist = Vec3.distance(pos, this.sceneViewCenter);
                 this.updateGrid();
-            });
-
-            this._distAnim = tweenNumber(startDist, targetDist, 300);
-            this._distAnim.step((dist: number) => {
-                this.viewDist = dist;
-                this.updateViewCenterByDist(-dist);
             });
         }
 
@@ -470,19 +494,27 @@ export class CameraController3D extends CameraControllerBase {
 
     focus(nodeUuids: string[], editorCameraInfo?: EditorCameraInfo, immediate = false) {
         if (editorCameraInfo) {
-            // 使用提供的相机信息
             if (editorCameraInfo.position) {
-                this.node.setWorldPosition(editorCameraInfo.position);
+                Vec3.copy(this._curEye, editorCameraInfo.position);
+            } else {
+                Vec3.copy(this._curEye, this.homePos);
             }
             if (editorCameraInfo.rotation) {
-                this.node.setWorldRotation(editorCameraInfo.rotation);
+                Quat.copy(this._curRot, editorCameraInfo.rotation);
+            } else {
+                Quat.copy(this._curRot, this.homeRot);
             }
             if (editorCameraInfo.viewCenter) {
                 Vec3.copy(this.sceneViewCenter, editorCameraInfo.viewCenter);
+            } else {
+                Vec3.set(this.sceneViewCenter, 0, 0, 0);
             }
+            this.viewDist = Vec3.distance(this._curEye, this.sceneViewCenter);
             if (editorCameraInfo.viewDist !== undefined) {
                 this.viewDist = editorCameraInfo.viewDist;
             }
+            this.node.setWorldPosition(this._curEye);
+            this.node.setWorldRotation(this._curRot);
             this.updateGrid();
             try {
                 const { Service } = require('../core/decorator');
@@ -530,14 +562,17 @@ export class CameraController3D extends CameraControllerBase {
 
         if (immediate) {
             this.node.setWorldPosition(targetCamPos);
+            Vec3.copy(this._curEye, targetCamPos);
             Vec3.copy(this.sceneViewCenter, targetPos);
+            this.viewDist = Vec3.distance(targetCamPos, this.sceneViewCenter);
             this.updateGrid();
         } else {
             const startPos = this.node.getWorldPosition().clone();
             this._posAnim = tweenPosition(startPos, targetCamPos, 300);
             this._posAnim.step((pos: Vec3) => {
                 this.node.setWorldPosition(pos);
-                this.updateViewCenterByDist(-this.viewDist);
+                Vec3.copy(this._curEye, pos);
+                this.viewDist = Vec3.distance(pos, this.sceneViewCenter);
                 this.updateGrid();
             });
         }
@@ -844,7 +879,14 @@ export class CameraController3D extends CameraControllerBase {
             indices.push(i);
         }
 
+        console.log('[Grid3D] updateGrid: count=' + count,
+            'model=' + !!(this._gridMeshComp.model),
+            'subModels=' + this._gridMeshComp.model?.subModels?.length,
+            'nodeActive=' + this._gridMeshComp.node.active,
+            'positions[0..5]=' + positions.slice(0, 6).join(','));
+
         CameraUtils.updateVBAttr(this._gridMeshComp, 'a_position', positions);
+        CameraUtils.updateVBAttr(this._gridMeshComp, gfx.AttributeName.ATTR_COLOR, colors);
         CameraUtils.updateIB(this._gridMeshComp, indices);
 
         this.updateOriginAxis();

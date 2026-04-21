@@ -155,6 +155,7 @@ class CameraComponentGizmo extends GizmoBase<Camera> {
 class CameraIconGizmo extends IconGizmoBase<Camera> {
     createController() {
         super.createController();
+        this._controller.setTextureByUUID('bd373594-df84-486d-a34a-19d09ddaa973@6c48a');
     }
 }
 
