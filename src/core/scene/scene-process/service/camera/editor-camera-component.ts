@@ -1,4 +1,5 @@
 import { Camera, Color, gfx, Layers, Rect, renderer } from 'cc';
+import { Service } from '../core/decorator';
 
 const CAMERA_EDITOR_GIZMO_MASK = Layers.Enum.GIZMOS | Layers.Enum.IGNORE_RAYCAST;
 
@@ -95,8 +96,11 @@ export default class EditorCameraComponent extends Camera {
 
     set clearFlags(val: gfx.ClearFlags) {
         super.clearFlags = val;
-        if (this._uiEditorGizmoCamera && this._camera) {
-            this._uiEditorGizmoCamera.clearFlag = this._camera.clearFlag;
+        // UIEditorGizmoCamera 必须始终保持 NONE，在原始编辑器中 onLoad 延迟调用，
+        // setter 执行时 _uiEditorGizmoCamera 为 null 所以不会被同步；
+        // CLI 中 onLoad 立即调用，需要手动恢复为 NONE
+        if (this._uiEditorGizmoCamera) {
+            this._uiEditorGizmoCamera.clearFlag = gfx.ClearFlagBit.NONE;
         }
     }
 
@@ -130,6 +134,10 @@ export default class EditorCameraComponent extends Camera {
         super.onLoad();
         this._inEditorMode = true;
         this.camera?.initGeometryRenderer();
+        const gr = (Service.Engine as any)?.getGeometryRenderer?.();
+        if (gr && this.camera?.geometryRenderer) {
+            gr.renderer = this.camera.geometryRenderer;
+        }
     }
 
     public onEnable() {

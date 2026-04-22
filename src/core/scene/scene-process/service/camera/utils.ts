@@ -182,8 +182,7 @@ export class CameraUtils {
         node._objFlags |= CCObject.Flags.DontSave;
         node.parent = parentNode;
         const camera = node.addComponent(componentClass) as Camera;
-        camera.priority = 1000;
-        camera.clearFlags = Camera.ClearFlag.DONT_CLEAR;
+        camera.clearFlags = Camera.ClearFlag.SKYBOX | gfx.ClearFlagBit.COLOR;
         camera.clearColor = color;
         camera.visibility = Layers.makeMaskExclude([Layers.BitMask.PROFILER, Layers.Enum.GIZMOS, Layers.Enum.SCENE_GIZMO]);
         camera.far = 100000;

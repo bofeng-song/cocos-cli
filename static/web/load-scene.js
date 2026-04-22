@@ -20,5 +20,4 @@ window.loadScene = async function (serverURL) {
     }
 
     await cli.Editor.open({ urlOrUUID: sceneUrl });
-    cc.game.resume();
 };

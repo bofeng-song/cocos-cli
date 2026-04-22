@@ -46,13 +46,21 @@ function getGizmoDefMap(type: TGizmoType): Map<string, any> {
     }
 }
 
-// Hack component for transform gizmo
+// Hack component for transform gizmo — needs a real class so
+// js.getClassName returns '_EditorHackTransformComponent_' to match GizmoDefines
+class HackTransformComponent {
+    node: Node;
+    get enabledInHierarchy() { return true; }
+    constructor(node: Node) { this.node = node; }
+}
+(HackTransformComponent.prototype as any).__classname__ = '_EditorHackTransformComponent_';
+
 const _transformCompMap = new WeakMap < Node, Component> ();
 
 function getTransformHackComp(node: Node): Component {
     let comp: Component | undefined = _transformCompMap.get(node);
     if (!comp) {
-        comp = { node } as any as Component;
+        comp = new HackTransformComponent(node) as any as Component;
         _transformCompMap.set(node, comp);
     }
     return comp;
@@ -77,6 +85,11 @@ function walkNodeComponent(node: Node, callback: (comp: Component) => void): voi
             callback(components[i]);
         }
     }
+}
+
+function getNodeByUuid(uuid: string): Node | null {
+    const EditorExtends = (cc as any).EditorExtends || (globalThis as any).EditorExtends;
+    return EditorExtends?.Node?.getNode?.(uuid) ?? null;
 }
 
 @register('Gizmo')
@@ -339,7 +352,7 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
         if (this._selection.includes(uuid)) return;
         this._selection.push(uuid);
         try {
-            const node = (Service as any).Scene?.getNodeByUuid?.(uuid);
+            const node = getNodeByUuid(uuid);
             if (node) {
                 this.showAllGizmoOfNode(node);
                 this._onNodeSelectionChanged(node, true);
@@ -353,7 +366,7 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
         const idx = this._selection.indexOf(uuid);
         if (idx >= 0) this._selection.splice(idx, 1);
         try {
-            const node = (Service as any).Scene?.getNodeByUuid?.(uuid);
+            const node = getNodeByUuid(uuid);
             if (node) {
                 this._onNodeSelectionChanged(node, false);
                 // Only remove component gizmos on unselect, keep icon/persistent
@@ -371,7 +384,7 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
         this._selection.length = 0;
         for (const uuid of oldSelection) {
             try {
-                const node = (Service as any).Scene?.getNodeByUuid?.(uuid);
+                const node = getNodeByUuid(uuid);
                 if (node) {
                     this._onNodeSelectionChanged(node, false);
                     walkNodeComponent(node, (component: Component) => {
@@ -481,7 +494,7 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
     onUpdate(deltaTime: number): void {
         for (const uuid of this._selection) {
             try {
-                const node = (Service as any).Scene?.getNodeByUuid?.(uuid);
+                const node = getNodeByUuid(uuid);
                 if (!node) continue;
                 walkNodeComponent(node, (component: Component) => {
                     const compGizmo = getGizmoProperty('component', component);

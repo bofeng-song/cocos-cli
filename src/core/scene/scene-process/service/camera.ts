@@ -1,4 +1,4 @@
-import { CCObject, Color, gfx, Layers, Node, Vec3 } from 'cc';
+import { CCObject, Color, Layers, Node, Vec3 } from 'cc';
 import { BaseService } from './core';
 import { register, Service } from './core/decorator';
 import { CameraController2D } from './camera/camera-controller-2d';
@@ -63,6 +63,7 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
         try {
             const backgroundNode = (cc as any).director?.getScene();
             if (!backgroundNode) return;
+
             const cam = CameraUtils.createCamera(
                 new Color(48, 48, 48, 0), backgroundNode, EditorCameraComponent,
             ) as EditorCameraComponent;
@@ -76,6 +77,9 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
             this._controller3D.on('projection-changed', (projection: number) => {
                 this.emit('camera:projection-changed', projection);
             });
+
+            this._detachSceneCameras();
+
             setTimeout(() => {
                 try {
                     this._controller.updateGrid();
@@ -201,10 +205,10 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
         this._controller3D.enableAcceleration = true;
         if (this._is2D) {
             this._controller2D.wheelSpeed = 6;
-            this.setCameraProperty({ fov: 45, far: 10000, near: 6, clearColor: [48, 48, 48, 0] });
+            this.setCameraProperty({ fov: 45, far: 10000, near: 6, clearColor: [48, 48, 48, 255] });
         } else {
             this._controller3D.wheelSpeed = 0.01;
-            this.setCameraProperty({ fov: 45, far: 10000, near: 0.01, clearColor: [48, 48, 48, 0] });
+            this.setCameraProperty({ fov: 45, far: 10000, near: 0.01, clearColor: [48, 48, 48, 255] });
         }
         Service.Engine.repaintInEditMode();
     }
@@ -251,6 +255,78 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
         return this._camera?.camera;
     }
 
+    /**
+     * 与原始编辑器 ScenePreview.detachSceneCameras 一致：
+     * 将所有非编辑器的场景相机从渲染管线中移除，并设置 tempWindow
+     * 使后续新建的相机默认渲染到离屏窗口，不干扰编辑器相机。
+     */
+    private _detachSceneCameras(): void {
+        try {
+            const root = (cc as any).director?.root;
+            const scene = (cc as any).director?.getScene();
+            if (!root || !scene) return;
+
+            const editorMask = Layers.makeMaskInclude([
+                Layers.Enum.GIZMOS,
+                Layers.Enum.SCENE_GIZMO,
+                Layers.Enum.EDITOR,
+            ]);
+
+            const renderScene = scene.renderScene || scene._renderScene;
+            if (renderScene) {
+                const cameras = [...renderScene.cameras];
+                for (const cam of cameras) {
+                    if (!cam || !cam.node) continue;
+                    if (cam.node.layer & editorMask) continue;
+                    const comp = cam.node.getComponent?.('cc.Camera');
+                    if (comp) {
+                        cam.detachCamera();
+                    }
+                }
+            }
+
+            // 设置 tempWindow，与原始编辑器一致：
+            // 后续新建的相机 (_inEditorMode=false) 会默认渲染到 tempWindow 而非 mainWindow
+            if (root.createWindow && root.mainWindow && !root.tempWindow) {
+                try {
+                    const mainSwapchain = root.mainWindow.swapchain;
+                    if (mainSwapchain) {
+                        const win = root.createWindow({
+                            title: 'CLI Temp',
+                            width: 1,
+                            height: 1,
+                            swapchain: mainSwapchain,
+                        });
+                        if (win) root.tempWindow = win;
+                    }
+                } catch {
+                    // tempWindow 创建失败不影响核心功能
+                }
+            }
+        } catch (e) {
+            console.warn('[Camera] _detachSceneCameras failed:', e);
+        }
+    }
+
+    /**
+     * 新增的 Camera 组件也需要 detach，与原始编辑器 ScenePreview.onComponentAdded 一致
+     */
+    detachNewSceneCamera(comp: any): void {
+        if (!comp || !comp.camera) return;
+        const editorMask = Layers.makeMaskInclude([
+            Layers.Enum.GIZMOS,
+            Layers.Enum.SCENE_GIZMO,
+            Layers.Enum.EDITOR,
+        ]);
+        if (comp.node?.layer & editorMask) return;
+        if (comp === this._camera) return;
+        Promise.resolve().then(() => {
+            if (comp.camera) {
+                comp.camera.detachCamera();
+            }
+        });
+    }
+
     private _focusOnSceneContent(): void {
         // 与原始编辑器一致：使用 getRootNode (等同于 cce.Scene.rootNode)
         const rootNode = Service.Editor?.getRootNode?.() as any;
@@ -292,5 +368,9 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
      */
     onEditorSaved(): void {
         // 可通过 RPC 保存相机配置
+    }
+
+    onComponentAdded(comp: any): void {
+        this.detachNewSceneCamera(comp);
     }
 }

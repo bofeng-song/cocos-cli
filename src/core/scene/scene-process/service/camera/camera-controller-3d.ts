@@ -142,10 +142,10 @@ export class CameraController3D extends CameraControllerBase {
     showGrid(visible: boolean) {
         super.showGrid(visible);
         if (this._originAxisHorizontalMeshComp?.node) {
-            this._originAxisHorizontalMeshComp.node.active = visible;
+            this._originAxisHorizontalMeshComp.node.active = visible && (this.originAxisX_Visible || this.originAxisZ_Visible);
         }
         if (this._originAxisVerticalMeshComp?.node) {
-            this._originAxisVerticalMeshComp.node.active = visible;
+            this._originAxisVerticalMeshComp.node.active = visible && this.originAxisY_Visible;
         }
     }
 
@@ -158,13 +158,10 @@ export class CameraController3D extends CameraControllerBase {
         this._originAxisVerticalMeshComp = CameraUtils.createGrid('internal/editor/grid', parentNode);
         this._originAxisVerticalMeshComp.node.setWorldRotationFromEuler(0, 90, 0);
 
-        // 默认不显示原点轴 (与 base class 默认值一致)
-        if (this._originAxisHorizontalMeshComp.node) {
-            this._originAxisHorizontalMeshComp.node.active = false;
-        }
-        if (this._originAxisVerticalMeshComp.node) {
-            this._originAxisVerticalMeshComp.node.active = false;
-        }
+        this.originAxisX_Visible = true;
+        this.originAxisZ_Visible = true;
+        this._originAxisHorizontalMeshComp.node.active = true;
+        this._originAxisVerticalMeshComp.node.active = false;
     }
 
     updateOriginAxisByConfig(config: { x?: boolean; y?: boolean; z?: boolean }, update = true) {
@@ -878,12 +875,6 @@ export class CameraController3D extends CameraControllerBase {
         for (let i = 0; i < totalPoints; i++) {
             indices.push(i);
         }
-
-        console.log('[Grid3D] updateGrid: count=' + count,
-            'model=' + !!(this._gridMeshComp.model),
-            'subModels=' + this._gridMeshComp.model?.subModels?.length,
-            'nodeActive=' + this._gridMeshComp.node.active,
-            'positions[0..5]=' + positions.slice(0, 6).join(','));
 
         CameraUtils.updateVBAttr(this._gridMeshComp, 'a_position', positions);
         CameraUtils.updateVBAttr(this._gridMeshComp, gfx.AttributeName.ATTR_COLOR, colors);

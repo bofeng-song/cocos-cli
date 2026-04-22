@@ -24,6 +24,11 @@ function getServiceProp(name: string): any {
     }
 }
 
+function getNodeByUuid(uuid: string): Node | null {
+    const EditorExtends = (cc as any).EditorExtends || (globalThis as any).EditorExtends;
+    return EditorExtends?.Node?.getNode?.(uuid) ?? null;
+}
+
 /**
  * Create a GizmoMouseEvent from an ISceneMouseEvent
  * Note: Our GizmoMouseEvent is a plain data class, NOT extending CCEvent
@@ -341,7 +346,7 @@ class GizmoOperation {
         const selection = getServiceProp('Selection');
         const uuids: string[] = selection?.query?.() ?? [];
         if (uuids.length > 0) {
-            const node = getServiceProp('Scene')?.getNodeByUuid?.(uuids[0]);
+            const node = getNodeByUuid(uuids[0]);
             if (node) {
                 const res = getServiceProp('Gizmo')?.callAllGizmoFuncOfNode?.(node, 'onKeyDown', event);
                 return res;
@@ -354,7 +359,7 @@ class GizmoOperation {
         const selection = getServiceProp('Selection');
         const uuids: string[] = selection?.query?.() ?? [];
         if (uuids.length > 0) {
-            const node = getServiceProp('Scene')?.getNodeByUuid?.(uuids[0]);
+            const node = getNodeByUuid(uuids[0]);
             if (node) {
                 const res = getServiceProp('Gizmo')?.callAllGizmoFuncOfNode?.(node, 'onKeyUp', event);
                 return res;

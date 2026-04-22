@@ -27,7 +27,8 @@ class TransformBaseGizmo extends GizmoBase<Component> {
         const svc = getService();
         const uuids: string[] = svc?.Selection?.query?.() ?? [];
         const nodes = uuids.map((uuid: string) => {
-            return svc?.Scene?.getNodeByUuid?.(uuid) ?? null;
+            const EditorExtends = (cc as any).EditorExtends || (globalThis as any).EditorExtends;
+            return EditorExtends?.Node?.getNode?.(uuid) ?? null;
         });
         return nodes.filter((node: Node | null) => {
             if (node === null || !node.isValid || this.isNodeLocked(node)) {

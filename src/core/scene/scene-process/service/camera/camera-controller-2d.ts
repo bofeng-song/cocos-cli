@@ -305,11 +305,9 @@ export class CameraController2D extends CameraControllerBase {
     private initOriginAxis() {
         const parentNode = this.node.parent || this.node;
         this._originAxisHorizontalMeshComp = CameraUtils.createGrid('internal/editor/grid-2d', parentNode);
-
-        // 默认不显示
-        if (this._originAxisHorizontalMeshComp?.node) {
-            this._originAxisHorizontalMeshComp.node.active = false;
-        }
+        this.originAxisX_Visible = true;
+        this.originAxisY_Visible = true;
+        this._originAxisHorizontalMeshComp.node.active = false;
     }
 
     updateOriginAxisByConfig(config: { x?: boolean; y?: boolean }, update = true) {
@@ -337,42 +335,31 @@ export class CameraController2D extends CameraControllerBase {
         const positions: number[] = [];
         const colors: number[] = [];
         const indices: number[] = [];
-        let idx = 0;
 
-        // X 轴 (水平红线, y=0)
         if (this.originAxisX_Visible) {
-            positions.push(left, 0, right, 0);
-            const r = this.originAxisX_Color.r / 255;
-            const g = this.originAxisX_Color.g / 255;
-            const b = this.originAxisX_Color.b / 255;
-            colors.push(r, g, b, 1, r, g, b, 1);
-            indices.push(idx, idx + 1);
-            idx += 2;
+            const lineLeft = Math.fround(Math.min(left, right)) - 100;
+            const lineRight = Math.fround(Math.max(left, right)) + 100;
+            positions.push(lineLeft, 0, lineRight, 0);
+            const c = this.originAxisX_Color;
+            colors.push(c.x, c.y, c.z, c.w, c.x, c.y, c.z, c.w);
         }
 
-        // Y 轴 (垂直绿线, x=0)
         if (this.originAxisY_Visible) {
-            positions.push(0, bottom, 0, top);
-            const r = this.originAxisY_Color.r / 255;
-            const g = this.originAxisY_Color.g / 255;
-            const b = this.originAxisY_Color.b / 255;
-            colors.push(r, g, b, 1, r, g, b, 1);
-            indices.push(idx, idx + 1);
-            idx += 2;
+            const lineTop = Math.fround(Math.min(top, bottom)) - 100;
+            const lineBottom = Math.fround(Math.max(top, bottom)) + 100;
+            positions.push(0, lineTop, 0, lineBottom);
+            const c = this.originAxisY_Color;
+            colors.push(c.x, c.y, c.z, c.w, c.x, c.y, c.z, c.w);
         }
 
-        // 补齐到 _maxTicks * _maxTicks
-        while (positions.length / 2 < _maxTicks * _maxTicks) {
-            positions.push(0, 0);
-            colors.push(0, 0, 0, 0);
+        if (positions.length > 0) {
+            for (let i = 0; i < positions.length; i += 2) {
+                indices.push(i / 2);
+            }
+            CameraUtils.updateVBAttr(this._originAxisHorizontalMeshComp, gfx.AttributeName.ATTR_POSITION, positions);
+            CameraUtils.updateVBAttr(this._originAxisHorizontalMeshComp, gfx.AttributeName.ATTR_COLOR, colors);
+            CameraUtils.updateIB(this._originAxisHorizontalMeshComp, indices);
         }
-        while (indices.length < _maxTicks * _maxTicks) {
-            indices.push(0);
-        }
-
-        CameraUtils.updateVBAttr(this._originAxisHorizontalMeshComp, 'a_position', positions);
-        CameraUtils.updateVBAttr(this._originAxisHorizontalMeshComp, gfx.AttributeName.ATTR_COLOR, colors);
-        CameraUtils.updateIB(this._originAxisHorizontalMeshComp, indices);
     }
 
     // ---------- 焦点 ----------
