@@ -78,6 +78,11 @@ export class CameraController3D extends CameraControllerBase {
 
     private _lineColor = new Color(255, 255, 255, 50);
 
+    // 预分配临时变量，避免高频方法中反复 new 产生 GC 压力
+    private v3a = new Vec3();
+    private v3b = new Vec3();
+    private q1 = new Quat();
+
     public lastMouseWheelDeltaY = 0;
     public maxMouseWheelDeltaY = 1000;
 
@@ -105,13 +110,11 @@ export class CameraController3D extends CameraControllerBase {
     constructor() {
         super();
 
-        // 计算 homeRot：从 homePos 朝向原点
-        const lookDir = new Vec3();
-        Vec3.subtract(lookDir, new Vec3(0, 0, 0), this.homePos);
-        Vec3.normalize(lookDir, lookDir);
-
+        // Quat.fromViewUp 的 view 参数是相机的后向（+Z），即从原点指向相机位置的方向
+        const viewDir = new Vec3();
+        Vec3.normalize(viewDir, this.homePos);
         this.homeRot = new Quat();
-        Quat.fromViewUp(this.homeRot, lookDir, Vec3.UNIT_Y);
+        Quat.fromViewUp(this.homeRot, viewDir);
     }
 
     init(camera: Camera) {
@@ -185,7 +188,7 @@ export class CameraController3D extends CameraControllerBase {
     }
 
     getOriginAxisData() {
-        const pos = new Vec3();
+        const pos = this.v3a;
         this.node.getWorldPosition(pos);
 
         // 根据摄像机位置计算可见范围
@@ -210,7 +213,7 @@ export class CameraController3D extends CameraControllerBase {
 
         // X 轴 (水平红线) — mesh on XZ plane via RG32F, rotated 90° on X
         if (this.originAxisX_Visible) {
-            const cameraPos = new Vec3();
+            const cameraPos = this.v3a;
             this.node.getPosition(cameraPos);
             positions.push(0, cameraPos.z);
             positions.push(0, minV);
@@ -226,7 +229,7 @@ export class CameraController3D extends CameraControllerBase {
 
         // Z 轴 (水平蓝线)
         if (this.originAxisZ_Visible) {
-            const cameraPos = new Vec3();
+            const cameraPos = this.v3a;
             this.node.getPosition(cameraPos);
             positions.push(cameraPos.x, 0);
             positions.push(minH, 0);
@@ -264,7 +267,7 @@ export class CameraController3D extends CameraControllerBase {
 
         // Y 轴 (垂直绿线) — mesh rotated 90° on Y, RG32F maps to world Y
         if (this.originAxisY_Visible) {
-            const cameraPos = new Vec3();
+            const cameraPos = this.v3a;
             this.node.getPosition(cameraPos);
             positions.push(0, cameraPos.z);
             positions.push(0, -yDist);
@@ -383,7 +386,8 @@ export class CameraController3D extends CameraControllerBase {
     updateViewCenterByDist(viewDist: number) {
         this.node.getWorldRotation(this._curRot);
 
-        const fwd = new Vec3(0, 0, -1);
+        const fwd = this.v3a;
+        Vec3.set(fwd, 0, 0, -1);
         Vec3.transformQuat(fwd, fwd, this._curRot);
         Vec3.normalize(fwd, fwd);
 
@@ -406,7 +410,8 @@ export class CameraController3D extends CameraControllerBase {
             this.node.getWorldPosition(this._curEye);
             this.node.getWorldRotation(this._curRot);
 
-            const fwd = new Vec3(0, 0, -1);
+            const fwd = this.v3a;
+            Vec3.set(fwd, 0, 0, -1);
             Vec3.transformQuat(fwd, fwd, this._curRot);
             Vec3.normalize(fwd, fwd);
 
@@ -454,11 +459,12 @@ export class CameraController3D extends CameraControllerBase {
 
         // 计算目标相机位置
         this.node.getWorldRotation(this._curRot);
-        const fwd = new Vec3(0, 0, 1);
+        const fwd = this.v3a;
+        Vec3.set(fwd, 0, 0, 1);
         Vec3.transformQuat(fwd, fwd, this._curRot);
         Vec3.normalize(fwd, fwd);
 
-        const targetCamPos = new Vec3();
+        const targetCamPos = this.v3b;
         Vec3.multiplyScalar(targetCamPos, fwd, targetDist);
         Vec3.add(targetCamPos, targetPos, targetCamPos);
 
@@ -471,8 +477,9 @@ export class CameraController3D extends CameraControllerBase {
             this.updateGrid();
         } else {
             const startPos = this.node.getWorldPosition().clone();
+            const endPos = targetCamPos.clone();
 
-            this._posAnim = tweenPosition(startPos, targetCamPos, 300);
+            this._posAnim = tweenPosition(startPos, endPos, 300);
             this._posAnim.step((pos: Vec3) => {
                 this.node.setWorldPosition(pos);
                 Vec3.copy(this._curEye, pos);
@@ -549,11 +556,12 @@ export class CameraController3D extends CameraControllerBase {
         const targetDist = this.viewDist;
 
         this.node.getWorldRotation(this._curRot);
-        const fwd = new Vec3(0, 0, 1);
+        const fwd = this.v3a;
+        Vec3.set(fwd, 0, 0, 1);
         Vec3.transformQuat(fwd, fwd, this._curRot);
         Vec3.normalize(fwd, fwd);
 
-        const targetCamPos = new Vec3();
+        const targetCamPos = this.v3b;
         Vec3.multiplyScalar(targetCamPos, fwd, targetDist);
         Vec3.add(targetCamPos, targetPos, targetCamPos);
 
@@ -565,7 +573,8 @@ export class CameraController3D extends CameraControllerBase {
             this.updateGrid();
         } else {
             const startPos = this.node.getWorldPosition().clone();
-            this._posAnim = tweenPosition(startPos, targetCamPos, 300);
+            const endPos = targetCamPos.clone();
+            this._posAnim = tweenPosition(startPos, endPos, 300);
             this._posAnim.step((pos: Vec3) => {
                 this.node.setWorldPosition(pos);
                 Vec3.copy(this._curEye, pos);
@@ -783,7 +792,7 @@ export class CameraController3D extends CameraControllerBase {
         lineColor: Color,
         lineEnd: number,
     ) {
-        const camPos = new Vec3();
+        const camPos = this.v3a;
         this.node.getWorldPosition(camPos);
 
         const viewRange = this.viewDist * 4;
@@ -900,18 +909,17 @@ export class CameraController3D extends CameraControllerBase {
         const startPos = this.node.getWorldPosition().clone();
 
         // 计算目标旋转
-        const normalizedDir = new Vec3();
+        const normalizedDir = this.v3a;
         Vec3.normalize(normalizedDir, dir);
 
         const targetRot = new Quat();
-        Quat.fromViewUp(targetRot, normalizedDir, Vec3.UNIT_Y);
+        Quat.fromViewUp(targetRot, normalizedDir);
 
         // 计算目标位置
         const targetPos = new Vec3();
         if (rotateByViewDist) {
-            const offset = new Vec3();
-            Vec3.multiplyScalar(offset, normalizedDir, -this.viewDist);
-            Vec3.add(targetPos, this.sceneViewCenter, offset);
+            Vec3.multiplyScalar(this.v3b, normalizedDir, -this.viewDist);
+            Vec3.add(targetPos, this.sceneViewCenter, this.v3b);
         } else {
             Vec3.copy(targetPos, startPos);
         }
@@ -954,14 +962,15 @@ export class CameraController3D extends CameraControllerBase {
         const dist = halfFov > 0 ? depthSize / halfFov : this.viewDist;
 
         this.node.getWorldRotation(this._curRot);
-        const fwd = new Vec3(0, 0, 1);
+        const fwd = this.v3a;
+        Vec3.set(fwd, 0, 0, 1);
         Vec3.transformQuat(fwd, fwd, this._curRot);
         Vec3.normalize(fwd, fwd);
 
-        const pos = new Vec3();
+        const pos = this.v3b;
         Vec3.multiplyScalar(fwd, fwd, dist);
         Vec3.add(pos, this.sceneViewCenter, fwd);
-        return pos;
+        return pos.clone();
     }
 
     isOrtho(): boolean {
