@@ -178,11 +178,6 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
                 // 与编辑器一致：2D 模式下聚焦到 Canvas 节点
                 const canvas = rootNode.getComponentInChildren?.(Canvas);
                 if (canvas && canvas.node) {
-                    // 确保 Widget 对齐已执行，与编辑器 Canvas.__preload 一致
-                    const widget = canvas.node.getComponent?.('cc.Widget') as any;
-                    if (widget?.updateAlignment) {
-                        widget.updateAlignment();
-                    }
                     uuids = [canvas.node.uuid];
                 }
             }
@@ -378,11 +373,6 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
             // 与编辑器 defaultFocus 一致：查找 Canvas 节点，使用 getBoundingBoxToWorld
             const canvas = scene.getComponentInChildren?.(Canvas);
             if (canvas?.node) {
-                // 确保 Widget 对齐已执行，与编辑器 Canvas.__preload 一致
-                const widget = canvas.node.getComponent?.('cc.Widget') as any;
-                if (widget?.updateAlignment) {
-                    widget.updateAlignment();
-                }
                 const uiTransform = canvas.node.getComponent?.('cc.UITransform') as any;
                 if (uiTransform) {
                     const bounds = uiTransform.getBoundingBoxToWorld();
