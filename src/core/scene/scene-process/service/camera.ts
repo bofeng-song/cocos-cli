@@ -1,4 +1,4 @@
-import { CCObject, Color, Layers, Node, Vec3 } from 'cc';
+import { CCObject, Canvas, Color, Layers, Node, Vec3 } from 'cc';
 import { BaseService } from './core';
 import { register, Service } from './core/decorator';
 import { CameraController2D } from './camera/camera-controller-2d';
@@ -61,7 +61,7 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
     onEditorOpened(): void {
         if (this._camera) return;
         try {
-            const backgroundNode = (cc as any).director?.getScene();
+            const backgroundNode = Service.Gizmo?.backgroundNode || (cc as any).director?.getScene();
             if (!backgroundNode) return;
 
             const cam = CameraUtils.createCamera(
@@ -80,6 +80,9 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
 
             this._detachSceneCameras();
 
+            // 读取编辑器配置（与 Editor.Profile.getConfig('scene', 'camera') 对应）
+            this.initFromConfig();
+
             setTimeout(() => {
                 try {
                     this._controller.updateGrid();
@@ -97,16 +100,21 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
     async initFromConfig(): Promise<void> {
         try {
             const rpc = Rpc.getInstance();
-            const config: any = await rpc.request('sceneConfig' as any, 'camera' as any, []);
+            const config: any = await rpc.request('sceneConfigInstance', 'get', ['camera']);
             if (config) {
+                if (config.color !== undefined) this.setCameraProperty({ clearColor: config.color });
                 if (config.fov !== undefined) this.setCameraProperty({ fov: config.fov });
-                if (config.far !== undefined) this._controller3D.far = config.far;
-                if (config.near !== undefined) this._controller3D.near = config.near;
+                if (config.far !== undefined) {
+                    this._controller3D.far = config.far;
+                    this._camera.far = config.far;
+                }
+                if (config.near !== undefined) {
+                    this._controller3D.near = config.near;
+                    this._camera.near = config.near;
+                }
                 if (config.wheelSpeed !== undefined) this._controller3D.wheelSpeed = config.wheelSpeed;
                 if (config.wanderSpeed !== undefined) this._controller3D.wanderSpeed = config.wanderSpeed;
-                if (config.far2D !== undefined) this._controller2D.far = config.far2D;
-                if (config.near2D !== undefined) this._controller2D.near = config.near2D;
-                if (config.wheelSpeed2D !== undefined) this._controller2D.wheelSpeed = config.wheelSpeed2D;
+                if (config.enableAcceleration !== undefined) this._controller3D.enableAcceleration = config.enableAcceleration;
             }
         } catch {
             // 配置不可用时使用默认值
@@ -115,13 +123,13 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
 
     private bindOperation(): void {
         const handlers: Record<string, (event: any) => any> = {
-            'dblclick': (event: any) => this.onMouseDBlDown(event),
-            'mousedown': (event: any) => this.onMouseDown(event),
-            'mousemove': (event: any) => this.onMouseMove(event),
-            'mouseup': (event: any) => this.onMouseUp(event),
-            'mousewheel': (event: any) => this.onMouseWheel(event),
-            'keydown': (event: any) => this.onKeyDown(event),
-            'keyup': (event: any) => this.onKeyUp(event),
+            dblclick: (event: any) => this.onMouseDBlDown(event),
+            mousedown: (event: any) => this.onMouseDown(event),
+            mousemove: (event: any) => this.onMouseMove(event),
+            mouseup: (event: any) => this.onMouseUp(event),
+            mousewheel: (event: any) => this.onMouseWheel(event),
+            keydown: (event: any) => this.onKeyDown(event),
+            keyup: (event: any) => this.onKeyUp(event),
         };
 
         for (const [eventType, handler] of Object.entries(handlers)) {
@@ -142,10 +150,17 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
         if (cameraInfo) {
             this.focus(null, cameraInfo, true);
         } else {
-            // 与原始编辑器一致：使用 getRootNode (等同于 cce.Scene.rootNode)
             const rootNode = Service.Editor?.getRootNode?.() as any;
-            if (rootNode?.uuid) {
-                this.focus([rootNode.uuid], undefined, true);
+            let uuids: string[] | null = rootNode?.uuid ? [rootNode.uuid] : null;
+            if (this._is2D && rootNode) {
+                // 与编辑器一致：2D 模式下聚焦到 Canvas 节点
+                const canvas = rootNode.getComponentInChildren?.(Canvas);
+                if (canvas && canvas.node) {
+                    uuids = [canvas.node.uuid];
+                }
+            }
+            if (uuids) {
+                this.focus(uuids, undefined, true);
             } else {
                 const scene = (cc as any).director?.getScene();
                 if (scene) {

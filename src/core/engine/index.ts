@@ -383,6 +383,7 @@ class EngineManager implements IEngine {
                 screen: {
                     frameRate: 30,
                     exactFitScreen: true,
+                    designResolution: this.getConfig().designResolution,
                 },
                 rendering: {
                     renderMode: 2,

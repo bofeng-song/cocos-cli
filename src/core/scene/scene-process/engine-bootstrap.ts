@@ -96,8 +96,17 @@ export async function startup(options: {
 
     // 切换物理引擎
     cc.physics.selector.switchTo(backend);
-    //TODO
-    cc.view.setDesignResolutionSize(1920, 1080, cc.ResolutionPolicy.SHOW_ALL);
+    const dr = config?.overrideSettings?.screen?.designResolution;
+    const drWidth = dr?.width ?? 1280;
+    const drHeight = dr?.height ?? 720;
+    let drPolicy = cc.ResolutionPolicy.SHOW_ALL;
+    if (dr) {
+        const fw = dr.fitWidth !== false;
+        const fh = dr.fitHeight === true;
+        if (fw && !fh) drPolicy = cc.ResolutionPolicy.FIXED_WIDTH;
+        else if (!fw && fh) drPolicy = cc.ResolutionPolicy.FIXED_HEIGHT;
+    }
+    cc.view.setDesignResolutionSize(drWidth, drHeight, drPolicy);
 
     await cc.game.run();
     await DecoratorService.Engine.init();
