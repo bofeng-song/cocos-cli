@@ -9,6 +9,14 @@ import { PanMode2D } from './modes/pan-mode-2d';
 import { tweenPosition } from './tween';
 import type { ISceneMouseEvent, ISceneKeyboardEvent } from '../operation/types';
 
+function getCanvasSize(): ISizeLike {
+    const canvas = (cc as any).game?.canvas;
+    if (canvas) {
+        return { width: canvas.width, height: canvas.height };
+    }
+    return { width: 1920, height: 1080 };
+}
+
 const _defaultMarginPercentage = 30;
 const _scales = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 3, 4, 5];
 const _maxTicks = 100;
@@ -76,6 +84,7 @@ export class CameraController2D extends CameraControllerBase {
 
     init(camera: Camera) {
         super.init(camera);
+        this._size = getCanvasSize();
         this._contentRect = new Rect(0, 0, this._size.width, this._size.height);
         this._gridMeshComp = CameraUtils.createGrid('internal/editor/grid-2d', this.node.parent!);
         this._gridMeshComp.node.active = false;
@@ -103,15 +112,13 @@ export class CameraController2D extends CameraControllerBase {
     // ---------- 网格初始化 ----------
 
     private _initGrid() {
-        const width = this._size.width;
-        const height = this._size.height;
-
-        this._grid = new Grid(width, height);
-        this._grid.setScaleH([1, 2, 5, 10], 0.001, 1000);
-        this._grid.setScaleV([1, 2, 5, 10], 0.001, 1000);
-        this._grid.setMappingH(-0.5, 0.5, 1);
-        this._grid.setMappingV(-0.5, 0.5, 1);
-        this._grid.setAnchor(0.5, 0.5);
+        const grid = new Grid(this._size.width, this._size.height);
+        grid.setScaleH([5, 2], 0.01, 5000);
+        grid.setMappingH(0, 1, 1);
+        grid.setScaleV([5, 2], 0.01, 5000);
+        grid.setMappingV(1, 0, 1);
+        grid.setAnchor(0.5, 0.5);
+        this._grid = grid;
     }
 
     // ---------- active ----------
@@ -124,7 +131,7 @@ export class CameraController2D extends CameraControllerBase {
             this.node.setWorldRotation(Quat.IDENTITY);
             this._camera.near = this._near;
             this._camera.far = this._far;
-            this.onResize(this._size);
+            this.onResize();
             this.showGrid(true);
         } else {
             this.showGrid(false);
@@ -133,33 +140,95 @@ export class CameraController2D extends CameraControllerBase {
 
     // ---------- 调整到中心 ----------
 
-    private _adjustToCenter() {
-        const width = this._size.width;
-        const height = this._size.height;
+    private _adjustToCenter(marginPercentage = _defaultMarginPercentage, contentBounds: Rect | null = null, immediate = false, forceScale?: number) {
+        let contentX = 0;
+        let contentY = 0;
+        let contentWidth = 0;
+        let contentHeight = 0;
 
-        // 根据内容矩形计算缩放
-        const contentW = this._contentRect.width || width;
-        const contentH = this._contentRect.height || height;
-        const scale = this.getSizeScale(
-            { width: contentW, height: contentH },
-            { width, height },
-        );
+        if (contentBounds) {
+            contentX = contentBounds.x;
+            contentY = contentBounds.y;
+            contentWidth = contentBounds.width;
+            contentHeight = contentBounds.height;
+        } else {
+            contentWidth = this._size.width;
+            contentHeight = this._size.height;
+        }
 
-        // 同步网格
-        const halfW = width / 2;
-        const halfH = height / 2;
-        this._grid.xAxisSync(halfW - (this._contentRect.x + contentW / 2) * scale, scale);
-        this._grid.yAxisSync(halfH - (this._contentRect.y + contentH / 2) * scale, scale);
+        let scale = forceScale ?? 1;
+        const leftMargin = (marginPercentage / 100) * this._size.width;
+        const rightMargin = (marginPercentage / 100) * this._size.height;
+        const fitW = this._size.width - leftMargin;
+        const fitH = this._size.height - rightMargin;
 
-        this.adjustCamera();
+        if (!forceScale) {
+            if (contentWidth <= fitW && contentHeight <= fitH) {
+                if (contentWidth === 0 || contentHeight === 0) {
+                    scale = 1;
+                } else {
+                    const targetAspect = contentWidth / contentHeight;
+                    const displayAspect = fitW / fitH;
+                    if (targetAspect > displayAspect) {
+                        scale = fitW / contentWidth;
+                    } else {
+                        scale = fitH / contentHeight;
+                    }
+                    contentWidth = contentWidth * scale;
+                    contentHeight = contentHeight * scale;
+                }
+            } else {
+                const result = this._fitSizeCalc(contentWidth, contentHeight, fitW, fitH);
+                scale = this._getSizeScale(result[0], result[1], contentWidth, contentHeight);
+                contentWidth = result[0];
+                contentHeight = result[1];
+            }
+        }
 
-        // 更新 contentRect 为当前视口范围
-        this._contentRect = new Rect(
-            this._grid.left,
-            this._grid.bottom,
-            this._grid.right - this._grid.left,
-            this._grid.top - this._grid.bottom,
-        );
+        this.setScale2D(scale);
+
+        const gridX = ((this._size.width - contentWidth) / 2 - contentX * scale) * this._grid.xDirection;
+        const gridY = ((this._size.height - contentHeight) / 2 - contentY * scale) * this._grid.yDirection;
+        this._grid.xAxisSync(gridX, scale);
+        this._grid.yAxisSync(gridY, scale);
+        this.updateGrid();
+        this.adjustCamera(immediate);
+
+        if (contentBounds) {
+            this._contentRect.x = contentX;
+            this._contentRect.y = contentY;
+            this._contentRect.width = contentWidth;
+            this._contentRect.height = contentHeight;
+        }
+    }
+
+    private _fitSizeCalc(srcWidth: number, srcHeight: number, destWidth: number, destHeight: number): [number, number] {
+        let width = 0;
+        let height = 0;
+        if (srcWidth > destWidth && srcHeight > destHeight) {
+            width = destWidth;
+            height = (srcHeight * destWidth) / srcWidth;
+            if (height > destHeight) {
+                height = destHeight;
+                width = (srcWidth * destHeight) / srcHeight;
+            }
+        } else if (srcWidth > destWidth) {
+            width = destWidth;
+            height = (srcHeight * destWidth) / srcWidth;
+        } else if (srcHeight > destHeight) {
+            width = (srcWidth * destHeight) / srcHeight;
+            height = destHeight;
+        } else {
+            width = srcWidth;
+            height = srcHeight;
+        }
+        return [width, height];
+    }
+
+    private _getSizeScale(newWidth: number, newHeight: number, oldWidth: number, oldHeight: number): number {
+        const scaleWidth = oldWidth <= 0 ? 1 : newWidth / oldWidth;
+        const scaleHeight = oldHeight <= 0 ? 1 : newHeight / oldHeight;
+        return Math.max(scaleWidth, scaleHeight);
     }
 
     // ---------- adjustCamera ----------
@@ -167,14 +236,16 @@ export class CameraController2D extends CameraControllerBase {
     adjustCamera(immediate = true) {
         if (!this._camera) return;
 
-        const width = this._size.width;
-        const height = this._size.height;
+        const scale = this._scale2D;
+        const grid = this._grid;
+        const sceneX = grid.xDirection * grid.xAxisOffset;
+        const sceneY = grid.yDirection * grid.yAxisOffset;
 
-        // 从网格状态计算相机位置
-        const centerX = (this._grid.left + this._grid.right) / 2;
-        const centerY = (this._grid.top + this._grid.bottom) / 2;
-
-        const targetPos = new Vec3(centerX, centerY, 1000);
+        const targetPos = new Vec3(
+            this._size.width / 2 / scale - sceneX / scale,
+            this._size.height / 2 / scale - sceneY / scale,
+            5000,
+        );
 
         if (immediate) {
             this.node.setWorldPosition(targetPos);
@@ -186,12 +257,7 @@ export class CameraController2D extends CameraControllerBase {
             });
         }
 
-        // 更新正交高度
-        this._updateOrthoHeight(height);
-
-        // 更新 scale2D
-        const curScale = this._grid.xAxisScale;
-        this.setScale2D(curScale);
+        this._updateOrthoHeight(scale);
 
         try {
             const { Service } = require('../core/decorator');
@@ -203,10 +269,9 @@ export class CameraController2D extends CameraControllerBase {
 
     // ---------- 更新正交高度 ----------
 
-    private _updateOrthoHeight(height: number) {
-        const scale = this._grid.yAxisScale;
+    private _updateOrthoHeight(scale: number) {
         if (scale > 0) {
-            this._camera.orthoHeight = height / 2 / scale;
+            this._camera.orthoHeight = this._size.height / 2 / scale;
         }
     }
 
@@ -365,82 +430,54 @@ export class CameraController2D extends CameraControllerBase {
     // ---------- 焦点 ----------
 
     focus(nodeUuids: string[], editorCameraInfo?: EditorCameraInfo, immediate = false) {
-        if (editorCameraInfo) {
-            if (editorCameraInfo.position) {
-                this.node.setWorldPosition(editorCameraInfo.position);
-            }
-            this.updateGrid();
-            this.adjustCamera();
-            try {
-                const { Service } = require('../core/decorator');
-                Service.Engine?.repaintInEditMode?.();
-            } catch (e) {
-                // Engine may not be ready
-            }
-            return;
-        }
+        const { contentRect, scale } = editorCameraInfo || {} as any;
+        let contentBounds: Rect | null = null;
 
-        if (!nodeUuids || nodeUuids.length === 0) return;
+        if (contentRect) {
+            contentBounds = new Rect(contentRect.x, contentRect.y, contentRect.width, contentRect.height);
+        } else if (nodeUuids && nodeUuids.length > 0) {
+            const EditorExtends = (cc as any).EditorExtends || (globalThis as any).EditorExtends;
+            if (!EditorExtends) return;
 
-        const EditorExtends = (cc as any).EditorExtends || (globalThis as any).EditorExtends;
-        if (!EditorExtends) return;
+            let maxX = -1e10;
+            let maxY = -1e10;
+            let minX = 1e10;
+            let minY = 1e10;
 
-        const nodes: Node[] = [];
-        for (const uuid of nodeUuids) {
-            const node = EditorExtends.Node.getNode(uuid);
-            if (node) {
-                nodes.push(node);
-            }
-        }
+            for (const uuid of nodeUuids) {
+                const node = EditorExtends.Node.getNode(uuid);
+                if (!node) continue;
 
-        if (nodes.length === 0) return;
-
-        // 尝试通过 UITransform 或 MeshRenderer 计算包围盒
-        let focusRect: Rect | null = null;
-
-        for (const node of nodes) {
-            const uiTransform = node.getComponent(UITransform) as UITransform | null;
-            if (uiTransform) {
-                const rect = uiTransform.getBoundingBoxToWorld();
-                if (focusRect) {
-                    Rect.union(focusRect, focusRect, rect);
+                const uiTransform = node.getComponent(UITransform) as UITransform | null;
+                if (uiTransform) {
+                    const bounds = uiTransform.getBoundingBoxToWorld();
+                    maxX = Math.max(bounds.xMax, maxX);
+                    maxY = Math.max(bounds.yMax, maxY);
+                    minX = Math.min(bounds.xMin, minX);
+                    minY = Math.min(bounds.yMin, minY);
                 } else {
-                    focusRect = rect.clone();
-                }
-                continue;
-            }
-
-            const meshRenderer = node.getComponent(MeshRenderer) as MeshRenderer | null;
-            if (meshRenderer && meshRenderer.model) {
-                const worldBounds = meshRenderer.model.worldBounds;
-                if (worldBounds) {
-                    const min = worldBounds.center.clone();
-                    Vec3.subtract(min, min, worldBounds.halfExtents);
-                    const max = worldBounds.center.clone();
-                    Vec3.add(max, max, worldBounds.halfExtents);
-                    const rect = new Rect(min.x, min.y, max.x - min.x, max.y - min.y);
-                    if (focusRect) {
-                        Rect.union(focusRect, focusRect, rect);
+                    const meshRenderer = node.getComponent(MeshRenderer) as MeshRenderer | null;
+                    if (meshRenderer && meshRenderer.model && meshRenderer.model.worldBounds) {
+                        const b = meshRenderer.model.worldBounds;
+                        minX = Math.min(minX, b.center.x - b.halfExtents.x);
+                        minY = Math.min(minY, b.center.y - b.halfExtents.y);
+                        maxX = Math.max(maxX, b.center.x + b.halfExtents.x);
+                        maxY = Math.max(maxY, b.center.y + b.halfExtents.y);
                     } else {
-                        focusRect = rect.clone();
+                        const worldPos = node.getWorldPosition();
+                        maxX = Math.max(worldPos.x, maxX);
+                        maxY = Math.max(worldPos.y, maxY);
+                        minX = Math.min(worldPos.x, minX);
+                        minY = Math.min(worldPos.y, minY);
                     }
-                    continue;
                 }
             }
-
-            // 使用世界坐标作为最终回退
-            const worldPos = node.getWorldPosition();
-            const fallbackRect = new Rect(worldPos.x - 50, worldPos.y - 50, 100, 100);
-            if (focusRect) {
-                Rect.union(focusRect, focusRect, fallbackRect);
-            } else {
-                focusRect = fallbackRect.clone();
+            if (minX < maxX && minY < maxY) {
+                contentBounds = new Rect(minX, minY, maxX - minX, maxY - minY);
             }
         }
 
-        if (!focusRect) return;
-
-        this.fitSize(focusRect);
+        this._adjustToCenter(_defaultMarginPercentage, contentBounds, immediate, scale);
     }
 
     // ---------- 缩放 ----------
@@ -453,12 +490,8 @@ export class CameraController2D extends CameraControllerBase {
         const width = this._size.width;
         const height = this._size.height;
 
-        const curScaleX = this._grid.xAxisScale;
-        const curScaleY = this._grid.yAxisScale;
+        let newScale = this.smoothScale(delta, this._scale2D);
 
-        let newScale = this.smoothScale(delta, curScaleX);
-
-        // 限制缩放范围
         if (this._grid.hTicks) {
             newScale = clamp(newScale, this._grid.hTicks.minValueScale, this._grid.hTicks.maxValueScale);
         }
@@ -469,6 +502,7 @@ export class CameraController2D extends CameraControllerBase {
         this._grid.xAxisScaleAt(px, newScale);
         this._grid.yAxisScaleAt(py, newScale);
 
+        this.setScale2D(newScale);
         this.updateGrid();
         this.adjustCamera();
     }
@@ -476,43 +510,8 @@ export class CameraController2D extends CameraControllerBase {
     // ---------- fitSize ----------
 
     fitSize(rect: Rect) {
-        const width = this._size.width;
-        const height = this._size.height;
-
-        const margin = _defaultMarginPercentage / 100;
-        const availW = width * (1 - margin);
-        const availH = height * (1 - margin);
-
-        const scaleX = availW / (rect.width || 1);
-        const scaleY = availH / (rect.height || 1);
-        const scale = Math.min(scaleX, scaleY);
-
-        // 限制范围
-        let finalScale = scale;
-        if (this._grid.hTicks) {
-            finalScale = clamp(finalScale, this._grid.hTicks.minValueScale, this._grid.hTicks.maxValueScale);
-        }
-
-        const centerX = rect.x + rect.width / 2;
-        const centerY = rect.y + rect.height / 2;
-
-        const halfW = width / 2;
-        const halfH = height / 2;
-
-        this._grid.xAxisSync(halfW - centerX * finalScale, finalScale);
-        this._grid.yAxisSync(halfH - centerY * finalScale, finalScale);
-
-        this.updateGrid();
-        this.adjustCamera();
+        this._adjustToCenter(_defaultMarginPercentage, rect, true);
     }
-
-    getSizeScale(contentSize: ISizeLike, viewSize: ISizeLike): number {
-        const scaleX = viewSize.width / (contentSize.width || 1);
-        const scaleY = viewSize.height / (contentSize.height || 1);
-        return Math.min(scaleX, scaleY);
-    }
-
-    // ---------- 鼠标/键盘事件 ----------
 
     onMouseDown(event: ISceneMouseEvent) {
         // 中键或右键 → 进入平移模式
@@ -593,9 +592,8 @@ export class CameraController2D extends CameraControllerBase {
     // ---------- onResize ----------
 
     onResize(size?: ISizeLike) {
-        if (size) {
-            this._size = size;
-        }
+        size ??= getCanvasSize();
+        this._size = size;
         const width = this._size.width;
         const height = this._size.height;
         this._grid.resize(width, height);
@@ -632,33 +630,30 @@ export class CameraController2D extends CameraControllerBase {
         this._grid.xAxisScaleAt(px, finalScale);
         this._grid.yAxisScaleAt(py, finalScale);
 
+        this.setScale2D(finalScale);
         this.updateGrid();
         this.adjustCamera();
     }
 
     zoomUp() {
-        const curScale = this._grid.xAxisScale;
-        // 找到下一个更大的缩放档位
+        const curScale = this._scale2D;
         for (const s of _scales) {
             if (s > curScale + 0.001) {
                 this.zoomTo(s);
                 return;
             }
         }
-        // 已达最大
         this.zoomTo(_scales[_scales.length - 1]);
     }
 
     zoomDown() {
-        const curScale = this._grid.xAxisScale;
-        // 找到下一个更小的缩放档位
+        const curScale = this._scale2D;
         for (let i = _scales.length - 1; i >= 0; i--) {
             if (_scales[i] < curScale - 0.001) {
                 this.zoomTo(_scales[i]);
                 return;
             }
         }
-        // 已达最小
         this.zoomTo(_scales[0]);
     }
 

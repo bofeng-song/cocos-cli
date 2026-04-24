@@ -1,4 +1,4 @@
-import { CCObject, Canvas, Color, Layers, Node, Vec3 } from 'cc';
+import { Canvas, Color, Layers, Node, Vec3 } from 'cc';
 import { BaseService } from './core';
 import { register, Service } from './core/decorator';
 import { CameraController2D } from './camera/camera-controller-2d';
@@ -71,6 +71,12 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
             this._controller2D.init(cam);
             this._controller3D.init(cam);
             this._controller.active = true;
+
+            // 与编辑器 onSceneOpened 一致：记录场景 UUID，使 is2D 切换时走 defaultFocus 路径
+            const scene = (cc as any).director?.getScene();
+            this._currentUuid = scene?.uuid || '';
+            this._controllerFirstChange = false;
+
             this._controller3D.on('mode', (mode: CameraMoveMode) => {
                 this.emit('camera:mode-change', mode);
             });
@@ -80,13 +86,28 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
 
             this._detachSceneCameras();
 
+            // 监听 canvas-resize，与编辑器 operation/index.ts 一致
+            try {
+                const view = (cc as any).view;
+                if (view?.on) {
+                    view.on('canvas-resize', () => {
+                        const canvas = (cc as any).game?.canvas;
+                        if (canvas) {
+                            Service.Operation.dispatch('resize', { width: canvas.width, height: canvas.height });
+                        }
+                    });
+                }
+            } catch (e) {
+                // view may not be ready
+            }
+
             // 读取编辑器配置（与 Editor.Profile.getConfig('scene', 'camera') 对应）
             this.initFromConfig();
 
             setTimeout(() => {
                 try {
                     this._controller.updateGrid();
-                    this._focusOnSceneContent();
+                    this.defaultFocus(this._currentUuid);
                     Service.Engine.repaintInEditMode();
                 } catch (e) {
                     console.warn('[Camera] deferred grid update failed:', e);
@@ -130,6 +151,7 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
             mousewheel: (event: any) => this.onMouseWheel(event),
             keydown: (event: any) => this.onKeyDown(event),
             keyup: (event: any) => this.onKeyUp(event),
+            resize: (size: any) => this.onResize(size),
         };
 
         for (const [eventType, handler] of Object.entries(handlers)) {
@@ -156,6 +178,11 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
                 // 与编辑器一致：2D 模式下聚焦到 Canvas 节点
                 const canvas = rootNode.getComponentInChildren?.(Canvas);
                 if (canvas && canvas.node) {
+                    // 确保 Widget 对齐已执行，与编辑器 Canvas.__preload 一致
+                    const widget = canvas.node.getComponent?.('cc.Widget') as any;
+                    if (widget?.updateAlignment) {
+                        widget.updateAlignment();
+                    }
                     uuids = [canvas.node.uuid];
                 }
             }
@@ -343,39 +370,29 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
     }
 
     private _focusOnSceneContent(): void {
-        // 与原始编辑器一致：使用 getRootNode (等同于 cce.Scene.rootNode)
         const rootNode = Service.Editor?.getRootNode?.() as any;
         const scene = rootNode || (cc as any).director?.getScene();
         if (!scene) return;
 
-        const EditorExtends = (cc as any).EditorExtends || (globalThis as any).EditorExtends;
-        if (EditorExtends?.Node) {
-            const node = EditorExtends.Node.getNode(scene.uuid);
-            if (node) {
-                this._controller.focus([scene.uuid], undefined, true);
-                return;
-            }
-            // Scene 节点可能未注册到 _map，尝试用子节点
-            for (const child of scene.children) {
-                if (child._objFlags & CCObject.Flags.DontSave) continue;
-                const childNode = EditorExtends.Node.getNode(child.uuid);
-                if (childNode) {
-                    this._controller.focus([child.uuid], undefined, true);
+        if (this._is2D) {
+            // 与编辑器 defaultFocus 一致：查找 Canvas 节点，使用 getBoundingBoxToWorld
+            const canvas = scene.getComponentInChildren?.(Canvas);
+            if (canvas?.node) {
+                // 确保 Widget 对齐已执行，与编辑器 Canvas.__preload 一致
+                const widget = canvas.node.getComponent?.('cc.Widget') as any;
+                if (widget?.updateAlignment) {
+                    widget.updateAlignment();
+                }
+                const uiTransform = canvas.node.getComponent?.('cc.UITransform') as any;
+                if (uiTransform) {
+                    const bounds = uiTransform.getBoundingBoxToWorld();
+                    this._controller2D.fitSize(bounds);
                     return;
                 }
             }
         }
 
-        // 降级：直接用场景子节点聚焦
-        const contentNodes: Node[] = [];
-        const dontSave = CCObject.Flags.DontSave;
-        for (const child of scene.children) {
-            if (child._objFlags & dontSave) continue;
-            contentNodes.push(child);
-        }
-        if (contentNodes.length > 0) {
-            this._controller3D.focusByNode(contentNodes, false, true);
-        }
+        this._controller3D.focusByNode([scene], false, true);
     }
 
     /**
