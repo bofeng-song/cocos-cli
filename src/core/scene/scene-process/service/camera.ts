@@ -38,6 +38,11 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
             this.defaultFocus(this._currentUuid);
             this._controllerFirstChange = true;
         }
+        const ttd = Service.Gizmo?.transformToolData;
+        if (ttd) {
+            ttd.is2D = value;
+            ttd.toolName = value ? 'rect' : 'position';
+        }
         Service.Engine.repaintInEditMode();
     }
 

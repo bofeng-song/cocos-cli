@@ -14,6 +14,7 @@ import type { IGizmoEvents, IGizmoService } from '../../common';
 import './gizmo/components/camera';
 import './gizmo/components/box-collider';
 import './gizmo/components/directional-light';
+import './gizmo/components/canvas';
 
 type TGizmoType = 'icon' | 'persistent' | 'component';
 
