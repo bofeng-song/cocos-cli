@@ -83,14 +83,12 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
             // 注意：is2D 切换正交投影，需要在控制器 init 之后才能安全调用
             const rootNode = Service.Editor?.getRootNode?.() as any || scene;
             const hasCanvas = rootNode?.getComponentInChildren?.(Canvas);
+            // 与编辑器 onSceneOpened 一致：先激活控制器并 defaultFocus（此时是 3D 控制器）
+            // 这样 3D 控制器能保存正确的聚焦位置，用户从 2D 切回 3D 时可以看到场景内容
+            this._controller.active = true;
+            this.defaultFocus(this._currentUuid);
             if (hasCanvas) {
-                // 先激活 3D 控制器并聚焦 Canvas，使其保存正确的相机位置
-                // 这样用户从 2D 切回 3D 时，相机仍能看到 Canvas 内容
-                this._controller.active = true;
-                this.focus([hasCanvas.node.uuid], undefined, true);
                 this.is2D = true;
-            } else {
-                this._controller.active = true;
             }
 
             this._controller3D.on('mode', (mode: CameraMoveMode) => {

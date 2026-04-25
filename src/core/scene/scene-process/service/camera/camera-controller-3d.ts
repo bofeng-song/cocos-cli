@@ -1,4 +1,4 @@
-import { Camera, Color, gfx, MeshRenderer, Node, Quat, Vec3, ISizeLike } from 'cc';
+import { Camera, Color, gfx, js, Layers, MeshRenderer, Node, Quat, Vec3, ISizeLike } from 'cc';
 import CameraControllerBase, { EditorCameraInfo } from './camera-controller-base';
 import { CameraMoveMode, CameraUtils } from './utils';
 import FiniteStateMachine from '../utils/state-machine/finite-state-machine';
@@ -28,17 +28,106 @@ function getWorldPosition3D(node: Node): Vec3 {
     return node.getWorldPosition();
 }
 
+function getMaxRangeOfNode(node: Node): number {
+    let maxRange = 0.001;
+
+    if (!node) return maxRange;
+    if (node.layer & Layers.Enum.GIZMOS || node.layer & Layers.Enum.SCENE_GIZMO || node.layer & Layers.Enum.EDITOR) {
+        return maxRange;
+    }
+
+    let compRange = 0;
+    const components = node.components;
+
+    if (components.length === 0) {
+        maxRange = 1;
+    }
+
+    for (let i = 0; i < components.length; i++) {
+        const component = components[i];
+        const className = js.getClassName(component);
+        switch (className) {
+            case 'cc.SphereLight':
+            case 'cc.SpotLight':
+            case 'cc.PointLight':
+                compRange = (component as any).range ?? 3;
+                break;
+            case 'cc.RangedDirectionalLight':
+            case 'cc.DirectionalLight':
+            case 'cc.Camera':
+                compRange = 3;
+                break;
+            case 'cc.MeshRenderer':
+            case 'cc.SkinnedMeshRenderer':
+            case 'cc.SkinnedMeshBatchRenderer': {
+                const mr = component as MeshRenderer;
+                if (mr.mesh && mr.model) {
+                    const worldBound = mr.model.worldBounds;
+                    if (worldBound) {
+                        const he = worldBound.halfExtents;
+                        if (!Number.isNaN(he.x) && !Number.isNaN(he.y) && !Number.isNaN(he.z)) {
+                            compRange = Math.max(he.x, he.y, he.z);
+                        }
+                    }
+                }
+                break;
+            }
+            case 'cc.UITransform': {
+                const ui = component as any;
+                if (ui.getBoundingBox) {
+                    const bbox = ui.getBoundingBox();
+                    if (ui.node.parent) {
+                        const wm = ui.node.parent.worldMatrix;
+                        if (wm && bbox.transformMat4) {
+                            bbox.transformMat4(wm);
+                        }
+                    }
+                    compRange = Math.max(bbox.width / 2, bbox.height / 2);
+                }
+                break;
+            }
+            case 'cc.BoxCollider': {
+                const size = (component as any).size;
+                if (size) compRange = Math.max(size.x / 2, size.y / 2, size.z / 2);
+                break;
+            }
+            case 'cc.SphereCollider':
+                compRange = (component as any).radius ?? 1;
+                break;
+            case 'cc.CapsuleCollider': {
+                const cap = component as any;
+                compRange = Math.max((cap.height ?? 2) / 2, cap.radius ?? 0.5);
+                break;
+            }
+            case 'cc.ReflectionProbe': {
+                const size = (component as any).size;
+                if (size) compRange = Math.max(size.x, size.y, size.z) / 2;
+                break;
+            }
+        }
+
+        if (compRange > maxRange) {
+            maxRange = compRange;
+        } else if (compRange === 0) {
+            maxRange = Math.max(maxRange, 1);
+        }
+    }
+
+    return Math.min(Math.max(maxRange, -1e10), 1e10);
+}
+
 function getMaxRangeOfNodes(nodes: Node[]): number {
     if (nodes.length === 0) return 1;
-    let maxRange = 0;
-    const center = getCenterWorldPos3D(nodes);
+    let maxRange = Number.MIN_VALUE;
+
     for (const node of nodes) {
-        const dist = Vec3.distance(center, node.getWorldPosition());
-        maxRange = Math.max(maxRange, dist);
-        // 递归检查子节点，与原始编辑器一致
+        const range = getMaxRangeOfNode(node);
+        if (range > maxRange) maxRange = range;
+
         const childRange = getMaxRangeOfNodes(node.children as Node[]);
-        maxRange = Math.max(maxRange, childRange);
+        if (childRange > maxRange) maxRange = childRange;
     }
+
     return Math.max(maxRange, 1);
 }
 
@@ -454,7 +543,35 @@ export class CameraController3D extends CameraControllerBase {
         const range = getMaxRangeOfNodes(nodes);
         let targetDist = this.viewDist;
         if (!notChangeDist) {
-            targetDist = Math.max(range * 2.5, 1);
+            if (this._camera.projection === Camera.ProjectionType.PERSPECTIVE) {
+                const camWidth = this._camera.camera?.width;
+                const camHeight = this._camera.camera?.height;
+                if (camWidth && camHeight) {
+                    const length = Math.min(camWidth, camHeight) / 2;
+                    const A = new Vec3(0, 0, 1);
+                    const B = new Vec3(length, 0, 1);
+                    const worldA = new Vec3();
+                    this._camera.screenToWorld(A, worldA);
+                    const worldB = new Vec3();
+                    this._camera.screenToWorld(B, worldB);
+                    const disWorld = worldA.subtract(worldB).length();
+                    if (disWorld > length * 3) {
+                        targetDist = Math.max((range / length) * disWorld, this.near * 1.3);
+                        targetDist = Math.min(targetDist, this.far * 0.9);
+                    } else {
+                        targetDist = Math.max(range * 2.5, 1);
+                    }
+                } else {
+                    targetDist = Math.max(range * 2.5, 1);
+                }
+            } else {
+                const fovRad = (this._camera.fov / 180) * Math.PI;
+                const depthSize = fovRad * this._camera.orthoHeight;
+                targetDist = ((range * depthSize) / this._camera.orthoHeight) * 13;
+                let angle = this._camera.node.eulerAngles.x % 360;
+                angle = Math.abs(angle) > 90 ? 180 - Math.abs(angle) : Math.abs(angle);
+                targetDist = targetDist / Math.cos((angle / 180) * Math.PI);
+            }
         }
 
         // 计算目标相机位置
