@@ -10,11 +10,18 @@ import { tweenPosition } from './tween';
 import type { ISceneMouseEvent, ISceneKeyboardEvent } from '../operation/types';
 
 function getCanvasSize(): ISizeLike {
+    const view = (cc as any).view;
+    if (view?.getDesignResolutionSize) {
+        const dr = view.getDesignResolutionSize();
+        if (dr.width > 0 && dr.height > 0) {
+            return { width: dr.width, height: dr.height };
+        }
+    }
     const canvas = (cc as any).game?.canvas;
     if (canvas) {
         return { width: canvas.width, height: canvas.height };
     }
-    return { width: 1920, height: 1080 };
+    return { width: 1280, height: 720 };
 }
 
 const _defaultMarginPercentage = 30;

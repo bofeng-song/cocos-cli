@@ -19,7 +19,6 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
     private _controller3D!: CameraController3D;
     private _controller!: CameraControllerBase;
     private _camera!: EditorCameraComponent;
-    private _is2D = false;
     private _controllerFirstChange = false;
     private _currentUuid = '';
     private _cameraInfos: Record<string, any> = {};
@@ -33,7 +32,6 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
         if (this._controller) {
             this._controller.active = false;
         }
-        this._is2D = value;
         this._controller = value ? this._controller2D : this._controller3D;
         this._controller.active = true;
         if (!this._controllerFirstChange && this._currentUuid) {
@@ -43,7 +41,7 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
         Service.Engine.repaintInEditMode();
     }
 
-    get is2D() { return this._is2D; }
+    get is2D() { return this._controller === this._controller2D; }
 
     init(): void {
         this._controller2D = new CameraController2D();
@@ -70,12 +68,25 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
             this._camera = cam;
             this._controller2D.init(cam);
             this._controller3D.init(cam);
-            this._controller.active = true;
 
             // 与编辑器 onSceneOpened 一致：记录场景 UUID，使 is2D 切换时走 defaultFocus 路径
             const scene = (cc as any).director?.getScene();
             this._currentUuid = scene?.uuid || '';
             this._controllerFirstChange = false;
+
+            // 与编辑器一致：检测 Canvas 组件自动切换 2D 模式
+            // 注意：is2D 切换正交投影，需要在控制器 init 之后才能安全调用
+            const rootNode = Service.Editor?.getRootNode?.() as any || scene;
+            const hasCanvas = rootNode?.getComponentInChildren?.(Canvas);
+            if (hasCanvas) {
+                // 先激活 3D 控制器并聚焦 Canvas，使其保存正确的相机位置
+                // 这样用户从 2D 切回 3D 时，相机仍能看到 Canvas 内容
+                this._controller.active = true;
+                this.focus([hasCanvas.node.uuid], undefined, true);
+                this.is2D = true;
+            } else {
+                this._controller.active = true;
+            }
 
             this._controller3D.on('mode', (mode: CameraMoveMode) => {
                 this.emit('camera:mode-change', mode);
@@ -174,21 +185,13 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
         } else {
             const rootNode = Service.Editor?.getRootNode?.() as any;
             let uuids: string[] | null = rootNode?.uuid ? [rootNode.uuid] : null;
-            if (this._is2D && rootNode) {
-                // 与编辑器一致：2D 模式下聚焦到 Canvas 节点
+            if (this.is2D && rootNode) {
                 const canvas = rootNode.getComponentInChildren?.(Canvas);
                 if (canvas && canvas.node) {
                     uuids = [canvas.node.uuid];
                 }
             }
-            if (uuids) {
-                this.focus(uuids, undefined, true);
-            } else {
-                const scene = (cc as any).director?.getScene();
-                if (scene) {
-                    this.focus([scene.uuid], undefined, true);
-                }
-            }
+            this.focus(uuids, undefined, true);
         }
     }
 
@@ -240,7 +243,7 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
     resetCameraProperty(): void {
         this._controller3D.wanderSpeed = 10;
         this._controller3D.enableAcceleration = true;
-        if (this._is2D) {
+        if (this.is2D) {
             this._controller2D.wheelSpeed = 6;
             this.setCameraProperty({ fov: 45, far: 10000, near: 6, clearColor: [48, 48, 48, 255] });
         } else {
@@ -369,7 +372,7 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
         const scene = rootNode || (cc as any).director?.getScene();
         if (!scene) return;
 
-        if (this._is2D) {
+        if (this.is2D) {
             // 与编辑器 defaultFocus 一致：查找 Canvas 节点，使用 getBoundingBoxToWorld
             const canvas = scene.getComponentInChildren?.(Canvas);
             if (canvas?.node) {

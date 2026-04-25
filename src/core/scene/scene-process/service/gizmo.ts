@@ -163,24 +163,6 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
         } catch (e) {
             // Camera not ready yet
         }
-
-        // Listen for selection events
-        try {
-            const selection = Service.Selection as any;
-            if (selection) {
-                selection.on?.('select', (uuid: string) => {
-                    this.onSelectionSelect(uuid);
-                });
-                selection.on?.('unselect', (uuid: string) => {
-                    this.onSelectionUnselect(uuid);
-                });
-                selection.on?.('clear', () => {
-                    this.onSelectionClear();
-                });
-            }
-        } catch (e) {
-            // Selection not ready
-        }
     }
 
     async initFromConfig(): Promise<void> {
