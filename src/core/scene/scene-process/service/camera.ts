@@ -62,61 +62,63 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
      * 场景就绪时调用，创建编辑器相机并初始化控制器
      */
     onEditorOpened(): void {
-        if (this._camera) return;
         try {
-            const backgroundNode = Service.Gizmo?.backgroundNode || (cc as any).director?.getScene();
-            if (!backgroundNode) return;
+            // 一次性初始化：创建编辑器相机和控制器
+            if (!this._camera) {
+                const backgroundNode = Service.Gizmo?.backgroundNode || (cc as any).director?.getScene();
+                if (!backgroundNode) return;
 
-            const cam = CameraUtils.createCamera(
-                new Color(48, 48, 48, 0), backgroundNode, EditorCameraComponent,
-            ) as EditorCameraComponent;
-            this._camera = cam;
-            this._controller2D.init(cam);
-            this._controller3D.init(cam);
+                const cam = CameraUtils.createCamera(
+                    new Color(48, 48, 48, 0), backgroundNode, EditorCameraComponent,
+                ) as EditorCameraComponent;
+                this._camera = cam;
+                this._controller2D.init(cam);
+                this._controller3D.init(cam);
 
-            // 与编辑器 onSceneOpened 一致：记录场景 UUID，使 is2D 切换时走 defaultFocus 路径
-            const scene = (cc as any).director?.getScene();
-            this._currentUuid = scene?.uuid || '';
-            this._controllerFirstChange = false;
+                this._controller3D.on('mode', (mode: CameraMoveMode) => {
+                    this.emit('camera:mode-change', mode);
+                });
+                this._controller3D.on('projection-changed', (projection: number) => {
+                    this.emit('camera:projection-changed', projection);
+                });
 
-            // 与编辑器一致：检测 Canvas 组件自动切换 2D 模式
-            // 注意：is2D 切换正交投影，需要在控制器 init 之后才能安全调用
-            const rootNode = Service.Editor?.getRootNode?.() as any || scene;
-            const hasCanvas = rootNode?.getComponentInChildren?.(Canvas);
-            // 与编辑器 onSceneOpened 一致：先激活控制器并 defaultFocus（此时是 3D 控制器）
-            // 这样 3D 控制器能保存正确的聚焦位置，用户从 2D 切回 3D 时可以看到场景内容
-            this._controller.active = true;
-            this.defaultFocus(this._currentUuid);
-            if (hasCanvas) {
-                this.is2D = true;
+                try {
+                    const view = (cc as any).view;
+                    if (view?.on) {
+                        view.on('canvas-resize', () => {
+                            const canvas = (cc as any).game?.canvas;
+                            if (canvas) {
+                                Service.Operation.dispatch('resize', { width: canvas.width, height: canvas.height });
+                            }
+                        });
+                    }
+                } catch (e) {
+                    // view may not be ready
+                }
+
+                this.initFromConfig();
             }
 
-            this._controller3D.on('mode', (mode: CameraMoveMode) => {
-                this.emit('camera:mode-change', mode);
-            });
-            this._controller3D.on('projection-changed', (projection: number) => {
-                this.emit('camera:projection-changed', projection);
-            });
+            // 每次场景加载都需要执行的设置（与编辑器 onSceneOpened 一致）
+            this.refresh();
+
+            const scene = (cc as any).director?.getScene();
+            const uuid = scene?.uuid || '';
+            if (this._currentUuid !== uuid) {
+                this._currentUuid = uuid;
+                this._controllerFirstChange = false;
+
+                const rootNode = Service.Editor?.getRootNode?.() as any || scene;
+                const hasCanvas = rootNode?.getComponentInChildren?.(Canvas);
+
+                this._controller.active = true;
+                this.defaultFocus(uuid);
+                if (hasCanvas) {
+                    this.is2D = true;
+                }
+            }
 
             this._detachSceneCameras();
-
-            // 监听 canvas-resize，与编辑器 operation/index.ts 一致
-            try {
-                const view = (cc as any).view;
-                if (view?.on) {
-                    view.on('canvas-resize', () => {
-                        const canvas = (cc as any).game?.canvas;
-                        if (canvas) {
-                            Service.Operation.dispatch('resize', { width: canvas.width, height: canvas.height });
-                        }
-                    });
-                }
-            } catch (e) {
-                // view may not be ready
-            }
-
-            // 读取编辑器配置（与 Editor.Profile.getConfig('scene', 'camera') 对应）
-            this.initFromConfig();
 
             setTimeout(() => {
                 try {
