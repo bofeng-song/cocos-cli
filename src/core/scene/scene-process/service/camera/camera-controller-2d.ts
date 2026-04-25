@@ -10,13 +10,6 @@ import { tweenPosition } from './tween';
 import type { ISceneMouseEvent, ISceneKeyboardEvent } from '../operation/types';
 
 function getCanvasSize(): ISizeLike {
-    const view = (cc as any).view;
-    if (view?.getDesignResolutionSize) {
-        const dr = view.getDesignResolutionSize();
-        if (dr.width > 0 && dr.height > 0) {
-            return { width: dr.width, height: dr.height };
-        }
-    }
     const canvas = (cc as any).game?.canvas;
     if (canvas) {
         return { width: canvas.width, height: canvas.height };
@@ -25,7 +18,6 @@ function getCanvasSize(): ISizeLike {
 }
 
 const _defaultMarginPercentage = 30;
-const _scales = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 3, 4, 5];
 const _maxTicks = 100;
 
 function clamp(val: number, min: number, max: number): number {
@@ -643,30 +635,15 @@ export class CameraController2D extends CameraControllerBase {
     }
 
     zoomUp() {
-        const curScale = this._scale2D;
-        for (const s of _scales) {
-            if (s > curScale + 0.001) {
-                this.zoomTo(s);
-                return;
-            }
-        }
-        this.zoomTo(_scales[_scales.length - 1]);
+        this.zoomTo(this._scale2D * 1.5);
     }
 
     zoomDown() {
-        const curScale = this._scale2D;
-        for (let i = _scales.length - 1; i >= 0; i--) {
-            if (_scales[i] < curScale - 0.001) {
-                this.zoomTo(_scales[i]);
-                return;
-            }
-        }
-        this.zoomTo(_scales[0]);
+        this.zoomTo(this._scale2D / 1.5);
     }
 
     zoomReset() {
         this.zoomTo(1);
-        this._adjustToCenter();
     }
 
     onDesignResolutionChange() {

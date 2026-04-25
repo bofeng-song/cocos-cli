@@ -488,14 +488,17 @@ export class CameraController3D extends CameraControllerBase {
     // ---------- 缩放 ----------
 
     scale(delta: number) {
+        let scalar = this.viewDist;
+        if (Math.abs(scalar) < this._minScalar) {
+            scalar = 1;
+        }
         if (this.isOrtho()) {
-            // 正交模式：调整 orthoHeight
             let height = this._camera.orthoHeight;
-            height -= delta * height * this._orthoScale;
+            height -= delta * this._wheelSpeed * scalar * this._orthoScale;
             height = Math.max(this._minScalar, height);
             this.setOrthoHeight(height);
         } else {
-            // 透视模式：沿前方向移动
+            const smoothed = smoothMouseWheelScale(delta);
             this.node.getWorldPosition(this._curEye);
             this.node.getWorldRotation(this._curRot);
 
@@ -504,7 +507,7 @@ export class CameraController3D extends CameraControllerBase {
             Vec3.transformQuat(fwd, fwd, this._curRot);
             Vec3.normalize(fwd, fwd);
 
-            Vec3.multiplyScalar(fwd, fwd, delta * this.viewDist * this._orthoScale);
+            Vec3.multiplyScalar(fwd, fwd, smoothed * this._wheelSpeed * scalar);
             Vec3.add(this._curEye, this._curEye, fwd);
 
             makeVec3InRange(this._curEye, -1e6, 1e6);
@@ -516,7 +519,7 @@ export class CameraController3D extends CameraControllerBase {
     }
 
     smoothScale(delta: number) {
-        this.scale(smoothMouseWheelScale(delta));
+        this.scale(delta * this._wheelBaseScale);
     }
 
     // ---------- 焦点 ----------
@@ -1137,11 +1140,11 @@ export class CameraController3D extends CameraControllerBase {
     // ---------- 缩放快捷键 ----------
 
     zoomUp() {
-        this.scale(this._wheelSpeed * this._wheelBaseScale * 100);
+        this.scale(20);
     }
 
     zoomDown() {
-        this.scale(-this._wheelSpeed * this._wheelBaseScale * 100);
+        this.scale(-20);
     }
 
     zoomReset() {
