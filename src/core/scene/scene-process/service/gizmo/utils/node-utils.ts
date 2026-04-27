@@ -121,9 +121,125 @@ export function getRaycastResultNodes(
     return resultNodes;
 }
 
+const regionTargetClassName: string[] = [
+    'cc.UITransform',
+    'cc.SpriteRenderer',
+    'cc.Camera',
+    'cc.DirectionalLight',
+    'cc.Terrain',
+    'cc.SphereLight',
+    'cc.ParticleSystem',
+    'cc.SpotLight',
+];
+
+function hasComponent(node: Node, classNames: string[]): boolean {
+    for (const name of classNames) {
+        if (node.getComponent(name)) return true;
+    }
+    return false;
+}
+
+function inRegion(x: number, y: number, left: number, right: number, top: number, bottom: number): boolean {
+    return x >= left && x <= right && y <= top && y >= bottom;
+}
+
+interface RegionCollectMap {
+    prefabs: { prefab: Node; models: any[]; nodes: Node[] }[];
+    models: any[];
+    nodes: Node[];
+}
+
+function collectNodesForRegion(shouldFilterForeground = true): RegionCollectMap {
+    const collectMap: RegionCollectMap = {
+        prefabs: [],
+        models: [],
+        nodes: [],
+    };
+
+    const collectPrefab = (prefabRoot: Node, collects: RegionCollectMap) => {
+        const target = {
+            prefab: prefabRoot,
+            models: [] as any[],
+            nodes: [] as Node[],
+        };
+        prefabRoot.walk((child: Node) => {
+            collectNodeAndModel(child, target);
+        });
+        collects.prefabs.push(target);
+    };
+
+    const collectNodeAndModel = (node: Node, collects: any) => {
+        if (hasComponent(node, regionTargetClassName)) {
+            collects.nodes.push(node);
+        } else if (hasComponent(node, ['cc.MeshRenderer', 'cc.SkinnedMeshRenderer'])) {
+            const com = (node.getComponent('cc.MeshRenderer') || node.getComponent('cc.SkinnedMeshRenderer')) as any;
+            if (com?.model) {
+                collects.models.push(com.model);
+            }
+        }
+    };
+
+    const collect = (child: Node, ignoreForPrefabMode = false) => {
+        // @ts-ignore
+        if (child['_prefab']) {
+            // @ts-ignore
+            if (!(ignoreForPrefabMode && !child?.['_prefab'].instance)) {
+                collectPrefab(child, collectMap);
+                return;
+            }
+        }
+        collectNodeAndModel(child, collectMap);
+        child.children.forEach((c: Node) => {
+            collect(c);
+        });
+    };
+
+    director.getScene()?.children.forEach((child: Node) => {
+        if (child.name === 'Editor Scene Foreground' && shouldFilterForeground) {
+            return;
+        }
+        if (child.name === 'Editor Scene Background') {
+            return;
+        }
+        collect(child, true);
+    });
+
+    return collectMap;
+}
+
+function isNodeInRegion(node: Node, camera: any, left: number, right: number, top: number, bottom: number): boolean {
+    const scenePos = new Vec3();
+    camera.worldToScreen(scenePos, node.worldPosition);
+    return inRegion(scenePos.x, scenePos.y, left, right, top, bottom);
+}
+
+function isModelInRegion(m: any, camera: any, left: number, right: number, top: number, bottom: number): boolean {
+    if (!m.worldBounds) return false;
+    const keys = ['x', 'y', 'z'];
+    const operations = [1, -1];
+    const center = m.worldBounds.center;
+    const point = new Vec3();
+    camera.worldToScreen(point, center);
+    if (inRegion(point.x, point.y, left, right, top, bottom)) {
+        const half = m.worldBounds.halfExtents;
+        for (const key of keys) {
+            for (const v of operations) {
+                const target = new Vec3(center);
+                // @ts-ignore
+                target[key] = target[key] + v * half[key];
+                camera.worldToScreen(point, target);
+                if (!inRegion(point.x, point.y, left, right, top, bottom)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
 /**
- * 框选：获取矩形区域内的节点
- * Simplified for CLI — iterates scene models and checks if their screen-space position is within the region
+ * 框选场景节点算法
  */
 export function getRegionNodes(
     camera: any,
@@ -135,35 +251,45 @@ export function getRegionNodes(
 ): Node[] {
     if (!camera) return [];
 
-    const scene = director.getScene()?.renderScene;
-    if (!scene) return [];
-
     const resultNodes: Node[] = [];
-    const seenNodes: Set<Node> = new Set();
-    const models = scene.models;
-    if (!models) return resultNodes;
+    const collectMap = collectNodesForRegion();
 
-    const screenPos = new Vec3();
-    for (let i = 0; i < models.length; i++) {
-        const model = models[i];
-        if (!model || !model.node || !model.enabled) continue;
-        if (!(model.node.layer & mask)) continue;
-        if (isEditorNode(model.node)) continue;
-        if (model.node._objFlags & CCObject.Flags.LockedInEditor) continue;
-        if (model.node._objFlags & CCObject.Flags.HideInHierarchy) continue;
-
-        // Project world position to screen space
-        const worldPos = model.node.getWorldPosition();
-        camera.worldToScreen(screenPos, worldPos);
-
-        if (screenPos.x >= left && screenPos.x <= right &&
-            screenPos.y >= bottom && screenPos.y <= top) {
-            if (!seenNodes.has(model.node)) {
-                seenNodes.add(model.node);
-                resultNodes.push(model.node);
+    // 遍历prefab,子节点被选中就选中整个prefab
+    collectMap.prefabs.forEach(prefab => {
+        for (const node of prefab.nodes) {
+            if (isNodeInRegion(node, camera, left, right, top, bottom)) {
+                resultNodes.push(prefab.prefab);
+                return;
             }
         }
-    }
+        for (const m of prefab.models) {
+            const transform = m.transform;
+            if (!transform || !m.enabled || !(m.node.layer & mask) || !m.worldBounds) {
+                return;
+            }
+            if (isModelInRegion(m, camera, left, right, top, bottom)) {
+                resultNodes.push(prefab.prefab);
+                return;
+            }
+        }
+    });
+
+    collectMap.nodes.forEach(node => {
+        if (isNodeInRegion(node, camera, left, right, top, bottom)) {
+            resultNodes.push(node);
+        }
+    });
+
+    // 遍历所有的model
+    collectMap.models.forEach(m => {
+        const transform = m.transform;
+        if (!transform || !m.enabled || !(m.node.layer & mask) || !m.worldBounds) {
+            return;
+        }
+        if (isModelInRegion(m, camera, left, right, top, bottom)) {
+            resultNodes.push(m.node);
+        }
+    });
 
     return resultNodes;
 }

@@ -1,10 +1,10 @@
 'use strict';
 
-import { CCObject, Layers, Node, Vec3 } from 'cc';
+import { CCObject, Color, Layers, Node, Vec3 } from 'cc';
 import { OperationPriority } from '../operation/types';
 import type { ISceneMouseEvent, ISceneKeyboardEvent } from '../operation/types';
 import { GizmoMouseEvent } from './utils/defines';
-import { getRaycastResultsByNodes } from './utils/engine-utils';
+import { getRaycastResults } from './utils/engine-utils';
 import { getRaycastResultNodes, getRegionNodes } from './utils/node-utils';
 
 function getService(): any {
@@ -79,10 +79,7 @@ class GizmoOperation {
         const gizmoRoot = gizmoSvc?.gizmoRootNode;
         if (!gizmoRoot) return [];
 
-        const results = getRaycastResultsByNodes(
-            [gizmoRoot], x, y, Infinity, false, Layers.Enum.IGNORE_RAYCAST,
-        );
-        return results;
+        return getRaycastResults(gizmoRoot, x, y, Infinity, Layers.Enum.IGNORE_RAYCAST);
     }
 
     private _emitEventToNode(node: Node, event: GizmoMouseEvent) {
@@ -104,6 +101,7 @@ class GizmoOperation {
         if (event.leftButton && !isViewMode && !cameraCtrl?.isMoving?.()) {
             if (this._regionSelecting) {
                 this._regionSelecting = false;
+                this._hideSelectionRegion();
             } else {
                 this._selectNode(event);
             }
@@ -168,6 +166,7 @@ class GizmoOperation {
                 if (event.propagationStopped) break;
             }
             this._curMouseDownInfos.length = 0;
+
             return false;
         }
 
@@ -338,6 +337,8 @@ class GizmoOperation {
     private _regionSelectNode(
         left: number, right: number, top: number, bottom: number, multiple: boolean,
     ) {
+        this._showSelectionRegion(left, right, top, bottom);
+
         const camera = getServiceProp('Camera')?.getCamera?.()?.camera;
         if (!camera) return;
 
@@ -361,6 +362,36 @@ class GizmoOperation {
                 selection?.unselect?.(uuid);
             }
         }
+    }
+
+    private _showSelectionRegion(left: number, right: number, top: number, bottom: number) {
+        const cameraComp = getServiceProp('Camera')?.getCamera?.();
+        if (!cameraComp) return;
+
+        const pos0 = new Vec3(left, bottom, 0.1);
+        const pos1 = new Vec3(right, bottom, 0.1);
+        const pos2 = new Vec3(right, top, 0.1);
+        const pos3 = new Vec3(left, top, 0.1);
+        const p0 = new Vec3();
+        const p1 = new Vec3();
+        const p2 = new Vec3();
+        const p3 = new Vec3();
+        cameraComp.screenToWorld(pos0, p0);
+        cameraComp.screenToWorld(pos1, p1);
+        cameraComp.screenToWorld(pos2, p2);
+        cameraComp.screenToWorld(pos3, p3);
+
+        const geometryRenderer = getServiceProp('Engine')?.getGeometryRenderer?.();
+        if (geometryRenderer) {
+            geometryRenderer.removeData('addQuad');
+            geometryRenderer.addQuad(p0, p1, p2, p3, new Color(255, 255, 255, 120), false, false, true);
+        }
+        getServiceProp('Engine')?.repaintInEditMode?.();
+    }
+
+    private _hideSelectionRegion() {
+        getServiceProp('Engine')?.getGeometryRenderer?.()?.removeData('addQuad');
+        getServiceProp('Engine')?.repaintInEditMode?.();
     }
 
     // --- Keyboard ---

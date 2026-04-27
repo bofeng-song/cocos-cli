@@ -1,9 +1,19 @@
 'use strict';
 
-import { CCObject, Color, Mat4, Node, Quat, Size, UITransform, Vec2, Vec3 } from 'cc';
+import { CCObject, Color, Layers, Mat4, Node, Quat, Size, UITransform, Vec2, Vec3 } from 'cc';
 import type { GizmoMouseEvent } from '../utils/defines';
 import TransformBaseGizmo from './transform-base';
 import { RectangleController, RectHandleType as HandleType } from './rectangle-controller';
+import { getRaycastResultNodes } from '../utils/node-utils';
+
+function getService(): any {
+    try {
+        const { Service } = require('../../core/decorator');
+        return Service;
+    } catch (e) {
+        return null;
+    }
+}
 
 function toPrecision(val: number, n: number): number {
     const f = Math.pow(10, n);
@@ -127,9 +137,30 @@ class RectGizmo extends TransformBaseGizmo {
         this.updateDataFromController();
     }
 
-    onControllerMouseUp(_event: GizmoMouseEvent) {
+    onControllerMouseUp(event: GizmoMouseEvent) {
         if (this._controller.updated) {
             this.onControlEnd('position');
+        } else {
+            const svc = getService();
+            const selected: string[] = svc?.Selection?.query?.() ?? [];
+            if (selected.length === 1) {
+                const camera = svc?.Camera?.getCamera?.()?.camera;
+                const mask = Layers.makeMaskExclude([Layers.Enum.GIZMOS, Layers.Enum.SCENE_GIZMO]);
+                const results = getRaycastResultNodes(camera, event.x, event.y, mask);
+                const firstSelection = selected[0];
+                for (let i = 0; i < results.length; i++) {
+                    if (results[i] && firstSelection === results[i].uuid) {
+                        if (i === results.length - 1) {
+                            svc?.Selection?.unselect?.(firstSelection);
+                            svc?.Selection?.select?.(results[0].uuid);
+                        } else if (results[i + 1]?.uuid) {
+                            svc?.Selection?.unselect?.(firstSelection);
+                            svc?.Selection?.select?.(results[i + 1].uuid);
+                        }
+                        break;
+                    }
+                }
+            }
         }
     }
 

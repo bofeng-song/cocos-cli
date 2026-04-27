@@ -13,9 +13,10 @@ declare module 'cc' {
 
 import {
     Camera, CCObject, Color, geometry, gfx, IVec3Like, math, MeshRenderer, Node,
-    primitives, utils, Vec2, Vec3, Material, Mesh, Layers, Vec4,
+    primitives, renderer, utils, Vec2, Vec3, Material, Mesh, Layers, Vec4,
 } from 'cc';
 import type { IAddMeshToNodeOption, ICreateMeshOption, IMeshPrimitive, DynamicMeshPrimitive } from './defines';
+import raycastUtil from './raycast';
 
 const flat = (arr: any, fn: any) => {
     return arr.map(fn).reduce((acc: any, val: any) => acc.concat(val), []);
@@ -414,10 +415,6 @@ export function updateBoundingBox(meshComp: MeshRenderer, minPos?: math.Vec3, ma
     model.createBoundingShape(minPos, maxPos);
 }
 
-/**
- * 简化的射线检测：通过节点列表检测
- * 编辑器版本使用 raycastUtil，此处使用内联的简化实现
- */
 export function getRaycastResultsByNodes(nodes: Node[], x: number, y: number, distance = Infinity, forSnap = false, excludeMask?: number): any[] {
     const results: any[] = [];
     const camera = getEditorCamera();
@@ -428,12 +425,11 @@ export function getRaycastResultsByNodes(nodes: Node[], x: number, y: number, di
     camera.camera.screenPointToRay(ray, x, y);
 
     const walkAllModels = (node: Node, cb: (mr: MeshRenderer) => void) => {
-        if (!node.activeInHierarchy) return;
-        const modelComponents = node.getComponents(MeshRenderer);
-        modelComponents.forEach(e => cb(e));
+        const modelComponent = node.getComponents(MeshRenderer);
+        modelComponent.forEach(e => cb(e));
         if (node.children.length > 0) {
-            node.children.forEach(child => {
-                walkAllModels(child, cb);
+            node.children.forEach(children => {
+                walkAllModels(children, cb);
             });
         }
     };
@@ -441,35 +437,28 @@ export function getRaycastResultsByNodes(nodes: Node[], x: number, y: number, di
     nodes.forEach(node => {
         walkAllModels(node, (mr: MeshRenderer) => {
             if (!mr.model) return;
-            if (excludeMask && mr.node.layer & excludeMask) return;
-            // Skip non-triangle meshes: editor narrowphase naturally rejects
-            // line/point primitives; we only have broadphase (AABB) so filter here
-            const subMeshes = mr.mesh?.renderingSubMeshes;
-            if (subMeshes && subMeshes.length > 0) {
-                const pm = subMeshes[0].primitiveMode;
-                if (pm === gfx.PrimitiveMode.LINE_LIST ||
-                    pm === gfx.PrimitiveMode.LINE_STRIP ||
-                    pm === gfx.PrimitiveMode.LINE_LOOP ||
-                    pm === gfx.PrimitiveMode.POINT_LIST) {
-                    return;
-                }
-            }
-            const worldBounds = mr.model.worldBounds;
-            if (worldBounds) {
-                const hit = geometry.intersect.rayAABB(ray, worldBounds);
-                if (hit > 0 && hit <= distance) {
-                    const hitPoint = new Vec3();
-                    Vec3.scaleAndAdd(hitPoint, ray.o, ray.d, hit);
-                    results.push({
-                        node: mr.node,
-                        distance: hit,
-                        hitPoint,
-                    });
-                }
+            if (raycastUtil.raycastSingleModel(ray, mr.model, node['_layer'], distance, forSnap, excludeMask)) {
+                results.push(...raycastUtil.rayResultSingleModel);
+                results.sort(cmp);
             }
         });
     });
 
-    results.sort(cmp);
+    return results;
+}
+
+export function getRaycastResults(rootNode: Node, x: number, y: number, distance = Infinity, excludeMask?: number): any[] {
+    const scene = (rootNode as any).scene?.renderScene as renderer.RenderScene;
+    const camera = getEditorCamera();
+    if (!camera || !camera.camera || !scene) {
+        return [];
+    }
+
+    camera.camera.screenPointToRay(ray, x, y);
+    const results: any[] = [];
+    if (raycastUtil.raycastAllModels(scene, ray, rootNode['_layer'], distance, false, excludeMask)) {
+        results.push(...raycastUtil.rayResultModels);
+        results.sort(cmp);
+    }
     return results;
 }
