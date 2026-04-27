@@ -3,6 +3,7 @@
 import { Component, js, Layers, Node } from 'cc';
 import { BaseService } from './core';
 import { register, Service } from './core/decorator';
+import { ServiceEvents } from './core/global-events';
 import { TransformToolData } from './gizmo/transform-tool';
 import GizmoDefines from './gizmo/gizmo-defines';
 import GizmoBase from './gizmo/base/gizmo-base';
@@ -15,6 +16,7 @@ import './gizmo/components/camera';
 import './gizmo/components/box-collider';
 import './gizmo/components/directional-light';
 import './gizmo/components/canvas';
+import './gizmo/components/ui-transform';
 
 type TGizmoType = 'icon' | 'persistent' | 'component';
 
@@ -155,15 +157,31 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
             this.emit('gizmo:tool-changed', name);
         });
 
+        // 与 cocos-editor 一致：2D 视图下隐藏 IconGizmo，让 UI 编辑更干净
+        this.transformToolData.on('dimension-changed', (is2D: boolean) => {
+            this.setIconVisible(!is2D);
+        });
+
         // Listen for camera mode changes to lock/unlock gizmo tool
+        // 与 cocos-editor 一致：监听 'camera-move-mode'，回调参数为 CameraMoveMode 枚举(number)
         try {
-            (Service as any).Camera?.controller3D?.on?.('mode', (mode: number) => {
-                // 0 = IDLE, lock when not idle
-                this.transformToolData.isLocked = mode !== 0;
+            (Service as any).Camera?.controller3D?.on?.('camera-move-mode', (mode: number) => {
+                this.transformToolData.isLocked = mode !== 0; // 0 = CameraMoveMode.IDLE
             });
         } catch (e) {
             // Camera not ready yet
         }
+
+        // 与 cocos-editor 一致：直接监听 Selection 事件
+        ServiceEvents.on('selection:select', (uuid: string) => {
+            this.onSelectionSelect(uuid);
+        });
+        ServiceEvents.on('selection:unselect', (uuid: string) => {
+            this.onSelectionUnselect(uuid);
+        });
+        ServiceEvents.on('selection:clear', () => {
+            this.onSelectionClear();
+        });
     }
 
     async initFromConfig(): Promise<void> {

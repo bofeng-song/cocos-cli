@@ -3,7 +3,7 @@
 import { CCObject, Layers, Node, Vec3 } from 'cc';
 import { OperationPriority } from '../operation/types';
 import type { ISceneMouseEvent, ISceneKeyboardEvent } from '../operation/types';
-import type { GizmoMouseEvent } from './utils/defines';
+import { GizmoMouseEvent } from './utils/defines';
 import { getRaycastResultsByNodes } from './utils/engine-utils';
 import { getRaycastResultNodes, getRegionNodes } from './utils/node-utils';
 
@@ -30,15 +30,23 @@ function getNodeByUuid(uuid: string): Node | null {
 }
 
 /**
+ * 与编辑器 adjustY 一致：将浏览器 Y（从顶部向下）翻转为屏幕坐标 Y（从底部向上）
+ */
+function adjustY(y: number): number {
+    const canvas = (cc as any).game?.canvas;
+    const height = canvas ? canvas.height : 720;
+    return height - y;
+}
+
+/**
  * Create a GizmoMouseEvent from an ISceneMouseEvent
  * Note: Our GizmoMouseEvent is a plain data class, NOT extending CCEvent
  */
 function createGizmoMouseEvent(type: string, event: ISceneMouseEvent): GizmoMouseEvent {
-    const { GizmoMouseEvent: GME } = require('./utils/defines');
-    const gme = new GME();
+    const gme = new GizmoMouseEvent();
     gme.type = type;
     gme.x = event.x;
-    gme.y = event.y;
+    gme.y = adjustY(event.y);
     gme.ctrlKey = event.ctrlKey;
     gme.shiftKey = event.shiftKey;
     gme.altKey = event.altKey;
@@ -58,8 +66,8 @@ class GizmoOperation {
     private _gizmoMoved = false;
     private _hoverInNodeMap: Map<Node, boolean> = new Map();
     private _curMouseDownInfos: { node: Node; hitPoint: Vec3 }[] = [];
-    private _gizmoMouseDownEvent: ISceneMouseEvent | null = null;
-    private _noGizmoMouseDownEvent: ISceneMouseEvent | null = null;
+    private _gizmoMouseDownEvent: GizmoMouseEvent | null = null;
+    private _noGizmoMouseDownEvent: GizmoMouseEvent | null = null;
     private _mouseDownRaycastGizmos: any[] = [];
     private _anyKeyDown = false;
 
@@ -90,16 +98,16 @@ class GizmoOperation {
         // placeholder for region select start
     }
 
-    private _onNotGizmoMouseUp(event: GizmoMouseEvent): boolean {
+    private _onNotGizmoMouseUp(event: GizmoMouseEvent): boolean | void {
         const isViewMode = getServiceProp('Gizmo')?.transformToolData?.viewMode === 'view';
-        if (event.leftButton && !isViewMode) {
+        const cameraCtrl = getServiceProp('Camera')?.controller;
+        if (event.leftButton && !isViewMode && !cameraCtrl?.isMoving?.()) {
             if (this._regionSelecting) {
                 this._regionSelecting = false;
             } else {
                 this._selectNode(event);
             }
         }
-        return true;
     }
 
     private _onNotGizmoMouseMove(event: GizmoMouseEvent): boolean | undefined {
@@ -128,6 +136,10 @@ class GizmoOperation {
     // --- Gizmo-hit handlers ---
 
     private _onGizmoMouseDown(event: GizmoMouseEvent, results: any[]): boolean {
+        // 与 cocos-editor 一致：相机移动中不处理 gizmo 交互
+        const cameraCtrl = getServiceProp('Camera')?.controller;
+        if (cameraCtrl?.isMoving?.()) return true;
+
         if (event.leftButton) {
             for (const info of results) {
                 const backInfo = {
@@ -145,6 +157,10 @@ class GizmoOperation {
     }
 
     private _onGizmoMouseUp(event: GizmoMouseEvent): boolean {
+        // 与 cocos-editor 一致：相机移动中不处理
+        const cameraCtrl = getServiceProp('Camera')?.controller;
+        if (cameraCtrl?.isMoving?.()) return true;
+
         if (this._curMouseDownInfos.length > 0) {
             for (const info of this._curMouseDownInfos) {
                 event.hitPoint = info.hitPoint;
@@ -153,6 +169,14 @@ class GizmoOperation {
             }
             this._curMouseDownInfos.length = 0;
             return false;
+        }
+
+        // 与 cocos-editor 一致：没有 mouseDown 记录时，对当前位置 raycast 并发送事件
+        const { x, y } = event;
+        const results = this.raycastGizmos(x, y);
+        for (let i = 0; i < results.length; i++) {
+            this._emitEventToNode(results[i].node, event);
+            if (event.propagationStopped) break;
         }
         return true;
     }
@@ -176,23 +200,25 @@ class GizmoOperation {
         this._anyKeyDown = event.altKey || event.ctrlKey || event.shiftKey || event.metaKey;
 
         const customEvent = createGizmoMouseEvent('mouseDown', event);
+
+        // 与 cocos-editor 一致：不区分按键，始终做 raycast
         const results = this.raycastGizmos(customEvent.x, customEvent.y);
         this._mouseDownRaycastGizmos = results;
 
         if (results.length > 0) {
-            this._gizmoMouseDownEvent = event;
+            this._gizmoMouseDownEvent = customEvent;
             return this._onGizmoMouseDown(customEvent, results);
-        } else {
-            this._noGizmoMouseDownEvent = event;
-            this._onNotGizmoMouseDown(customEvent);
         }
+
+        this._noGizmoMouseDownEvent = customEvent;
+        this._onNotGizmoMouseDown(customEvent);
     }
 
     public onMouseUp(event: ISceneMouseEvent): boolean | void {
         this._anyKeyDown = false;
         const customEvent = createGizmoMouseEvent('mouseUp', event);
 
-        if (this._mouseDownRaycastGizmos.length > 0) {
+        if (this._mouseDownRaycastGizmos && this._mouseDownRaycastGizmos.length > 0) {
             if (!this._gizmoMouseDownEvent) return true;
             this._gizmoMouseDownEvent = null;
             return this._onGizmoMouseUp(customEvent);
@@ -208,12 +234,11 @@ class GizmoOperation {
         const customEvent = createGizmoMouseEvent('mouseMove', event);
         const results = this.raycastGizmos(customEvent.x, customEvent.y);
 
-        if (this._mouseDownRaycastGizmos.length > 0) {
+        if (this._mouseDownRaycastGizmos && this._mouseDownRaycastGizmos.length > 0) {
             if (!this._gizmoMouseDownEvent) {
                 return this._changeMouseHover(customEvent, results);
             }
-            this._onGizmoMouseMove(customEvent, results);
-            return false;
+            return this._onGizmoMouseMove(customEvent, results);
         } else {
             if (!this._noGizmoMouseDownEvent) {
                 return this._changeMouseHover(customEvent, results);
@@ -387,10 +412,6 @@ class GizmoOperation {
         this._noGizmoMouseDownEvent = null;
         this._hoverInNodeMap.clear();
         this._curMouseDownInfos.length = 0;
-        this._mouseDownRaycastGizmos.length = 0;
-        this._regionSelecting = false;
-        this._gizmoMoved = false;
-        this._anyKeyDown = false;
     }
 }
 

@@ -428,6 +428,7 @@ export function getRaycastResultsByNodes(nodes: Node[], x: number, y: number, di
     camera.camera.screenPointToRay(ray, x, y);
 
     const walkAllModels = (node: Node, cb: (mr: MeshRenderer) => void) => {
+        if (!node.activeInHierarchy) return;
         const modelComponents = node.getComponents(MeshRenderer);
         modelComponents.forEach(e => cb(e));
         if (node.children.length > 0) {
@@ -440,7 +441,19 @@ export function getRaycastResultsByNodes(nodes: Node[], x: number, y: number, di
     nodes.forEach(node => {
         walkAllModels(node, (mr: MeshRenderer) => {
             if (!mr.model) return;
-            // 简化射线检测：检测 model 的包围盒
+            if (excludeMask && mr.node.layer & excludeMask) return;
+            // Skip non-triangle meshes: editor narrowphase naturally rejects
+            // line/point primitives; we only have broadphase (AABB) so filter here
+            const subMeshes = mr.mesh?.renderingSubMeshes;
+            if (subMeshes && subMeshes.length > 0) {
+                const pm = subMeshes[0].primitiveMode;
+                if (pm === gfx.PrimitiveMode.LINE_LIST ||
+                    pm === gfx.PrimitiveMode.LINE_STRIP ||
+                    pm === gfx.PrimitiveMode.LINE_LOOP ||
+                    pm === gfx.PrimitiveMode.POINT_LIST) {
+                    return;
+                }
+            }
             const worldBounds = mr.model.worldBounds;
             if (worldBounds) {
                 const hit = geometry.intersect.rayAABB(ray, worldBounds);
@@ -448,7 +461,7 @@ export function getRaycastResultsByNodes(nodes: Node[], x: number, y: number, di
                     const hitPoint = new Vec3();
                     Vec3.scaleAndAdd(hitPoint, ray.o, ray.d, hit);
                     results.push({
-                        node: node,
+                        node: mr.node,
                         distance: hit,
                         hitPoint,
                     });

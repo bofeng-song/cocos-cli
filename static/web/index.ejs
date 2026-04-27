@@ -675,7 +675,13 @@
                     dispatchMouse('mousemove', toSceneMouseEvent(e));
                 });
                 canvas.addEventListener('mouseup', function(e) {
-                    dispatchMouse('mouseup', toSceneMouseEvent(e));
+                    var evt = toSceneMouseEvent(e);
+                    // On mouseup, e.buttons no longer includes the released button.
+                    // Use e.button (which button was released) instead.
+                    evt.leftButton = e.button === 0;
+                    evt.middleButton = e.button === 1;
+                    evt.rightButton = e.button === 2;
+                    dispatchMouse('mouseup', evt);
                 });
                 canvas.addEventListener('dblclick', function(e) {
                     if (isOverPanel(e)) return;

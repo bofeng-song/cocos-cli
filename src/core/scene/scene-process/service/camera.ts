@@ -297,7 +297,7 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
     }
 
     getCamera() {
-        return this._camera?.camera;
+        return this._camera;
     }
 
     /**
