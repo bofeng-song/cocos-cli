@@ -72,24 +72,41 @@ function buildPlatformTypeUnion(): string {
 
 async function postProcessDts(filePath: string) {
     let content = await fs.readFile(filePath, 'utf-8');
-    const selfRef = 'type PlatformType = PlatformType;';
-    if (!content.includes(selfRef)) return;
+    let changed = false;
 
-    const platformTypeUnion = buildPlatformTypeUnion();
-    content = content.replace(
-        new RegExp(selfRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-        `type PlatformType = ${platformTypeUnion};`
-    );
+    // Fix api-extractor circular self-reference for PlatformType
+    const selfRef = 'type PlatformType = PlatformType;';
+    if (content.includes(selfRef)) {
+        const platformTypeUnion = buildPlatformTypeUnion();
+        content = content.replace(
+            new RegExp(selfRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+            `type PlatformType = ${platformTypeUnion};`
+        );
+        changed = true;
+    }
+
     // Remove leftover eslint-disable-next-line @typescript-eslint/ban-types comments
-    // These come from dependencies like @cocos/ccbuild but trigger errors in the new ESLint config
-    // We add `[ \t]*` to catch any indentation the comment might have
     const banTypesComment = /[ \t]*\/\/ eslint-disable-next-line @typescript-eslint\/ban-types\r?\n/g;
     if (content.match(banTypesComment)) {
         content = content.replace(banTypesComment, '');
         console.log(`  Post-processed: removed @typescript-eslint/ban-types comments in ${path.basename(filePath)}`);
+        changed = true;
     }
 
-    await fs.writeFile(filePath, content, 'utf-8');
+    // api-extractor demotes types not in the entry's export chain to bare
+    // `declare interface/type/enum/...` (no `export`). Promote them back so
+    // consumers can import any type that was originally exported in source.
+    const promoteRe = /^declare (interface|type|enum|class|function|const|abstract class) /gm;
+    if (promoteRe.test(content)) {
+        promoteRe.lastIndex = 0;
+        content = content.replace(promoteRe, 'export declare $1 ');
+        console.log(`  Post-processed: promoted non-exported declarations to export in ${path.basename(filePath)}`);
+        changed = true;
+    }
+
+    if (changed) {
+        await fs.writeFile(filePath, content, 'utf-8');
+    }
 }
 
 const projectRoot = path.resolve(__dirname, '..');
