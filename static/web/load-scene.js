@@ -19,7 +19,7 @@ window.loadScene = async function (serverURL) {
         return;
     }
 
-    cli.SceneEvents.on('editor:open', () => { 
+    cli.SceneEvents.on('editor:open', () => {
         console.log('editor:open onCalled');
     });
     await cli.Scene.Editor.open({ urlOrUUID: sceneUrl });
