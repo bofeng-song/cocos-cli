@@ -44,7 +44,7 @@ jobs:
         uses: ./.github/actions/setup-env
 
       - name: Generate DTS
-        run: npx tsx workflow/generate-dts.ts
+        run: npm run generate:dts:ci
 
       - name: Run unit tests
         id: unit-tests
