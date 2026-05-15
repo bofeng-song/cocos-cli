@@ -45,7 +45,7 @@ jobs:
 
       - name: Generate DTS
         shell: bash
-        run: npx tsx workflow/generate-dts.ts
+        run: node node_modules/tsx/dist/cli.cjs workflow/generate-dts.ts
 
       - name: Run unit tests
         id: unit-tests
