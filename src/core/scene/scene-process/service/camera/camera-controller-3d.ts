@@ -167,6 +167,8 @@ export class CameraController3D extends CameraControllerBase {
     private _curEye = new Vec3();
 
     private _lineColor = new Color(255, 255, 255, 50);
+    get lineColor() { return this._lineColor; }
+    set lineColor(value: Color) { this._lineColor = value; }
 
     // 预分配临时变量，避免高频方法中反复 new 产生 GC 压力
     private v3a = new Vec3();
@@ -455,6 +457,7 @@ export class CameraController3D extends CameraControllerBase {
     // ---------- 模式切换 ----------
 
     async changeMode(command: string) {
+        if (!this._modeFSM) return;
         await this._modeFSM.issueCommand(command);
         this.emit('mode', command);
     }
@@ -765,15 +768,17 @@ export class CameraController3D extends CameraControllerBase {
     // ---------- 鼠标/键盘事件 ----------
 
     isMoving(): boolean {
-        return this._modeFSM.currentState !== this._idleMode;
+        return this._modeFSM?.currentState !== this._idleMode;
     }
 
     onMouseDBlDown(event: ISceneMouseEvent) {
+        if (!this._modeFSM) return;
         const currentMode = this._modeFSM.currentState as ModeBase3D;
         currentMode.onMouseDBlDown(event);
     }
 
     onMouseDown(event: ISceneMouseEvent) {
+        if (!this._modeFSM) return;
         this.mousePressing = true;
         this.shiftKey = event.shiftKey;
         this.altKey = event.altKey;
@@ -800,6 +805,7 @@ export class CameraController3D extends CameraControllerBase {
     }
 
     onMouseMove(event: ISceneMouseEvent) {
+        if (!this._modeFSM) return;
         this.shiftKey = event.shiftKey;
         this.altKey = event.altKey;
 
@@ -810,6 +816,7 @@ export class CameraController3D extends CameraControllerBase {
     }
 
     onMouseUp(event: ISceneMouseEvent) {
+        if (!this._modeFSM) return;
         this.mousePressing = false;
 
         const currentMode = this._modeFSM.currentState as ModeBase3D;
@@ -822,6 +829,7 @@ export class CameraController3D extends CameraControllerBase {
     }
 
     onMouseWheel(event: ISceneMouseEvent) {
+        if (!this._modeFSM) return;
         const currentMode = this._modeFSM.currentState as ModeBase3D;
         if (currentMode.modeName === CameraMoveMode.WANDER) {
             // 漫游模式下滚轮调节速度
@@ -836,16 +844,19 @@ export class CameraController3D extends CameraControllerBase {
     }
 
     onKeyDown(event: ISceneKeyboardEvent) {
+        if (!this._modeFSM) return;
         const currentMode = this._modeFSM.currentState as ModeBase3D;
         currentMode.onKeyDown(event);
     }
 
     onKeyUp(event: ISceneKeyboardEvent) {
+        if (!this._modeFSM) return;
         const currentMode = this._modeFSM.currentState as ModeBase3D;
         currentMode.onKeyUp(event);
     }
 
     onUpdate(deltaTime: number) {
+        if (!this._modeFSM) return;
         const currentMode = this._modeFSM.currentState as ModeBase3D;
         currentMode.onUpdate(deltaTime);
     }

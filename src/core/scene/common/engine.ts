@@ -17,4 +17,7 @@ export interface IEngineService extends IServiceEvents {
      * 让引擎执行一帧
      */
     repaintInEditMode(): Promise<void>;
+
+    pause(): void;
+    resume(): void;
 }

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title><%= title %></title>
     <meta name="viewport" content="width=device-width,user-scalable=no,initial-scale=1,minimum-scale=1,maximum-scale=1,viewport-fit=cover"/>
-    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="mobile-web-app-capable" content="yes"/>
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <meta name="renderer" content="webkit"/>
@@ -309,6 +309,58 @@
             </div>
         </div>
 
+        <!-- Preview -->
+        <div class="panel-section" id="sec-preview">
+            <h3 onclick="toggleSection('sec-preview')">Preview</h3>
+            <div class="section-body">
+                <div class="row">
+                    <label>Type</label>
+                    <select id="previewType" onchange="onPreviewTypeChange()">
+                        <option value="scene">Scene</option>
+                        <option value="material">Material</option>
+                        <option value="model">Model</option>
+                        <option value="mesh">Mesh</option>
+                        <option value="skeleton">Skeleton</option>
+                        <option value="prefab">Prefab</option>
+                        <option value="spine">Spine</option>
+                    </select>
+                </div>
+                <div class="row" id="previewUuidRow">
+                    <label>UUID</label>
+                    <input type="text" id="previewUuid" placeholder="asset uuid" style="flex:1;background:#2a2a2a;color:#ddd;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;">
+                </div>
+                <div class="row">
+                    <label>Size</label>
+                    <input type="number" id="previewW" value="256" min="32" max="2048" style="width:50px;background:#2a2a2a;color:#ddd;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;">
+                    x
+                    <input type="number" id="previewH" value="256" min="32" max="2048" style="width:50px;background:#2a2a2a;color:#ddd;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;">
+                </div>
+                <div class="row" id="previewPrimitiveRow" style="display:none;">
+                    <label>Primitive</label>
+                    <select id="previewPrimitive">
+                        <option value="sphere">Sphere</option>
+                        <option value="box">Box</option>
+                        <option value="capsule">Capsule</option>
+                        <option value="cylinder">Cylinder</option>
+                        <option value="torus">Torus</option>
+                        <option value="cone">Cone</option>
+                        <option value="quad">Quad</option>
+                    </select>
+                    <button class="btn" onclick="doSwitchPrimitive()">Apply</button>
+                </div>
+                <div class="row">
+                    <button class="btn btn-primary" onclick="doPreview()">Preview</button>
+                    <button class="btn" onclick="doThumbnail()">Thumbnail</button>
+                    <button class="btn" onclick="doTestRender()">Test Render</button>
+                    <button class="btn" onclick="doPreviewDebug()">Debug</button>
+                    <span id="previewStatus" class="info-text">-</span>
+                </div>
+                <div style="margin-top:6px;text-align:center;">
+                    <canvas id="previewCanvas" width="256" height="256" style="border:1px solid #555;background:#1a1a1a;max-width:100%;"></canvas>
+                </div>
+            </div>
+        </div>
+
         <!-- Rect Test -->
         <div class="panel-section" id="sec-rect-test">
             <h3 onclick="toggleSection('sec-rect-test')">Rect Test</h3>
@@ -389,6 +441,9 @@
     <script type="module">
         const { default: boot } = await import("/static/web/boot.js");
         await boot();
+        if (window.cli && window.cli.Scene && window.cli.Scene.Engine) {
+            window.cli.Scene.Engine.resume();
+        }
     </script>
     <script>
         /* ── Helpers ── */
@@ -549,7 +604,7 @@
             const sel = document.getElementById('nodeList');
             sel.innerHTML = '<option value="">loading...</option>';
             try {
-                const root = await window.cli.Scene.Node.queryNode({
+                const root = await window.cli.Scene.Node.query({
                     path: '/', queryChildren: true, queryComponent: false
                 });
                 sel.innerHTML = '';
@@ -718,6 +773,334 @@
             }
         }
         window.refreshRectInfo = refreshRectInfo;
+
+        /* ── Preview ── */
+        function onPreviewTypeChange() {
+            var type = document.getElementById('previewType').value;
+            document.getElementById('previewUuidRow').style.display = type === 'scene' ? 'none' : 'flex';
+            document.getElementById('previewPrimitiveRow').style.display = type === 'material' ? 'flex' : 'none';
+        }
+        window.onPreviewTypeChange = onPreviewTypeChange;
+
+        function renderPreviewData(data) {
+            if (!data) {
+                log('Preview returned null/undefined', 'status-warn');
+                document.getElementById('previewStatus').textContent = 'no data';
+                return;
+            }
+            if (!data.buffer) {
+                log('Preview data has no buffer, keys: ' + Object.keys(data).join(','), 'status-warn');
+                document.getElementById('previewStatus').textContent = 'no buffer';
+                return;
+            }
+            var canvas = document.getElementById('previewCanvas');
+            var w = data.width;
+            var h = data.height;
+            log('Preview data: ' + w + 'x' + h + ' buffer.length=' + data.buffer.length, 'status-ok');
+            var nonZero = 0;
+            var buf = data.buffer;
+            for (var i = 0; i < Math.min(buf.length, 4000); i++) {
+                if (buf[i] !== 0) nonZero++;
+            }
+            log('Buffer check: nonZero in first 4000 bytes = ' + nonZero + ', type=' + (buf.constructor ? buf.constructor.name : typeof buf), 'status-ok');
+            // Dump first 5 pixels RGBA to diagnose color/alpha issues
+            var pixelSamples = [];
+            for (var p = 0; p < 5 && p * 4 + 3 < buf.length; p++) {
+                var off = p * 4;
+                pixelSamples.push('px' + p + '=(' + buf[off] + ',' + buf[off+1] + ',' + buf[off+2] + ',' + buf[off+3] + ')');
+            }
+            // Also sample center pixel
+            var cx = Math.floor(w / 2), cy = Math.floor(h / 2);
+            var coff = (cy * w + cx) * 4;
+            if (coff + 3 < buf.length) {
+                pixelSamples.push('center=(' + buf[coff] + ',' + buf[coff+1] + ',' + buf[coff+2] + ',' + buf[coff+3] + ')');
+            }
+            log('Pixel samples: ' + pixelSamples.join(' '), 'status-ok');
+            if (w <= 0 || h <= 0) {
+                log('Preview data has zero dimensions', 'status-warn');
+                document.getElementById('previewStatus').textContent = 'zero size';
+                return;
+            }
+            canvas.width = w;
+            canvas.height = h;
+            var ctx = canvas.getContext('2d');
+            var imgData = ctx.createImageData(w, h);
+            var buf = data.buffer;
+            for (var i = 0; i < buf.length && i < imgData.data.length; i++) {
+                imgData.data[i] = buf[i];
+            }
+            ctx.putImageData(imgData, 0, 0);
+            // Verify canvas actually has data
+            var readback = ctx.getImageData(0, 0, Math.min(w, 4), 1).data;
+            var rbSamples = [];
+            for (var ri = 0; ri < readback.length; ri += 4) {
+                rbSamples.push('(' + readback[ri] + ',' + readback[ri+1] + ',' + readback[ri+2] + ',' + readback[ri+3] + ')');
+            }
+            log('Canvas readback: ' + rbSamples.join(' '), 'status-ok');
+            document.getElementById('previewStatus').textContent = w + 'x' + h + ' ok';
+            log('Preview rendered ' + w + 'x' + h, 'status-ok');
+        }
+
+        async function doPreview() {
+            if (!window.cli || !window.cli.Scene) {
+                log('cli.Scene not ready', 'status-warn');
+                return;
+            }
+            var preview;
+            try {
+                preview = window.cli.Scene.Preview;
+            } catch(e) {
+                log('Preview service not registered: ' + e.message, 'status-err');
+                return;
+            }
+            if (!preview) {
+                log('Preview service is null', 'status-warn');
+                return;
+            }
+            var type = document.getElementById('previewType').value;
+            var uuid = document.getElementById('previewUuid').value.trim();
+            var w = parseInt(document.getElementById('previewW').value) || 256;
+            var h = parseInt(document.getElementById('previewH').value) || 256;
+            var status = document.getElementById('previewStatus');
+            status.textContent = 'loading...';
+            status.className = 'info-text status-warn';
+            log('Preview: type=' + type + ' uuid=' + uuid + ' size=' + w + 'x' + h, 'status-ok');
+            try {
+                var preview = window.cli.Scene.Preview;
+                var data;
+                switch (type) {
+                    case 'scene':
+                        data = await preview.queryScenePreview(w, h);
+                        break;
+                    case 'material':
+                        if (!uuid) { log('UUID required', 'status-warn'); status.textContent = 'need uuid'; return; }
+                        data = await preview.queryMaterialPreview(uuid, w, h);
+                        break;
+                    case 'model':
+                        if (!uuid) { log('UUID required', 'status-warn'); status.textContent = 'need uuid'; return; }
+                        data = await preview.queryModelPreview(uuid, w, h);
+                        break;
+                    case 'mesh':
+                        if (!uuid) { log('UUID required', 'status-warn'); status.textContent = 'need uuid'; return; }
+                        data = await preview.queryMeshPreview(uuid, w, h);
+                        break;
+                    case 'skeleton':
+                        if (!uuid) { log('UUID required', 'status-warn'); status.textContent = 'need uuid'; return; }
+                        data = await preview.querySkeletonPreview(uuid, w, h);
+                        break;
+                    case 'prefab':
+                        if (!uuid) { log('UUID required', 'status-warn'); status.textContent = 'need uuid'; return; }
+                        data = await preview.queryPrefabPreview(uuid, w, h);
+                        break;
+                    case 'spine':
+                        if (!uuid) { log('UUID required', 'status-warn'); status.textContent = 'need uuid'; return; }
+                        data = await preview.querySpinePreview(uuid, w, h);
+                        break;
+                }
+                renderPreviewData(data);
+                status.className = 'info-text status-ok';
+            } catch (e) {
+                status.textContent = 'error';
+                status.className = 'info-text status-err';
+                log('Preview error: ' + e.message, 'status-err');
+                console.error('Preview error:', e);
+            }
+        }
+        window.doPreview = doPreview;
+
+        async function doThumbnail() {
+            if (!window.cli || !window.cli.Scene || !window.cli.Scene.Preview) {
+                log('Preview service not ready', 'status-warn');
+                return;
+            }
+            var type = document.getElementById('previewType').value;
+            var uuid = document.getElementById('previewUuid').value.trim();
+            var w = parseInt(document.getElementById('previewW').value) || 128;
+            var h = parseInt(document.getElementById('previewH').value) || 128;
+            if (type === 'scene') { log('Thumbnail not supported for scene', 'status-warn'); return; }
+            if (!uuid) { log('UUID required', 'status-warn'); return; }
+            var assetTypeMap = {
+                material: 'cc.Material',
+                model: 'cc.Prefab',
+                mesh: 'cc.Mesh',
+                skeleton: 'cc.Skeleton',
+                prefab: 'cc.Prefab',
+                spine: 'sp.SkeletonData',
+            };
+            var status = document.getElementById('previewStatus');
+            status.textContent = 'generating...';
+            try {
+                var data = await window.cli.Scene.Preview.generateThumbnail(uuid, assetTypeMap[type], w, h);
+                renderPreviewData(data);
+                status.textContent = w + 'x' + h + ' thumb ok';
+                status.className = 'info-text status-ok';
+            } catch (e) {
+                status.textContent = 'error';
+                status.className = 'info-text status-err';
+                log('Thumbnail error: ' + e.message, 'status-err');
+            }
+        }
+        window.doThumbnail = doThumbnail;
+
+        function doSwitchPrimitive() {
+            var type = document.getElementById('previewPrimitive').value;
+            safeCall('Preview', 'switchMaterialPrimitive', type);
+        }
+        window.doSwitchPrimitive = doSwitchPrimitive;
+
+        async function doTestRender() {
+            try {
+                var preview = window.cli.Scene.Preview;
+                var mp = preview.materialPreview;
+                if (!mp) { log('materialPreview is null', 'status-err'); return; }
+
+                var buf = mp.previewBuffer;
+                var root = cc.director.root;
+                var rootScenes = root.scenes || [];
+                var sceneInRoot = false;
+                for (var i = 0; i < rootScenes.length; i++) {
+                    if (rootScenes[i] === buf.renderScene) sceneInRoot = true;
+                }
+                log('Root scenes: ' + rootScenes.length + ', previewScene in root: ' + sceneInRoot, 'status-ok');
+
+                // Check pipeline type
+                var pipeline = root.pipeline;
+                var pipelineType = pipeline ? (pipeline.constructor.name || typeof pipeline) : 'null';
+                log('Pipeline: ' + pipelineType, 'status-ok');
+
+                // Check camera details
+                var cam = mp.cameraComp;
+                if (cam) {
+                    var pos = cam.node.worldPosition;
+                    var internalCam = cam.camera;
+                    log('Camera pos: ' + pos.x.toFixed(1) + ',' + pos.y.toFixed(1) + ',' + pos.z.toFixed(1), 'status-ok');
+                    log('Internal cam: enabled=' + internalCam.isEnable + ' scene=' + !!internalCam.scene + ' window=' + !!internalCam.window, 'status-ok');
+                    log('Cam.window === buf.window: ' + (internalCam.window === buf.window), 'status-ok');
+                }
+
+                // Test 1: copy from main window to see if copyTextureToBuffers works at all
+                var mainWin = root.mainWindow;
+                if (mainWin && mainWin.framebuffer && mainWin.framebuffer.colorTextures && mainWin.framebuffer.colorTextures.length > 0) {
+                    var mainTex = mainWin.framebuffer.colorTextures[0];
+                    var testBuf = new Uint8Array(100 * 100 * 4);
+                    var regions = [new cc.gfx.BufferTextureCopy()];
+                    regions[0].texExtent.width = 100;
+                    regions[0].texExtent.height = 100;
+                    try {
+                        root.device.copyTextureToBuffers(mainTex, [testBuf], regions);
+                        var mainNonZero = 0;
+                        for (var i = 0; i < testBuf.length; i++) { if (testBuf[i] !== 0) mainNonZero++; }
+                        log('MainWindow copy test: nonZero=' + mainNonZero + '/' + testBuf.length, mainNonZero > 0 ? 'status-ok' : 'status-err');
+                    } catch (e) {
+                        log('MainWindow copy test FAILED: ' + e.message, 'status-err');
+                    }
+                } else {
+                    log('MainWindow has no framebuffer/colorTextures', 'status-warn');
+                }
+
+                // Test 2: check renderScene cameras
+                if (buf.renderScene) {
+                    var rsCameras = buf.renderScene.cameras || [];
+                    log('RenderScene cameras: ' + rsCameras.length, 'status-ok');
+                    for (var i = 0; i < rsCameras.length; i++) {
+                        var rsc = rsCameras[i];
+                        log('  cam[' + i + ']: enabled=' + rsc.isEnable + ' window=' + (rsc.window === buf.window) + ' visibility=' + rsc.visibility, 'status-ok');
+                    }
+                }
+
+                // Test 3: call queryPreviewData
+                log('Calling queryPreviewData...', 'status-ok');
+                var data = await mp.queryPreviewData({ width: 256, height: 256 });
+                renderPreviewData(data);
+            } catch (e) {
+                log('TestRender error: ' + e.message, 'status-err');
+                console.error(e);
+            }
+        }
+        window.doTestRender = doTestRender;
+
+        function doPreviewDebug() {
+            try {
+                var preview = window.cli.Scene.Preview;
+                log('=== Preview Debug ===', 'status-ok');
+                log('initialized: ' + preview._initialized, 'status-ok');
+                log('previewMap keys: ' + Array.from(preview._previewMap.keys()).join(', '), 'status-ok');
+
+                // Check effect system
+                var effectCount = 0;
+                try {
+                    var effectAsset = cc.EffectAsset;
+                    if (effectAsset && effectAsset.getAll) {
+                        var allEffects = effectAsset.getAll();
+                        effectCount = Object.keys(allEffects).length;
+                    } else if (effectAsset && effectAsset._effects) {
+                        effectCount = Object.keys(effectAsset._effects).length;
+                    }
+                } catch(e) {}
+                log('Effects loaded: ' + effectCount, effectCount > 0 ? 'status-ok' : 'status-err');
+
+                // Check builtin assets
+                try {
+                    var effects = cc.EffectAsset.getAll ? cc.EffectAsset.getAll() : (cc.EffectAsset._effects || {});
+                    var names = Object.values(effects).map(function(e) { return e.name; }).sort();
+                    log('All effects (' + names.length + '): ' + names.join(', '), 'status-ok');
+                    var builtinStd = names.some(function(n) { return n && n.indexOf('standard') >= 0; });
+                    log('Any "standard" effect: ' + builtinStd, builtinStd ? 'status-ok' : 'status-err');
+                } catch(e) { log('Cannot read effects: ' + e.message, 'status-err'); }
+
+                // Check internal bundle
+                var internalBundle = cc.assetManager.getBundle('internal');
+                log('internal bundle: ' + (internalBundle ? 'loaded' : 'NOT LOADED'), internalBundle ? 'status-ok' : 'status-err');
+                var mainBundle = cc.assetManager.getBundle('main');
+                log('main bundle: ' + (mainBundle ? 'loaded' : 'NOT LOADED'), mainBundle ? 'status-ok' : 'status-err');
+
+                // Check material preview meshComp
+                var mp = preview.materialPreview;
+                if (mp && mp.meshComp) {
+                    var mat = mp.meshComp.material;
+                    log('MeshRenderer material: ' + (mat ? (mat.name || mat.effectName || 'unnamed') : 'NULL'), mat ? 'status-ok' : 'status-err');
+                    if (mat && mat.effectAsset) {
+                        log('Effect asset: ' + mat.effectAsset.name, 'status-ok');
+                    } else if (mat) {
+                        log('Effect asset: NULL (error shader)', 'status-err');
+                    }
+                }
+
+                var previews = {
+                    material: preview.materialPreview,
+                    model: preview.modelPreview,
+                    mesh: preview.meshPreview,
+                    skeleton: preview.skeletonPreview,
+                    prefab: preview.prefabPreview,
+                    scene: preview.scenePreview,
+                };
+                Object.keys(previews).forEach(function(name) {
+                    var p = previews[name];
+                    if (!p) { log(name + ': null', 'status-err'); return; }
+                    var buf = p.previewBuffer;
+                    var info = name + ': ';
+                    if (!buf) { log(info + 'no previewBuffer', 'status-err'); return; }
+                    info += 'renderScene=' + (buf.renderScene ? 'yes' : 'NO');
+                    info += ' window=' + (buf.window ? 'yes' : 'NO');
+                    info += ' size=' + buf.width + 'x' + buf.height;
+                    if (buf.window) {
+                        info += ' winCams=' + (buf.window.cameras ? buf.window.cameras.length : '?');
+                    }
+                    var hasScene = p.scene || p._scene;
+                    info += ' scene=' + (hasScene ? 'yes' : 'NO');
+                    if (p.cameraComp) {
+                        info += ' cam=yes enabled=' + p.cameraComp.enabled;
+                    } else {
+                        info += ' cam=NO';
+                    }
+                    log(info, buf.renderScene && buf.window ? 'status-ok' : 'status-warn');
+                });
+            } catch(e) {
+                log('Debug error: ' + e.message, 'status-err');
+                console.error('Preview debug error:', e);
+            }
+        }
+        window.doPreviewDebug = doPreviewDebug;
 
         /* ── Init Panel ── */
         async function initPanel() {

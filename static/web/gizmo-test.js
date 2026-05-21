@@ -77,7 +77,7 @@ async function scanGizmoComponents() {
     }
 
     try {
-        const root = await window.cli.Scene.Node.queryNode({
+        const root = await window.cli.Scene.Node.query({
             path: '/',
             queryChildren: true,
             queryComponent: true,

@@ -25,6 +25,8 @@ import {
     IGizmoService,
     IPublicSceneViewService,
     ISceneViewService,
+    IPublicPreviewService,
+    IPreviewService,
 } from '../../common';
 
 /**
@@ -44,6 +46,7 @@ export interface IPublicServiceManager {
     Camera: IPublicCameraService,
     Gizmo: IPublicGizmoService,
     SceneView: IPublicSceneViewService,
+    Preview: IPublicPreviewService,
 }
 
 export interface IServiceManager {
@@ -60,4 +63,5 @@ export interface IServiceManager {
     Camera: ICameraService,
     Gizmo: IGizmoService,
     SceneView: ISceneViewService,
+    Preview: IPreviewService,
 }

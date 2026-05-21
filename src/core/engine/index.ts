@@ -466,6 +466,8 @@ class EngineManager implements IEngine {
                 rendering: {
                     renderMode: 2,
                     highQualityMode: highQuality,
+                    customPipeline: true,
+                    effectSettingsPath: `${serverURL}/scripting/effect-settings`,
                 },
                 physics: {
                     ...physicsConfig,
