@@ -62,12 +62,17 @@ export async function startup(options: {
         }
     }
 
-    // Get decodeCCONBinary for CCONB binary format support (.bin library files)
-    let decodeCCONBinary: ((bytes: Uint8Array) => any) | null = null;
-    try {
-        const cconModule: any = await System.import('cc/editor/serialization');
-        decodeCCONBinary = cconModule?.decodeCCONBinary ?? null;
-    } catch { /* module may not be available */ }
+    let _decodeCCONBinaryCached = false;
+    let _decodeCCONBinary: ((bytes: Uint8Array) => any) | null = null;
+    async function getDecodeCCONBinary(): Promise<((bytes: Uint8Array) => any) | null> {
+        if (_decodeCCONBinaryCached) return _decodeCCONBinary;
+        try {
+            const m: any = await System.import('cc/editor/serialization');
+            _decodeCCONBinary = m?.decodeCCONBinary ?? null;
+        } catch { _decodeCCONBinary = null; }
+        _decodeCCONBinaryCached = true;
+        return _decodeCCONBinary;
+    }
 
     // ---- hack creator 使用的一些 engine 参数
     await import('cc/polyfill/engine');
@@ -150,8 +155,9 @@ export async function startup(options: {
 
                     const isBinary = ext === 'bin';
                     let deserializeData: any;
-                    if (isBinary && decodeCCONBinary) {
-                        deserializeData = decodeCCONBinary(new Uint8Array(await r.arrayBuffer()));
+                    const decode = isBinary ? await getDecodeCCONBinary() : null;
+                    if (isBinary && decode) {
+                        deserializeData = decode(new Uint8Array(await r.arrayBuffer()));
                     } else {
                         deserializeData = await r.json();
                     }
@@ -280,8 +286,9 @@ export async function startup(options: {
             let deserializeInput: any;
             if (isBinary) {
                 const rawBytes = new Uint8Array(await res.arrayBuffer());
-                if (decodeCCONBinary) {
-                    deserializeInput = decodeCCONBinary(rawBytes);
+                const decode = await getDecodeCCONBinary();
+                if (decode) {
+                    deserializeInput = decode(rawBytes);
                 } else {
                     console.warn(`[loadFromServer] decodeCCONBinary not available, cannot decode CCONB for ${uuid}`);
                     onComplete?.(new Error('decodeCCONBinary not available'), null);

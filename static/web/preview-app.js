@@ -1,12 +1,12 @@
 /* global window, document, cc */
 
 const PREVIEW_TYPES = {
-    material: { method: 'queryMaterialPreview', needsUuid: true, instance: 'materialPreview' },
-    model:    { method: 'queryModelPreview',    needsUuid: true, instance: 'modelPreview' },
-    mesh:     { method: 'queryMeshPreview',     needsUuid: true, instance: 'meshPreview' },
-    prefab:   { method: 'queryPrefabPreview',   needsUuid: true, instance: 'prefabPreview' },
-    skeleton: { method: 'querySkeletonPreview', needsUuid: true, instance: 'skeletonPreview' },
-    spine:    { method: 'querySpinePreview',    needsUuid: true, instance: 'spinePreview' },
+    material: { setup: 'setMaterialByUuid', instance: 'materialPreview' },
+    model:    { setup: 'setModel',          instance: 'modelPreview' },
+    mesh:     { setup: 'setMesh',           instance: 'meshPreview' },
+    prefab:   { setup: 'setPrefab',         instance: 'prefabPreview' },
+    skeleton: { setup: 'setSkeleton',       instance: 'skeletonPreview' },
+    spine:    { setup: 'setSpine',          instance: 'spinePreview' },
 };
 
 var _activePreviewInstance = null;
@@ -73,7 +73,7 @@ async function doPreview() {
         log('Unknown preview type: ' + type, 'err');
         return null;
     }
-    if (info.needsUuid && !uuid) {
+    if (!uuid) {
         log('UUID is required for ' + type + ' preview', 'warn');
         return null;
     }
@@ -87,11 +87,12 @@ async function doPreview() {
             _activePreviewInstance.cameraComp.enabled = false;
         }
 
-        // Load the asset into the preview instance (this calls setModel/setMesh/etc.)
-        var previewInstance = info.instance ? preview[info.instance] : null;
+        var previewInstance = preview[info.instance];
 
-        // Use the query method to trigger asset loading (setModel, setMesh, etc.)
-        await preview[info.method](uuid, 256, 256);
+        // Call the setup method directly (setModel, setMesh, etc.)
+        // This skips the offscreen render + gl.readPixels pipeline
+        // that queryPreviewData uses for thumbnail generation.
+        await previewInstance[info.setup](uuid);
 
         _activePreviewInstance = previewInstance;
 
