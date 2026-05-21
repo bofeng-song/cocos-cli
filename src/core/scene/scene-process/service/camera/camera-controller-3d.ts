@@ -185,11 +185,6 @@ export class CameraController3D extends CameraControllerBase {
     get lineColor() { return this._lineColor; }
     set lineColor(value: Color) { this._lineColor = value; }
 
-    // 预分配临时变量，避免高频方法中反复 new 产生 GC 压力
-    private v3a = new Vec3();
-    private v3b = new Vec3();
-    private q1 = new Quat();
-
     public lastMouseWheelDeltaY = 0;
     public maxMouseWheelDeltaY = 1000;
 
