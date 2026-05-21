@@ -5366,6 +5366,8 @@ export declare interface IEditorService extends IServiceEvents {
 export declare interface IEngineService extends IServiceEvents {
     init(): Promise<void>;
     repaintInEditMode(): Promise<void>;
+    pause(): void;
+    resume(): void;
 }
 export declare interface IExecuteComponentMethodOptions {
     path: string;
@@ -5534,6 +5536,20 @@ export declare interface IPrefabStateInfo {
     isNested: boolean;
     assetUuid: string;
 }
+export declare interface IPreviewService {
+    init(): void;
+    queryPreviewData(previewName: string, info: any): Promise<any>;
+    callPreviewFunction(previewName: string, funcName: string, ...args: any[]): Promise<any>;
+    queryMaterialPreview(uuid: string, width: number, height: number): Promise<any>;
+    queryModelPreview(uuid: string, width: number, height: number): Promise<any>;
+    queryMeshPreview(uuid: string, width: number, height: number): Promise<any>;
+    querySkeletonPreview(uuid: string, width: number, height: number): Promise<any>;
+    queryPrefabPreview(uuid: string, width: number, height: number): Promise<any>;
+    querySpinePreview(uuid: string, width: number, height: number): Promise<any>;
+    queryScenePreview(width: number, height: number): Promise<any>;
+    switchMaterialPrimitive(type: string): void;
+    generateThumbnail(uuid: string, assetType: string, width?: number, height?: number): Promise<any>;
+}
 export declare interface IProperty {
     value: { [key: string]: IPropertyValueType } | IPropertyValueType;
     default?: any; 
@@ -5662,8 +5678,8 @@ export declare interface ISceneViewService {
     saveConfig(): Promise<void>;
     setSceneLightOn(enable: boolean): void;
     querySceneLightOn(): boolean;
-    onSceneOpened(scene: any): void;
-    onSceneClosed(): void;
+    onEditorOpened(): void;
+    onEditorClosed(): void;
     onComponentAdded(comp: Component): void;
     onComponentRemoved(comp: Component): void;
 }
@@ -5729,6 +5745,7 @@ export declare interface IServiceManager {
     Camera: ICameraService;
     Gizmo: IGizmoService;
     SceneView: ISceneViewService;
+    Preview: IPreviewService;
 }
 export declare interface ISetPropertyOptions {
     nodePath: string;
@@ -7279,6 +7296,8 @@ export declare interface IEngineProjectConfig extends Exclude<IEngineConfig, 'in
 export declare interface IEngineService extends IServiceEvents {
     init(): Promise<void>;
     repaintInEditMode(): Promise<void>;
+    pause(): void;
+    resume(): void;
 }
 export declare interface IExecuteComponentMethodOptions {
     path: string;
@@ -7535,6 +7554,20 @@ export declare interface IPrefabStateInfo {
     isNested: boolean;
     assetUuid: string;
 }
+export declare interface IPreviewService {
+    init(): void;
+    queryPreviewData(previewName: string, info: any): Promise<any>;
+    callPreviewFunction(previewName: string, funcName: string, ...args: any[]): Promise<any>;
+    queryMaterialPreview(uuid: string, width: number, height: number): Promise<any>;
+    queryModelPreview(uuid: string, width: number, height: number): Promise<any>;
+    queryMeshPreview(uuid: string, width: number, height: number): Promise<any>;
+    querySkeletonPreview(uuid: string, width: number, height: number): Promise<any>;
+    queryPrefabPreview(uuid: string, width: number, height: number): Promise<any>;
+    querySpinePreview(uuid: string, width: number, height: number): Promise<any>;
+    queryScenePreview(width: number, height: number): Promise<any>;
+    switchMaterialPrimitive(type: string): void;
+    generateThumbnail(uuid: string, assetType: string, width?: number, height?: number): Promise<any>;
+}
 export declare interface IProject {
     get path(): string;
     get type(): '2d' | '3d';
@@ -7676,8 +7709,8 @@ export declare interface ISceneViewService {
     saveConfig(): Promise<void>;
     setSceneLightOn(enable: boolean): void;
     querySceneLightOn(): boolean;
-    onSceneOpened(scene: any): void;
-    onSceneClosed(): void;
+    onEditorOpened(): void;
+    onEditorClosed(): void;
     onComponentAdded(comp: Component): void;
     onComponentRemoved(comp: Component): void;
 }
@@ -7743,6 +7776,7 @@ export declare interface IServiceManager {
     Camera: ICameraService;
     Gizmo: IGizmoService;
     SceneView: ISceneViewService;
+    Preview: IPreviewService;
 }
 export declare interface ISetPropertyOptions {
     nodePath: string;
