@@ -153,7 +153,6 @@ class PreviewBuffer extends EventEmitter {
     ];
 
     copyFrameBuffer(window: any = null) {
-        window || (window = this.window);
         if (!window || !window.framebuffer) { return this.renderData; }
 
         const destBuffer = new Uint8Array(this.renderData.buffer.buffer);

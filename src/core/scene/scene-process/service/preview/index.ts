@@ -43,14 +43,6 @@ export class PreviewService extends BaseService<IPreviewEvents> implements IPrev
         mgr.init(registerName, queryName);
     }
 
-    public async queryPreviewData(previewName: string, info: any) {
-        if (this._previewMap.has(previewName)) {
-            const preview = this._previewMap.get(previewName);
-            return await preview?.queryPreviewData(info);
-        }
-        return null;
-    }
-
     public async callPreviewFunction(previewName: string, funcName: string, ...args: any[]) {
         if (this._previewMap.has(previewName)) {
             const preview: any = this._previewMap.get(previewName);
@@ -63,37 +55,37 @@ export class PreviewService extends BaseService<IPreviewEvents> implements IPrev
 
     // --- 资源预览快捷方法 ---
 
-    public async queryMaterialPreview(uuid: string, width: number, height: number) {
+    async queryMaterialPreview(uuid: string, width: number, height: number) {
         await this.materialPreview.setMaterialByUuid(uuid);
         return await this.materialPreview.queryPreviewData({ width, height });
     }
 
-    public async queryModelPreview(uuid: string, width: number, height: number) {
+    async queryModelPreview(uuid: string, width: number, height: number) {
         await this.modelPreview.setModel(uuid);
         return await this.modelPreview.queryPreviewData({ width, height });
     }
 
-    public async queryMeshPreview(uuid: string, width: number, height: number) {
+    async queryMeshPreview(uuid: string, width: number, height: number) {
         await this.meshPreview.setMesh(uuid);
         return await this.meshPreview.queryPreviewData({ width, height });
     }
 
-    public async querySkeletonPreview(uuid: string, width: number, height: number) {
+    async querySkeletonPreview(uuid: string, width: number, height: number) {
         await this.skeletonPreview.setSkeleton(uuid);
         return await this.skeletonPreview.queryPreviewData({ width, height });
     }
 
-    public async queryPrefabPreview(uuid: string, width: number, height: number) {
+    async queryPrefabPreview(uuid: string, width: number, height: number) {
         await this.prefabPreview.setPrefab(uuid);
         return await this.prefabPreview.queryPreviewData({ width, height });
     }
 
-    public async querySpinePreview(uuid: string, width: number, height: number) {
+    async querySpinePreview(uuid: string, width: number, height: number) {
         await this.spinePreview.setSpine(uuid);
         return await this.spinePreview.queryPreviewData({ width, height });
     }
 
-    public async queryScenePreview(width: number, height: number) {
+    async queryScenePreview(width: number, height: number) {
         return await this.scenePreview.queryPreviewData({ width, height });
     }
 
