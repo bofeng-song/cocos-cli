@@ -193,6 +193,7 @@ export function encodeNode(node: Node): INode {
         }
     }
     data.__comps__.forEach((comp, index) => {
+        comp.path = `__comps__.${index}`;
         if (comp.value && typeof comp.value === 'object' && !Array.isArray(comp.value)) {
             for (const [key, prop] of Object.entries(comp.value as Record<string, unknown>)) {
                 if (prop && typeof prop === 'object' && !Array.isArray(prop) && 'type' in prop && 'value' in prop) {
@@ -214,10 +215,10 @@ export function encodeScene(scene: any): IScene {
 
     const data: IScene = {
         path: '/',
-        active: encodeObject(scene.active, { default: null }),
-        locked: encodeObject(false, { default: false }),
-        name: encodeObject(scene.name || ctor.name, { default: null }),
-        uuid: encodeObject(scene.uuid, { default: null }),
+        active: encodeObject(scene.active, { default: null, displayName: 'Active' }),
+        locked: encodeObject(false, { default: false, displayName: 'Locked' }),
+        name: encodeObject(scene.name || ctor.name, { default: null, displayName: 'Name' }),
+        uuid: encodeObject(scene.uuid, { default: null, displayName: 'UUID', visible: false }),
         autoReleaseAssets: encodeObject(scene.autoReleaseAssets, { displayName: 'Auto Release Assets', default: false }),
         children: scene.children
             .map((child: any) => {
@@ -347,8 +348,8 @@ export function encodeComponent(component: any): IComponent {
         if (component instanceof cc._MissingScript) {
             const compData = component['_$erialized'];
             let uuid = compData && compData['__type__'];
-            uuid = uuid && EditorExtends.UuidUtils.decompressUuid(component._$erialized.__type__);
-            scriptType.visible = !!(uuid && EditorExtends.UuidUtils.isUuid(uuid));
+            uuid = uuid && EditorExtends.UuidUtils.decompressUUID(component._$erialized.__type__);
+            scriptType.visible = !!(uuid && EditorExtends.UuidUtils.isUUID(uuid));
             scriptType.value = { uuid };
         } else {
             scriptType.visible = !!component.__scriptUuid;
