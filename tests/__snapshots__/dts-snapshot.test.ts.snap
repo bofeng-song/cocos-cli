@@ -5603,11 +5603,18 @@ export declare interface IPrefabStateInfo {
     isNested: boolean;
     assetUuid: string;
 }
+export declare interface IPreviewInstance {
+    onMouseDown(event: any): void;
+    onMouseMove(event: any): void;
+    onMouseUp(event: any): void;
+    onMouseWheel(event: any): void;
+    viewToggle(): void;
+    is2DView(): boolean;
+    resetCameraView(): void;
+    hide(): void;
+}
 export declare interface IPreviewService {
-    init(): void;
-    open(uuid: string): Promise<any>;
-    switchMaterialPrimitive(type: string): void;
-    switchLight(enabled: boolean): void;
+    open(uuid: string): Promise<IPreviewInstance | null>;
     generateThumbnail(uuid: string, assetType: string, width?: number, height?: number): Promise<any>;
 }
 export declare interface IProperty {
@@ -7699,11 +7706,18 @@ export declare interface IPrefabStateInfo {
     isNested: boolean;
     assetUuid: string;
 }
+export declare interface IPreviewInstance {
+    onMouseDown(event: any): void;
+    onMouseMove(event: any): void;
+    onMouseUp(event: any): void;
+    onMouseWheel(event: any): void;
+    viewToggle(): void;
+    is2DView(): boolean;
+    resetCameraView(): void;
+    hide(): void;
+}
 export declare interface IPreviewService {
-    init(): void;
-    open(uuid: string): Promise<any>;
-    switchMaterialPrimitive(type: string): void;
-    switchLight(enabled: boolean): void;
+    open(uuid: string): Promise<IPreviewInstance | null>;
     generateThumbnail(uuid: string, assetType: string, width?: number, height?: number): Promise<any>;
 }
 export declare interface IProject {

@@ -14,6 +14,11 @@ function getPreviewService() {
     }
 }
 
+function getActive() {
+    var preview = getPreviewService();
+    return preview && preview.activePreview;
+}
+
 // ── Preview execution ──
 
 async function doPreview() {
@@ -51,30 +56,28 @@ async function doPreview() {
 }
 
 function switchPrimitive(type) {
-    var preview = getPreviewService();
-    if (preview) {
-        preview.switchMaterialPrimitive(type);
+    var active = getActive();
+    if (active && active.switchPrimitive) {
+        active.switchPrimitive(type);
         window.cli.Scene.Engine.repaintInEditMode();
         log('Switched primitive: ' + type);
     }
 }
 
-var _lightOn = true;
-
 function toggleLight() {
-    var preview = getPreviewService();
-    if (!preview) return;
-    _lightOn = !_lightOn;
-    preview.switchLight(_lightOn);
-    log('Light: ' + (_lightOn ? 'ON' : 'OFF'));
+    var active = getActive();
+    if (!active || !active.setLightEnable) return;
+    var light = active.lightComp;
+    var on = light ? !light.enabled : true;
+    active.setLightEnable(on);
+    window.cli.Scene.Engine.repaintInEditMode();
+    log('Light: ' + (on ? 'ON' : 'OFF'));
 }
 
 function toggle2D3D() {
-    var preview = getPreviewService();
-    if (!preview) return;
-    var mp = preview.materialPreview;
-    if (mp && mp.viewToggle) {
-        mp.viewToggle();
+    var active = getActive();
+    if (active && active.viewToggle) {
+        active.viewToggle();
         window.cli.Scene.Engine.repaintInEditMode();
         log('Toggled 2D/3D view');
     }
@@ -83,11 +86,6 @@ function toggle2D3D() {
 // ── Mouse event forwarding to InteractivePreview ──
 
 function bindPreviewMouseEvents(canvas) {
-    function getActive() {
-        var preview = getPreviewService();
-        return preview && preview.activePreview;
-    }
-
     canvas.addEventListener('mousedown', function(e) {
         var active = getActive();
         if (active) active.onMouseDown(e);

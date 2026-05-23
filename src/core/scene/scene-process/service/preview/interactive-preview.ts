@@ -5,6 +5,7 @@ import { PreviewWorldAxis } from './preview-axis';
 import { Grid } from './grid';
 import { smoothMouseWheelScale } from '../camera/camera-controller-3d';
 import { Service } from '../core/decorator';
+import type { IPreviewInstance } from '../../../common/preview';
 
 const tempVec3A = new Vec3();
 const tempVec3B = new Vec3();
@@ -53,7 +54,7 @@ function makeVec3InRange(v: Vec3, min: number, max: number) {
     v.z = Math.max(min, Math.min(max, v.z));
 }
 
-class InteractivePreview extends PreviewBase {
+class InteractivePreview extends PreviewBase implements IPreviewInstance {
     protected scene!: Scene;
     protected cameraComp!: Camera;
     protected camera: renderer.scene.Camera | any;
@@ -537,6 +538,9 @@ class InteractivePreview extends PreviewBase {
 
     public hide() {
         this.cameraComp.enabled = false;
+    }
+
+    public resetCameraView() {
     }
 }
 

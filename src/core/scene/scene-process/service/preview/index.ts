@@ -10,7 +10,7 @@ import { SpinePreview } from './spine-preview';
 import { BaseService, register, Service } from '../core';
 import { Rpc } from '../../rpc';
 import type { InteractivePreview } from './interactive-preview';
-import type { IPreviewService, IPreviewEvents } from '../../../common/preview';
+import type { IPreviewService, IPreviewEvents, IPreviewInstance } from '../../../common/preview';
 
 interface PreviewTypeEntry {
     instance: PreviewBase;
@@ -22,7 +22,7 @@ export class PreviewService extends BaseService<IPreviewEvents> implements IPrev
     private _previewMap: Map<string, PreviewBase> = new Map();
     private _typeMap: Map<string, PreviewTypeEntry> = new Map();
     private _initialized = false;
-    private _activePreview: PreviewBase | null = null;
+    private _activePreview: IPreviewInstance | null = null;
 
     scenePreview = scenePreview;
     materialPreview = new MaterialPreview();
@@ -33,7 +33,7 @@ export class PreviewService extends BaseService<IPreviewEvents> implements IPrev
     prefabPreview = new PrefabPreview();
     spinePreview = new SpinePreview();
 
-    get activePreview(): PreviewBase | null {
+    get activePreview(): IPreviewInstance | null {
         return this._activePreview;
     }
 
@@ -109,7 +109,7 @@ export class PreviewService extends BaseService<IPreviewEvents> implements IPrev
 
     // --- 上屏预览 ---
 
-    async open(uuid: string): Promise<any> {
+    async open(uuid: string): Promise<IPreviewInstance | null> {
         const assetType = await this.resolveAssetType(uuid);
         if (!assetType) {
             console.warn(`[Preview] Cannot resolve asset type for uuid: ${uuid}`);
@@ -132,13 +132,13 @@ export class PreviewService extends BaseService<IPreviewEvents> implements IPrev
 
         // 设置资源
         await (entry.instance as any)[entry.setup](uuid);
-        this._activePreview = entry.instance;
+        this._activePreview = entry.instance as unknown as IPreviewInstance;
 
         // 将相机挂到 mainWindow 上屏渲染
         this.attachToMainWindow(entry.instance as InteractivePreview);
         Service.Engine.repaintInEditMode();
 
-        return entry.instance;
+        return this._activePreview;
     }
 
     private attachToMainWindow(previewInstance: InteractivePreview) {
@@ -164,15 +164,6 @@ export class PreviewService extends BaseService<IPreviewEvents> implements IPrev
                 inst.worldAxis.show();
             }
         }
-    }
-
-    public switchMaterialPrimitive(type: string) {
-        this.materialPreview.switchPrimitive(type);
-    }
-
-    public switchLight(enabled: boolean) {
-        this.materialPreview.setLightEnable(enabled);
-        Service.Engine.repaintInEditMode();
     }
 
     // --- 缩略图生成 ---

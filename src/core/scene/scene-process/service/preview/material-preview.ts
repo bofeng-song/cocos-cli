@@ -80,7 +80,9 @@ function getPrimitiveData(): Record<string, IPrimitiveInfo> {
 const tempVec3A = new Vec3();
 const tempVec3B = new Vec3();
 
-export class MaterialPreview extends InteractivePreview {
+import type { IMaterialPreviewInstance } from '../../../common/preview';
+
+export class MaterialPreview extends InteractivePreview implements IMaterialPreviewInstance {
     private lightComp!: DirectionalLight;
     private modelComp!: MeshRenderer;
     private currentPrimitive = 'sphere';

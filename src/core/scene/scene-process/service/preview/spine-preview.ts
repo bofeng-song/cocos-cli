@@ -1,8 +1,9 @@
 import { InteractivePreview, getBoundaryOfMeshNodes } from './interactive-preview';
 import { Scene, Node, assetManager, DirectionalLight, Canvas } from 'cc';
 import { Service } from '../core/decorator';
+import type { ISpinePreviewInstance } from '../../../common/preview';
 
-export class SpinePreview extends InteractivePreview {
+export class SpinePreview extends InteractivePreview implements ISpinePreviewInstance {
     protected is2D = true;
     protected enableViewToggle = false;
     protected orthoScale = 0.6;
