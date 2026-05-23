@@ -7,13 +7,22 @@ import { MeshPreview } from './mesh-preview';
 import { SkeletonPreview } from './skeleton-preview';
 import { PrefabPreview } from './prefab-preview';
 import { SpinePreview } from './spine-preview';
-import { BaseService, register } from '../core';
+import { BaseService, register, Service } from '../core';
+import { Rpc } from '../../rpc';
+import type { InteractivePreview } from './interactive-preview';
 import type { IPreviewService, IPreviewEvents } from '../../../common/preview';
+
+interface PreviewTypeEntry {
+    instance: PreviewBase;
+    setup: string;
+}
 
 @register('Preview')
 export class PreviewService extends BaseService<IPreviewEvents> implements IPreviewService {
     private _previewMap: Map<string, PreviewBase> = new Map();
+    private _typeMap: Map<string, PreviewTypeEntry> = new Map();
     private _initialized = false;
+    private _activePreview: PreviewBase | null = null;
 
     scenePreview = scenePreview;
     materialPreview = new MaterialPreview();
@@ -23,6 +32,10 @@ export class PreviewService extends BaseService<IPreviewEvents> implements IPrev
     skeletonPreview = new SkeletonPreview();
     prefabPreview = new PrefabPreview();
     spinePreview = new SpinePreview();
+
+    get activePreview(): PreviewBase | null {
+        return this._activePreview;
+    }
 
     init() {
         if (this._initialized) return;
@@ -35,7 +48,48 @@ export class PreviewService extends BaseService<IPreviewEvents> implements IPrev
         this.initPreview('scene:skeleton-preview', 'query-skeleton-preview-data', this.skeletonPreview);
         this.initPreview('scene:prefab-preview', 'query-prefab-preview-data', this.prefabPreview);
         this.initPreview('scene:spine-preview', 'query-spine-preview-data', this.spinePreview);
+        this.initTypeMap();
         console.log('[Preview] PreviewService initialized');
+    }
+
+    private initTypeMap() {
+        const entries: [string[], PreviewTypeEntry][] = [
+            [['material', 'cc.Material'], { instance: this.materialPreview, setup: 'setMaterialByUuid' }],
+            [['model', 'cc.FBX', 'cc.GLTF', 'cc.ModelAsset'], { instance: this.modelPreview, setup: 'setModel' }],
+            [['mesh', 'cc.Mesh'], { instance: this.meshPreview, setup: 'setMesh' }],
+            [['prefab', 'cc.Prefab'], { instance: this.prefabPreview, setup: 'setPrefab' }],
+            [['skeleton', 'cc.Skeleton'], { instance: this.skeletonPreview, setup: 'setSkeleton' }],
+            [['spine', 'sp.SkeletonData'], { instance: this.spinePreview, setup: 'setSpine' }],
+        ];
+        for (const [keys, entry] of entries) {
+            for (const key of keys) {
+                this._typeMap.set(key, entry);
+            }
+        }
+    }
+
+    // importer name → preview type 的映射（用于 assetType 为 cc.Asset 等泛型的回退）
+    private static readonly IMPORTER_MAP: Record<string, string> = {
+        'gltf': 'model',
+        'fbx': 'model',
+        'spine-data': 'spine',
+    };
+
+    private resolvePreview(assetType: string): PreviewTypeEntry | null {
+        return this._typeMap.get(assetType) ?? null;
+    }
+
+    private async resolveAssetType(uuid: string): Promise<string | null> {
+        const info = await Rpc.getInstance().request('assetManager', 'queryAssetInfo', [uuid]);
+        if (!info) return null;
+        // 优先用 type 匹配；若 type 为泛型（如 cc.Asset），用 importer 回退
+        if (info.type && this._typeMap.has(info.type)) {
+            return info.type;
+        }
+        if (info.importer && PreviewService.IMPORTER_MAP[info.importer]) {
+            return PreviewService.IMPORTER_MAP[info.importer];
+        }
+        return info.type ?? null;
     }
 
     private initPreview(registerName: string, queryName: string, mgr: PreviewBase) {
@@ -53,67 +107,81 @@ export class PreviewService extends BaseService<IPreviewEvents> implements IPrev
         return false;
     }
 
-    // --- 资源预览快捷方法 ---
+    // --- 上屏预览 ---
 
-    async queryMaterialPreview(uuid: string, width: number, height: number) {
-        await this.materialPreview.setMaterialByUuid(uuid);
-        return await this.materialPreview.queryPreviewData({ width, height });
+    async open(uuid: string): Promise<any> {
+        const assetType = await this.resolveAssetType(uuid);
+        if (!assetType) {
+            console.warn(`[Preview] Cannot resolve asset type for uuid: ${uuid}`);
+            return null;
+        }
+
+        const entry = this.resolvePreview(assetType);
+        if (!entry) {
+            console.warn(`[Preview] Unsupported asset type: ${assetType}`);
+            return null;
+        }
+
+        // 清理上一个预览的相机
+        if (this._activePreview) {
+            const prev = this._activePreview as any;
+            if (prev.cameraComp) {
+                prev.cameraComp.enabled = false;
+            }
+        }
+
+        // 设置资源
+        await (entry.instance as any)[entry.setup](uuid);
+        this._activePreview = entry.instance;
+
+        // 将相机挂到 mainWindow 上屏渲染
+        this.attachToMainWindow(entry.instance as InteractivePreview);
+        Service.Engine.repaintInEditMode();
+
+        return entry.instance;
     }
 
-    async queryModelPreview(uuid: string, width: number, height: number) {
-        await this.modelPreview.setModel(uuid);
-        return await this.modelPreview.queryPreviewData({ width, height });
-    }
+    private attachToMainWindow(previewInstance: InteractivePreview) {
+        const inst = previewInstance as any;
+        if (!inst?.cameraComp) return;
 
-    async queryMeshPreview(uuid: string, width: number, height: number) {
-        await this.meshPreview.setMesh(uuid);
-        return await this.meshPreview.queryPreviewData({ width, height });
-    }
+        const mainWindow = cc.director.root.mainWindow;
+        const camera = inst.cameraComp.camera || inst.camera;
+        if (!camera || !mainWindow) return;
 
-    async querySkeletonPreview(uuid: string, width: number, height: number) {
-        await this.skeletonPreview.setSkeleton(uuid);
-        return await this.skeletonPreview.queryPreviewData({ width, height });
-    }
+        camera.changeTargetWindow(mainWindow);
+        camera.isWindowSize = true;
+        camera.enabled = true;
+        inst.cameraComp.enabled = true;
 
-    async queryPrefabPreview(uuid: string, width: number, height: number) {
-        await this.prefabPreview.setPrefab(uuid);
-        return await this.prefabPreview.queryPreviewData({ width, height });
-    }
+        if (inst.scene?.renderScene && !camera.scene) {
+            inst.scene.renderScene.addCamera(camera);
+        }
 
-    async querySpinePreview(uuid: string, width: number, height: number) {
-        await this.spinePreview.setSpine(uuid);
-        return await this.spinePreview.queryPreviewData({ width, height });
-    }
-
-    async queryScenePreview(width: number, height: number) {
-        return await this.scenePreview.queryPreviewData({ width, height });
+        if (inst.worldAxis) {
+            inst.worldAxis._sceneGizmoCamera.camera.changeTargetWindow(mainWindow);
+            if (inst.enableAxis) {
+                inst.worldAxis.show();
+            }
+        }
     }
 
     public switchMaterialPrimitive(type: string) {
         this.materialPreview.switchPrimitive(type);
     }
 
+    public switchLight(enabled: boolean) {
+        this.materialPreview.setLightEnable(enabled);
+        Service.Engine.repaintInEditMode();
+    }
+
     // --- 缩略图生成 ---
 
     public async generateThumbnail(uuid: string, assetType: string, width = 128, height = 128) {
-        switch (assetType) {
-            case 'cc.Material':
-                return await this.queryMaterialPreview(uuid, width, height);
-            case 'cc.Mesh':
-                return await this.queryMeshPreview(uuid, width, height);
-            case 'cc.Prefab':
-                return await this.queryPrefabPreview(uuid, width, height);
-            case 'cc.Skeleton':
-                return await this.querySkeletonPreview(uuid, width, height);
-            case 'sp.SkeletonData':
-                return await this.querySpinePreview(uuid, width, height);
-            default:
-                // 对于 fbx/gltf 等模型资源
-                if (['cc.FBX', 'cc.GLTF', 'cc.ModelAsset'].includes(assetType)) {
-                    return await this.queryModelPreview(uuid, width, height);
-                }
-                return null;
-        }
+        const entry = this.resolvePreview(assetType);
+        if (!entry) return null;
+        await (entry.instance as any)[entry.setup](uuid);
+        return await entry.instance.queryPreviewData({ width, height });
     }
 
     // --- Service 事件钩子 ---

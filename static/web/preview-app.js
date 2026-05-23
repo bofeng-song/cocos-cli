@@ -1,16 +1,5 @@
 /* global window, document, cc */
 
-const PREVIEW_TYPES = {
-    material: { setup: 'setMaterialByUuid', instance: 'materialPreview' },
-    model:    { setup: 'setModel',          instance: 'modelPreview' },
-    mesh:     { setup: 'setMesh',           instance: 'meshPreview' },
-    prefab:   { setup: 'setPrefab',         instance: 'prefabPreview' },
-    skeleton: { setup: 'setSkeleton',       instance: 'skeletonPreview' },
-    spine:    { setup: 'setSpine',          instance: 'spinePreview' },
-};
-
-var _activePreviewInstance = null;
-
 function log(msg, level) {
     if (level === 'err') console.error('[Preview]', msg);
     else if (level === 'warn') console.warn('[Preview]', msg);
@@ -25,36 +14,6 @@ function getPreviewService() {
     }
 }
 
-// ── Redirect preview camera to main window ──
-
-function attachToMainWindow(previewInstance) {
-    if (!previewInstance || !previewInstance.cameraComp) return;
-
-    var mainWindow = cc.director.root.mainWindow;
-    var camera = previewInstance.cameraComp.camera || previewInstance.camera;
-    if (!camera || !mainWindow) return;
-
-    camera.changeTargetWindow(mainWindow);
-    camera.isWindowSize = true;
-    camera.enabled = true;
-    previewInstance.cameraComp.enabled = true;
-
-    if (previewInstance.scene && previewInstance.scene.renderScene) {
-        if (!camera.scene) {
-            previewInstance.scene.renderScene.addCamera(camera);
-        }
-    }
-
-    if (previewInstance.worldAxis) {
-        previewInstance.worldAxis._sceneGizmoCamera.camera.changeTargetWindow(mainWindow);
-        if (previewInstance.enableAxis) {
-            previewInstance.worldAxis.show();
-        }
-    }
-
-    log('Attached preview camera to mainWindow');
-}
-
 // ── Preview execution ──
 
 async function doPreview() {
@@ -64,44 +23,25 @@ async function doPreview() {
         return null;
     }
 
-    var type = document.getElementById('pvType').value;
     var uuid = document.getElementById('pvUuid').value.trim();
     var status = document.getElementById('pvStatus');
 
-    var info = PREVIEW_TYPES[type];
-    if (!info) {
-        log('Unknown preview type: ' + type, 'err');
-        return null;
-    }
     if (!uuid) {
-        log('UUID is required for ' + type + ' preview', 'warn');
+        log('UUID is required', 'warn');
         return null;
     }
 
     status.textContent = 'Loading...';
-    log('Preview: type=' + type + ' uuid=' + uuid);
+    log('Preview: uuid=' + uuid);
 
     try {
-        // Detach previous preview from mainWindow
-        if (_activePreviewInstance && _activePreviewInstance.cameraComp) {
-            _activePreviewInstance.cameraComp.enabled = false;
+        var instance = await preview.open(uuid);
+        if (!instance) {
+            status.textContent = 'unsupported type';
+            return null;
         }
-
-        var previewInstance = preview[info.instance];
-
-        // Call the setup method directly (setModel, setMesh, etc.)
-        // This skips the offscreen render + gl.readPixels pipeline
-        // that queryPreviewData uses for thumbnail generation.
-        await previewInstance[info.setup](uuid);
-
-        _activePreviewInstance = previewInstance;
-
-        // Redirect the preview camera to render on the main canvas
-        attachToMainWindow(previewInstance);
-
-        window.cli.Scene.Engine.repaintInEditMode();
-        status.textContent = type + ' ok';
-        return null;
+        status.textContent = 'ok';
+        return instance;
     } catch (e) {
         log('Preview error: ' + e.message, 'err');
         status.textContent = 'error';
@@ -119,16 +59,14 @@ function switchPrimitive(type) {
     }
 }
 
+var _lightOn = true;
+
 function toggleLight() {
     var preview = getPreviewService();
     if (!preview) return;
-    var mp = preview.materialPreview;
-    if (mp && mp.lightComp) {
-        var on = !mp.lightComp.enabled;
-        mp.setLightEnable(on);
-        window.cli.Scene.Engine.repaintInEditMode();
-        log('Light: ' + (on ? 'ON' : 'OFF'));
-    }
+    _lightOn = !_lightOn;
+    preview.switchLight(_lightOn);
+    log('Light: ' + (_lightOn ? 'ON' : 'OFF'));
 }
 
 function toggle2D3D() {
@@ -137,7 +75,7 @@ function toggle2D3D() {
     var mp = preview.materialPreview;
     if (mp && mp.viewToggle) {
         mp.viewToggle();
-        attachToMainWindow(mp);
+        window.cli.Scene.Engine.repaintInEditMode();
         log('Toggled 2D/3D view');
     }
 }
@@ -145,28 +83,35 @@ function toggle2D3D() {
 // ── Mouse event forwarding to InteractivePreview ──
 
 function bindPreviewMouseEvents(canvas) {
+    function getActive() {
+        var preview = getPreviewService();
+        return preview && preview.activePreview;
+    }
+
     canvas.addEventListener('mousedown', function(e) {
-        if (!_activePreviewInstance) return;
-        _activePreviewInstance.onMouseDown(e);
+        var active = getActive();
+        if (active) active.onMouseDown(e);
     });
 
     canvas.addEventListener('mousemove', function(e) {
-        if (!_activePreviewInstance) return;
-        _activePreviewInstance.onMouseMove(e);
-        if (_activePreviewInstance._isMouseDown) {
+        var active = getActive();
+        if (!active) return;
+        active.onMouseMove(e);
+        if (active._isMouseDown) {
             window.cli.Scene.Engine.repaintInEditMode();
         }
     });
 
     canvas.addEventListener('mouseup', function(e) {
-        if (!_activePreviewInstance) return;
-        _activePreviewInstance.onMouseUp(e);
+        var active = getActive();
+        if (active) active.onMouseUp(e);
     });
 
     canvas.addEventListener('wheel', function(e) {
-        if (!_activePreviewInstance) return;
+        var active = getActive();
+        if (!active) return;
         e.preventDefault();
-        _activePreviewInstance.onMouseWheel({
+        active.onMouseWheel({
             wheelDeltaY: -e.deltaY,
         });
         window.cli.Scene.Engine.repaintInEditMode();
@@ -206,32 +151,23 @@ export default function initPreviewApp() {
 
     // Parse URL params for auto-preview
     var params = new URLSearchParams(window.location.search);
-    var type = params.get('type');
     var uuid = params.get('uuid');
 
-    if (type && PREVIEW_TYPES[type]) {
-        document.getElementById('pvType').value = type;
-    }
     if (uuid) {
         document.getElementById('pvUuid').value = uuid;
-    }
-
-    if (type && uuid) {
-        log('Auto-preview from URL params: type=' + type + ' uuid=' + uuid);
+        log('Auto-preview from URL params: uuid=' + uuid);
         setTimeout(function() { doPreview(); }, 100);
     }
 
     // Expose API for external automation
     window.previewAPI = {
         doPreview: doPreview,
-        preview: function(type, uuid) {
-            document.getElementById('pvType').value = type;
+        open: function(uuid) {
             document.getElementById('pvUuid').value = uuid || '';
             return doPreview();
         },
         switchPrimitive: switchPrimitive,
         toggleLight: toggleLight,
         toggle2D3D: toggle2D3D,
-        getPreviewTypes: function() { return Object.keys(PREVIEW_TYPES); },
     };
 }
