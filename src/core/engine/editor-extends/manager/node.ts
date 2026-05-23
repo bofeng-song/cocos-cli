@@ -122,6 +122,9 @@ export default class NodeManager extends EventEmitter {
     }
 
     getNodeByPath(path: string): Node | null {
+        if (path === '/') {
+            return cc.director.getScene() ?? null;
+        }
         const result = pathManager.getNodeResult(path);
         if (result.error === 'Ambiguous') {
             throw new Error(`The path "${path}" is ambiguous. Multiple nodes found with case-insensitive match.`);
@@ -140,6 +143,10 @@ export default class NodeManager extends EventEmitter {
     }
 
     getNodeUuidByPath(path: string): string | null {
+        if (path === '/') {
+            const scene = cc.director.getScene();
+            return scene ? scene.uuid : null;
+        }
         const uuid = pathManager.getNodeUuid(path);
         const node = uuid && this.getNode(uuid);
         return node ? node.uuid : null;
