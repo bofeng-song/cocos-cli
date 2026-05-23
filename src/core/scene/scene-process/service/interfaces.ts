@@ -27,6 +27,8 @@ import {
     ISceneViewService,
     IPublicPreviewService,
     IPreviewService,
+    IPublicUIService,
+    IUIService,
 } from '../../common';
 
 /**
@@ -47,6 +49,7 @@ export interface IPublicServiceManager {
     Gizmo: IPublicGizmoService,
     SceneView: IPublicSceneViewService,
     Preview: IPublicPreviewService,
+    UI: IPublicUIService,
 }
 
 export interface IServiceManager {
@@ -64,4 +67,5 @@ export interface IServiceManager {
     Gizmo: IGizmoService,
     SceneView: ISceneViewService,
     Preview: IPreviewService,
+    UI: IUIService,
 }

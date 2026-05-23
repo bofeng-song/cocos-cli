@@ -182,8 +182,6 @@ export class CameraController3D extends CameraControllerBase {
 
 
     private _lineColor = new Color(85, 85, 85, 255);
-    get lineColor() { return this._lineColor; }
-    set lineColor(value: Color) { this._lineColor = value; }
 
     public lastMouseWheelDeltaY = 0;
     public maxMouseWheelDeltaY = 1000;
@@ -202,6 +200,14 @@ export class CameraController3D extends CameraControllerBase {
     public altKey?: boolean;
     public mousePressing = false;
     public lastFocusNodeUUID: string[] = [];
+
+    public get lineColor() {
+        return this._lineColor;
+    }
+
+    public set lineColor(value: Color) {
+        this._lineColor = value;
+    }
 
     public get sceneViewCenter() {
         return this._sceneViewCenter;

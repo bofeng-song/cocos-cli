@@ -166,7 +166,10 @@ export declare interface CreateAssetOptions {
     userData?: Record<string, any>;
     customOptions?: Record<string, any>;
 }
-export declare function deleteAsset(dbPath: string): Promise<IAssetInfo | null>;
+export declare function deleteAsset(dbPath: string, options?: DeleteAssetOptions): Promise<IAssetInfo | null>;
+export declare interface DeleteAssetOptions {
+    useTrash?: boolean;
+}
 export declare interface DirectoryAssetUserData {
     isBundle?: boolean;
     bundleConfigID?: string;
@@ -300,6 +303,18 @@ export declare interface IAssetDBInfo extends AssetDBOptions_2 {
     visible: boolean;
     preImportExtList: string[];
 }
+export declare interface IAssetDeleteOptions extends IAssetOperationOptionsBase {
+    recursive?: boolean;
+    useTrash?: boolean;
+}
+export declare interface IAssetFileSystemProvider {
+    readFile?(path: string, encoding?: BufferEncoding): Promise<Buffer | string> | Buffer | string;
+    writeFile?(path: string, content: Buffer | string | Uint8Array, options?: IAssetWriteFileOptions): Promise<void> | void;
+    createDirectory?(path: string): Promise<void> | void;
+    delete?(path: string, options?: IAssetDeleteOptions): Promise<void> | void;
+    rename?(oldPath: string, newPath: string, options?: IAssetRenameOptions): Promise<void> | void;
+    copy?(sourcePath: string, destinationPath: string, options?: IAssetRenameOptions): Promise<void> | void;
+}
 export declare interface IAssetInfo {
     name: string; 
     source: string; 
@@ -346,6 +361,22 @@ export declare interface IAssetMeta<T extends ISupportCreateType | 'unknown' = '
     id?: string;
     name?: string;
 }
+export declare interface IAssetOperationContext {
+    opId: string;
+    kind: IAssetOperationKind;
+    origin: IAssetOperationOrigin;
+    source: string;
+    paths: string[];
+    timestamp: number;
+}
+export declare type IAssetOperationKind = 'write' | 'rename' | 'move' | 'copy' | 'delete';
+export declare interface IAssetOperationOptionsBase {
+    context?: IAssetOperationContext;
+}
+export declare type IAssetOperationOrigin = 'direct-op' | 'watcher';
+export declare interface IAssetRenameOptions extends IAssetOperationOptionsBase {
+    overwrite?: boolean;
+}
 export declare type IAssetType =
 | ISupportCreateCCType
 | 'cc.Asset'               
@@ -371,6 +402,10 @@ export declare type IAssetType =
 | 'dragonBones.DragonBonesAtlasAsset' 
 | 'RenderStage'            
 | 'RenderFlow';
+export declare interface IAssetWriteFileOptions extends IAssetOperationOptionsBase {
+    create?: boolean;
+    overwrite?: boolean;
+}
 export declare interface ICreateMenuInfo {
     label: string;
     name: string;
@@ -623,6 +658,7 @@ export declare interface RtSpriteFrameAssetUserData {
     height?: number;
 }
 export declare function saveAsset(pathOrUrlOrUUID: string, data: string | Buffer): Promise<IAssetInfo>;
+export declare function saveAssetMeta(uuid: string, meta: IAssetMeta): Promise<void>;
 export declare interface ScriptModuleUserData {
     isPlugin: false;
 }
@@ -634,6 +670,7 @@ export declare interface SerializedAssetFinder {
     materials?: Array<string | null>;
     scenes?: Array<string | null>;
 }
+export declare function setFileSystemProvider(provider: IAssetFileSystemProvider): void;
 export declare interface SimplifyOptions {
     targetRatio?: number;
     enableSmartLink?: boolean;
@@ -5266,6 +5303,18 @@ export declare interface IBaseIdentifier {
     assetUrl: string;
     assetType: string;
 }
+export declare interface ICameraConfig {
+    color: number[];
+    fov: number;
+    far: number;
+    near: number;
+    wheelSpeed: number;
+    wanderSpeed: number;
+    enableAcceleration: boolean;
+    aperture: number;
+    shutter: number;
+    iso: number;
+}
 export declare interface ICameraService {
     init(): void;
     initFromConfig(): Promise<void>;
@@ -5278,12 +5327,17 @@ export declare interface ICameraService {
     isGridVisible(): boolean;
     setCameraProperty(options: any): void;
     resetCameraProperty(): void;
+    queryConfig(): ICameraConfig;
+    updateConfig(config: Partial<ICameraConfig>): void;
     getCameraFov(): number;
     zoomUp(): void;
     zoomDown(): void;
     zoomReset(): void;
     alignNodeToSceneView(nodes: string[]): void;
     alignSceneViewToNode(nodes: string[]): void;
+    setGridColor(color: number[]): void;
+    setOriginAxes2D(config: IOriginAxesConfig): void;
+    setOriginAxes3D(config: IOriginAxesConfig): void;
     onUpdate(deltaTime: number): void;
 }
 export declare interface IChangeNodeOptions {
@@ -5412,8 +5466,16 @@ export declare interface IGizmoService {
     setIconGizmo3D(value: boolean): void;
     queryIconGizmoSize(): number;
     setIconGizmoSize(size: number): void;
+    queryGridColor(): number[];
+    setGridColor(color: number[]): void;
+    queryOriginAxes2D(): IOriginAxesConfig;
+    setOriginAxes2D(config: IOriginAxesConfig): void;
+    queryOriginAxes3D(): IOriginAxesConfig;
+    setOriginAxes3D(config: IOriginAxesConfig): void;
     queryTransformSnapConfigs(): any;
     setTransformSnapConfigs(name: string, value: any): void;
+    queryRectSnapConfig(): IRectSnapConfigData;
+    setRectSnapConfig(config: Partial<IRectSnapConfigData>): void;
     querySelectNodes(): any[];
     hasSelected(uuid: string): boolean;
     onResize(): void;
@@ -5509,6 +5571,11 @@ export declare interface IOperationService {
     exitPointerLock(): void;
     changePointer(type: string): void;
 }
+export declare interface IOriginAxesConfig {
+    x: boolean;
+    y: boolean;
+    z: boolean;
+}
 export declare interface IPrefab {
     uuid: string;
     fileId: string;
@@ -5538,15 +5605,6 @@ export declare interface IPrefabStateInfo {
 }
 export declare interface IPreviewService {
     init(): void;
-    queryPreviewData(previewName: string, info: any): Promise<any>;
-    callPreviewFunction(previewName: string, funcName: string, ...args: any[]): Promise<any>;
-    queryMaterialPreview(uuid: string, width: number, height: number): Promise<any>;
-    queryModelPreview(uuid: string, width: number, height: number): Promise<any>;
-    queryMeshPreview(uuid: string, width: number, height: number): Promise<any>;
-    querySkeletonPreview(uuid: string, width: number, height: number): Promise<any>;
-    queryPrefabPreview(uuid: string, width: number, height: number): Promise<any>;
-    querySpinePreview(uuid: string, width: number, height: number): Promise<any>;
-    queryScenePreview(width: number, height: number): Promise<any>;
     switchMaterialPrimitive(type: string): void;
     generateThumbnail(uuid: string, assetType: string, width?: number, height?: number): Promise<any>;
 }
@@ -5611,6 +5669,10 @@ export declare interface IQueryNodeParams {
 }
 export declare interface IQueryNodeTreeParams {
     path?: string;
+}
+export declare interface IRectSnapConfigData {
+    enableSnapping: boolean;
+    snapThreshold: number;
 }
 export declare interface IRedirectInfo {
     type: string;
@@ -5746,6 +5808,7 @@ export declare interface IServiceManager {
     Gizmo: IGizmoService;
     SceneView: ISceneViewService;
     Preview: IPreviewService;
+    UI: IUIService;
 }
 export declare interface ISetPropertyOptions {
     nodePath: string;
@@ -5776,6 +5839,10 @@ export declare interface ITargetOverrideInfo {
     propertyPath: string[];
     target: string;
     targetInfo?: string[];
+}
+export declare interface IUIService {
+    alignSelection(type: UIAlignType): void;
+    distributeSelection(type: UIAlignType): void;
 }
 export declare interface IUndoService {
     beginRecording(uuids: string[], options?: any): string;
@@ -6118,6 +6185,7 @@ export declare interface TextureCubeAssetUserData extends TextureBaseAssetUserDa
     bottom?: string;
 }
 export declare type TSceneTemplateType = typeof SCENE_TEMPLATE_TYPE[number];
+export declare type UIAlignType = 'top' | 'v-center' | 'bottom' | 'left' | 'h-center' | 'right';
 export declare interface Vec2 {
     x: number;
     y: number;
@@ -6546,6 +6614,7 @@ export declare interface AssetOperationOption {
 export declare namespace Assets {
     export {
         init,
+        setFileSystemProvider,
         start,
         onReady,
         onDBReady,
@@ -6554,6 +6623,7 @@ export declare namespace Assets {
         refresh,
         queryAssetInfo,
         queryAssetMeta,
+        saveAssetMeta,
         queryCreateMap,
         queryAssetInfos,
         queryAssetDBInfos,
@@ -6587,9 +6657,17 @@ export declare namespace Assets {
         QueryAssetType,
         FilterPluginOptions,
         IPluginScriptInfo,
+        IAssetDeleteOptions,
+        IAssetFileSystemProvider,
+        IAssetOperationContext,
+        IAssetOperationKind,
+        IAssetOperationOrigin,
+        IAssetRenameOptions,
+        IAssetWriteFileOptions,
         IAssetMeta,
         IAssetInfo,
         AssetOperationOption,
+        DeleteAssetOptions,
         AssetInfo,
         IRedirectInfo,
         QueryAssetsOption,
@@ -6740,7 +6818,10 @@ export declare interface CreateAssetOptions {
     userData?: Record<string, any>;
     customOptions?: Record<string, any>;
 }
-export declare function deleteAsset(dbPath: string): Promise<IAssetInfo | null>;
+export declare function deleteAsset(dbPath: string, options?: DeleteAssetOptions): Promise<IAssetInfo | null>;
+export declare interface DeleteAssetOptions {
+    useTrash?: boolean;
+}
 export declare interface DirectoryAssetUserData {
     isBundle?: boolean;
     bundleConfigID?: string;
@@ -6984,6 +7065,18 @@ export declare interface IAssetDBInfo extends AssetDBOptions {
     visible: boolean;
     preImportExtList: string[];
 }
+export declare interface IAssetDeleteOptions extends IAssetOperationOptionsBase {
+    recursive?: boolean;
+    useTrash?: boolean;
+}
+export declare interface IAssetFileSystemProvider {
+    readFile?(path: string, encoding?: BufferEncoding): Promise<Buffer | string> | Buffer | string;
+    writeFile?(path: string, content: Buffer | string | Uint8Array, options?: IAssetWriteFileOptions): Promise<void> | void;
+    createDirectory?(path: string): Promise<void> | void;
+    delete?(path: string, options?: IAssetDeleteOptions): Promise<void> | void;
+    rename?(oldPath: string, newPath: string, options?: IAssetRenameOptions): Promise<void> | void;
+    copy?(sourcePath: string, destinationPath: string, options?: IAssetRenameOptions): Promise<void> | void;
+}
 export declare interface IAssetInfo {
     name: string; 
     source: string; 
@@ -7030,6 +7123,22 @@ export declare interface IAssetMeta<T extends ISupportCreateType | 'unknown' = '
     id?: string;
     name?: string;
 }
+export declare interface IAssetOperationContext {
+    opId: string;
+    kind: IAssetOperationKind;
+    origin: IAssetOperationOrigin;
+    source: string;
+    paths: string[];
+    timestamp: number;
+}
+export declare type IAssetOperationKind = 'write' | 'rename' | 'move' | 'copy' | 'delete';
+export declare interface IAssetOperationOptionsBase {
+    context?: IAssetOperationContext;
+}
+export declare type IAssetOperationOrigin = 'direct-op' | 'watcher';
+export declare interface IAssetRenameOptions extends IAssetOperationOptionsBase {
+    overwrite?: boolean;
+}
 export declare interface IAssetService extends IServiceEvents {
     assetChanged(uuid: string): Promise<void>;
     assetDeleted(uuid: string): Promise<void>;
@@ -7059,6 +7168,10 @@ export declare type IAssetType =
 | 'dragonBones.DragonBonesAtlasAsset' 
 | 'RenderStage'            
 | 'RenderFlow';
+export declare interface IAssetWriteFileOptions extends IAssetOperationOptionsBase {
+    create?: boolean;
+    overwrite?: boolean;
+}
 export declare interface IBaseConfiguration extends EventEmitterMethods {
     moduleName: string;
     getDefaultConfig(): Record<string, any> | undefined;
@@ -7083,6 +7196,18 @@ export declare interface IBaseIdentifier {
     assetUrl: string;
     assetType: string;
 }
+export declare interface ICameraConfig {
+    color: number[];
+    fov: number;
+    far: number;
+    near: number;
+    wheelSpeed: number;
+    wanderSpeed: number;
+    enableAcceleration: boolean;
+    aperture: number;
+    shutter: number;
+    iso: number;
+}
 export declare interface ICameraService {
     init(): void;
     initFromConfig(): Promise<void>;
@@ -7095,12 +7220,17 @@ export declare interface ICameraService {
     isGridVisible(): boolean;
     setCameraProperty(options: any): void;
     resetCameraProperty(): void;
+    queryConfig(): ICameraConfig;
+    updateConfig(config: Partial<ICameraConfig>): void;
     getCameraFov(): number;
     zoomUp(): void;
     zoomDown(): void;
     zoomReset(): void;
     alignNodeToSceneView(nodes: string[]): void;
     alignSceneViewToNode(nodes: string[]): void;
+    setGridColor(color: number[]): void;
+    setOriginAxes2D(config: IOriginAxesConfig): void;
+    setOriginAxes3D(config: IOriginAxesConfig): void;
     onUpdate(deltaTime: number): void;
 }
 export declare interface IChangeNodeOptions {
@@ -7359,8 +7489,16 @@ export declare interface IGizmoService {
     setIconGizmo3D(value: boolean): void;
     queryIconGizmoSize(): number;
     setIconGizmoSize(size: number): void;
+    queryGridColor(): number[];
+    setGridColor(color: number[]): void;
+    queryOriginAxes2D(): IOriginAxesConfig;
+    setOriginAxes2D(config: IOriginAxesConfig): void;
+    queryOriginAxes3D(): IOriginAxesConfig;
+    setOriginAxes3D(config: IOriginAxesConfig): void;
     queryTransformSnapConfigs(): any;
     setTransformSnapConfigs(name: string, value: any): void;
+    queryRectSnapConfig(): IRectSnapConfigData;
+    setRectSnapConfig(config: Partial<IRectSnapConfigData>): void;
     querySelectNodes(): any[];
     hasSelected(uuid: string): boolean;
     onResize(): void;
@@ -7500,6 +7638,11 @@ export declare interface IOperationService {
     exitPointerLock(): void;
     changePointer(type: string): void;
 }
+export declare interface IOriginAxesConfig {
+    x: boolean;
+    y: boolean;
+    z: boolean;
+}
 export declare interface IPhysicsConfig {
     gravity: IVec3Like; 
     allowSleep: boolean; 
@@ -7556,15 +7699,6 @@ export declare interface IPrefabStateInfo {
 }
 export declare interface IPreviewService {
     init(): void;
-    queryPreviewData(previewName: string, info: any): Promise<any>;
-    callPreviewFunction(previewName: string, funcName: string, ...args: any[]): Promise<any>;
-    queryMaterialPreview(uuid: string, width: number, height: number): Promise<any>;
-    queryModelPreview(uuid: string, width: number, height: number): Promise<any>;
-    queryMeshPreview(uuid: string, width: number, height: number): Promise<any>;
-    querySkeletonPreview(uuid: string, width: number, height: number): Promise<any>;
-    queryPrefabPreview(uuid: string, width: number, height: number): Promise<any>;
-    querySpinePreview(uuid: string, width: number, height: number): Promise<any>;
-    queryScenePreview(width: number, height: number): Promise<any>;
     switchMaterialPrimitive(type: string): void;
     generateThumbnail(uuid: string, assetType: string, width?: number, height?: number): Promise<any>;
 }
@@ -7642,6 +7776,10 @@ export declare interface IQueryNodeParams {
 }
 export declare interface IQueryNodeTreeParams {
     path?: string;
+}
+export declare interface IRectSnapConfigData {
+    enableSnapping: boolean;
+    snapThreshold: number;
 }
 export declare interface IRedirectInfo {
     type: string;
@@ -7777,6 +7915,7 @@ export declare interface IServiceManager {
     Gizmo: IGizmoService;
     SceneView: ISceneViewService;
     Preview: IPreviewService;
+    UI: IUIService;
 }
 export declare interface ISetPropertyOptions {
     nodePath: string;
@@ -7854,6 +7993,10 @@ export declare interface IUerDataConfigItem {
             value: string;
         }>;
     };
+}
+export declare interface IUIService {
+    alignSelection(type: UIAlignType): void;
+    distributeSelection(type: UIAlignType): void;
 }
 export declare interface IUndoService {
     beginRecording(uuids: string[], options?: any): string;
@@ -8268,6 +8411,7 @@ export declare interface RtSpriteFrameAssetUserData {
 }
 export declare function save(force?: boolean): Promise<void>;
 export declare function saveAsset(pathOrUrlOrUUID: string, data: string | Buffer): Promise<IAssetInfo>;
+export declare function saveAssetMeta(uuid: string, meta: IAssetMeta): Promise<void>;
 export declare namespace Scene {
     export {
         init_6 as init,
@@ -8310,6 +8454,7 @@ export declare namespace Server {
     }
 }
 export declare function set<T>(key: string, value: T, scope?: ConfigurationScope): Promise<boolean>;
+export declare function setFileSystemProvider(provider: IAssetFileSystemProvider): void;
 export declare interface SharedSettings {
     useDefineForClassFields: boolean;
     allowDeclareFields: boolean;
@@ -8423,6 +8568,7 @@ export declare interface ThumbnailInfo {
 }
 export declare type ThumbnailSize = 'large' | 'small' | 'middle' | 'origin';
 export declare type TSceneTemplateType = typeof SCENE_TEMPLATE_TYPE[number];
+export declare type UIAlignType = 'top' | 'v-center' | 'bottom' | 'left' | 'h-center' | 'right';
 export declare function unregister(): Promise<void>;
 export declare function updateAssetUserData(urlOrUuidOrPath: string, path: string, value: any): Promise<any>;
 export declare function updateDefaultUserData(handler: string, path: string, value: any): Promise<void>;
