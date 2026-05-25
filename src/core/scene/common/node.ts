@@ -154,17 +154,40 @@ export interface IDeleteNodeResult {
     path: string; // 节点相对根节点路径
 }
 
-// 节点创建参数接口
-// export interface ICreateNodeParams {
-//     dbURL?: string; // 预制体资源路径 或 节点类型（NodeType）
-//     path: string; // 节点路径
-//     workMode?: '2d' | '3d';
-//     nodeType?: NodeType;
-//     name?: string;
-//     position?: IVec3;
-//     keepWorldTransform?: boolean;
-//     canvasRequired?: boolean;
-// }
+// 节点移动参数接口
+export interface ISetParentParams {
+    paths: string[];
+    parentPath: string;
+    keepWorldTransform?: boolean;
+}
+
+// 节点排序参数接口
+export interface IReorderParams {
+    path: string; // 父节点路径
+    from: number; // 原索引
+    to: number;   // 目标索引
+}
+
+// 节点拷贝参数接口
+export interface ICopyNodeParams {
+    paths: string[];
+}
+
+// 节点粘贴参数接口
+export interface IPasteNodeParams {
+    parentPath?: string;
+    keepWorldTransform?: boolean;
+}
+
+// 节点复制参数接口
+export interface IDuplicateNodeParams {
+    paths: string[];
+}
+
+// 节点剪切参数接口
+export interface ICutNodeParams {
+    paths: string[];
+}
 
 interface IBaseCreateNodeParams {
     path: string;
@@ -377,6 +400,15 @@ export interface INodeService extends IServiceEvents {
      * @returns 节点路径，节点不存在时返回空字符串
      */
     getPathByUuid(uuid: string): string;
+
+    // ---- 层级管理器操作 ----
+
+    setParent(params: ISetParentParams): Promise<string[]>;
+    reorder(params: IReorderParams): Promise<boolean>;
+    copyNode(params: ICopyNodeParams): Promise<string[]>;
+    pasteNode(params: IPasteNodeParams): Promise<string[]>;
+    duplicateNode(params: IDuplicateNodeParams): Promise<string[]>;
+    cutNode(params: ICutNodeParams): Promise<string[]>;
 }
 
 ///

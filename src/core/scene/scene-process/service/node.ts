@@ -10,6 +10,12 @@ import {
     type IQueryNodeTreeParams,
     type INodeTreeItem,
     type INodeEvents,
+    type ISetParentParams,
+    type IReorderParams,
+    type ICopyNodeParams,
+    type IPasteNodeParams,
+    type IDuplicateNodeParams,
+    type ICutNodeParams,
     NodeType,
     NodeEventType,
     ISetPropertyOptions
@@ -472,6 +478,187 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
 
     public getPathByUuid(uuid: string): string {
         return nodeMgr.getPathByUuid(uuid);
+    }
+
+    async setParent(params: ISetParentParams): Promise<string[]> {
+        try {
+            await Service.Editor.lock();
+            const root = Service.Editor.getRootNode();
+            if (!root) {
+                throw new Error('Failed to set parent: the scene is not opened.');
+            }
+
+            const uuids = params.paths.map(p => {
+                const node = NodeMgr.getNodeByPath(p);
+                if (!node) throw new Error(`Node not found at path: ${p}`);
+                return node.uuid;
+            });
+
+            const parentNode = NodeMgr.getNodeByPath(params.parentPath);
+            if (!parentNode) {
+                throw new Error(`Parent node not found at path: ${params.parentPath}`);
+            }
+
+            nodeMgr.setParent(parentNode.uuid, uuids, params.keepWorldTransform);
+
+            return uuids.map(uuid => {
+                const node = nodeMgr.query(uuid);
+                return node ? NodeMgr.getNodePath(node) : '';
+            }).filter(Boolean);
+        } catch (error) {
+            console.error(error);
+            throw error;
+        } finally {
+            Service.Editor.unlock();
+        }
+    }
+
+    async reorder(params: IReorderParams): Promise<boolean> {
+        try {
+            await Service.Editor.lock();
+            const root = Service.Editor.getRootNode();
+            if (!root) {
+                throw new Error('Failed to reorder: the scene is not opened.');
+            }
+
+            const parentNode = NodeMgr.getNodeByPath(params.path);
+            if (!parentNode) {
+                throw new Error(`Parent node not found at path: ${params.path}`);
+            }
+
+            return nodeMgr.moveArrayElement(parentNode.uuid, 'children', params.from, params.to);
+        } catch (error) {
+            console.error(error);
+            throw error;
+        } finally {
+            Service.Editor.unlock();
+        }
+    }
+
+    async copyNode(params: ICopyNodeParams): Promise<string[]> {
+        try {
+            await Service.Editor.lock();
+            const root = Service.Editor.getRootNode();
+            if (!root) {
+                throw new Error('Failed to copy node: the scene is not opened.');
+            }
+
+            const uuids = params.paths.map(p => {
+                const node = NodeMgr.getNodeByPath(p);
+                if (!node) throw new Error(`Node not found at path: ${p}`);
+                return node.uuid;
+            });
+
+            const copiedUuids = nodeMgr.copyNode(uuids);
+            return copiedUuids.map(uuid => {
+                const node = nodeMgr.query(uuid);
+                return node ? NodeMgr.getNodePath(node) : '';
+            }).filter(Boolean);
+        } catch (error) {
+            console.error(error);
+            throw error;
+        } finally {
+            Service.Editor.unlock();
+        }
+    }
+
+    async pasteNode(params: IPasteNodeParams): Promise<string[]> {
+        try {
+            await Service.Editor.lock();
+            const root = Service.Editor.getRootNode();
+            if (!root) {
+                throw new Error('Failed to paste node: the scene is not opened.');
+            }
+
+            let parentUuid: string | null = null;
+            if (params.parentPath) {
+                const parentNode = NodeMgr.getNodeByPath(params.parentPath);
+                if (!parentNode) {
+                    throw new Error(`Parent node not found at path: ${params.parentPath}`);
+                }
+                parentUuid = parentNode.uuid;
+            }
+
+            const copiedUuids = nodeMgr.getCopiedUuids();
+            if (copiedUuids.length === 0) {
+                throw new Error('No nodes have been copied.');
+            }
+
+            const newUuids = nodeMgr.pasteNode(parentUuid, copiedUuids, params.keepWorldTransform);
+            return newUuids.map(uuid => {
+                const node = nodeMgr.query(uuid);
+                return node ? NodeMgr.getNodePath(node) : '';
+            }).filter(Boolean);
+        } catch (error) {
+            console.error(error);
+            throw error;
+        } finally {
+            Service.Editor.unlock();
+        }
+    }
+
+    async duplicateNode(params: IDuplicateNodeParams): Promise<string[]> {
+        try {
+            await Service.Editor.lock();
+            const root = Service.Editor.getRootNode();
+            if (!root) {
+                throw new Error('Failed to duplicate node: the scene is not opened.');
+            }
+
+            const uuids = params.paths.map(p => {
+                const node = NodeMgr.getNodeByPath(p);
+                if (!node) throw new Error(`Node not found at path: ${p}`);
+                return node.uuid;
+            });
+
+            const newUuids = nodeMgr.duplicateNode(uuids);
+            return newUuids.map(uuid => {
+                const node = nodeMgr.query(uuid);
+                return node ? NodeMgr.getNodePath(node) : '';
+            }).filter(Boolean);
+        } catch (error) {
+            console.error(error);
+            throw error;
+        } finally {
+            Service.Editor.unlock();
+        }
+    }
+
+    async cutNode(params: ICutNodeParams): Promise<string[]> {
+        try {
+            await Service.Editor.lock();
+            const root = Service.Editor.getRootNode();
+            if (!root) {
+                throw new Error('Failed to cut node: the scene is not opened.');
+            }
+
+            const uuids = params.paths.map(p => {
+                const node = NodeMgr.getNodeByPath(p);
+                if (!node) throw new Error(`Node not found at path: ${p}`);
+                return node.uuid;
+            });
+
+            const copiedUuids = nodeMgr.copyNode(uuids);
+
+            const copiedPaths = copiedUuids.map(uuid => {
+                const node = nodeMgr.query(uuid);
+                return node ? NodeMgr.getNodePath(node) : '';
+            }).filter(Boolean);
+
+            for (const uuid of copiedUuids) {
+                const node = nodeMgr.query(uuid);
+                if (node) {
+                    nodeMgr.baseRemoveNode(node, false);
+                }
+            }
+
+            return copiedPaths;
+        } catch (error) {
+            console.error(error);
+            throw error;
+        } finally {
+            Service.Editor.unlock();
+        }
     }
 }
 
