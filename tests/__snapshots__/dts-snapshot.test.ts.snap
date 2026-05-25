@@ -5376,6 +5376,7 @@ export declare interface IComponentService extends IServiceEvents {
     queryFunctionOfNode(path: string): Promise<any>;
     executeMethod(options: IExecuteComponentMethodOptions): Promise<any>;
     hasScript(name: string): Promise<boolean>;
+    getPathByUuid(uuid: string): string;
     init(): void;
     unregisterCompMgrEvents(): void;
 }
@@ -5535,6 +5536,7 @@ export declare interface INodeService extends IServiceEvents {
     resetProperty(options: ISetPropertyOptions): Promise<boolean>;
     updatePropertyFromNull(options: ISetPropertyOptions): Promise<boolean>;
     setNodeAndChildrenLayer(options: ISetPropertyOptions): Promise<void>;
+    getPathByUuid(uuid: string): string;
 }
 export declare interface INodeTreeComponent {
     isCustom: boolean;
@@ -7291,6 +7293,7 @@ export declare interface IComponentService extends IServiceEvents {
     queryFunctionOfNode(path: string): Promise<any>;
     executeMethod(options: IExecuteComponentMethodOptions): Promise<any>;
     hasScript(name: string): Promise<boolean>;
+    getPathByUuid(uuid: string): string;
     init(): void;
     unregisterCompMgrEvents(): void;
 }
@@ -7594,6 +7597,7 @@ export declare interface INodeService extends IServiceEvents {
     resetProperty(options: ISetPropertyOptions): Promise<boolean>;
     updatePropertyFromNull(options: ISetPropertyOptions): Promise<boolean>;
     setNodeAndChildrenLayer(options: ISetPropertyOptions): Promise<void>;
+    getPathByUuid(uuid: string): string;
 }
 export declare interface INodeTreeComponent {
     isCustom: boolean;
