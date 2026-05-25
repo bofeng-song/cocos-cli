@@ -139,7 +139,15 @@ export default class NodeManager extends EventEmitter {
     }
 
     getNodePath(node: Node): string {
-        return pathManager.getNodePath(node.uuid) || '/';
+        if (!node?.uuid) {
+            return '';
+        }
+        const path = pathManager.getNodePath(node.uuid);
+        if (!path) {
+            const scene = cc.director.getScene();
+            return node === scene ? '/' : '';
+        }
+        return path;
     }
 
     getNodeUuidByPath(path: string): string | null {
