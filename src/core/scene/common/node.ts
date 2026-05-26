@@ -189,6 +189,28 @@ export interface ICutNodeParams {
     paths: string[];
 }
 
+// 移动数组元素参数接口
+export interface IMoveArrayElementParams {
+    nodePath: string;   // 节点路径
+    path: string;       // 数组属性路径，如 'children'、'__comps__'
+    target: number;     // 当前索引
+    offset: number;     // 偏移量
+}
+
+// 删除数组元素参数接口
+export interface IRemoveArrayElementParams {
+    nodePath: string;   // 节点路径
+    path: string;       // 数组属性路径
+    index: number;      // 要删除的元素索引
+}
+
+// 节点锁定参数接口
+export interface IChangeNodeLockParams {
+    paths: string[];    // 节点路径列表
+    locked: boolean;    // 是否锁定
+    loop?: boolean;     // 是否递归子节点
+}
+
 interface IBaseCreateNodeParams {
     path: string;
     name?: string;
@@ -240,7 +262,16 @@ export type IPublicNodeService = Omit<INodeService, keyof IServiceEvents |
     'reset' |
     'resetProperty' |
     'updatePropertyFromNull' |
-    'setNodeAndChildrenLayer'
+    'setNodeAndChildrenLayer' |
+    'setParent' | 
+    'reorder' |
+    'copyNode' |
+    'pasteNode' |
+    'duplicateNode' |
+    'cutNode' |
+    'moveArrayElement' |
+    'removeArrayElement' |
+    'changeNodeLock'
 >;
 
 /**
@@ -409,6 +440,23 @@ export interface INodeService extends IServiceEvents {
     pasteNode(params: IPasteNodeParams): Promise<string[]>;
     duplicateNode(params: IDuplicateNodeParams): Promise<string[]>;
     cutNode(params: ICutNodeParams): Promise<string[]>;
+
+    /**
+     * 移动数组元素位置
+     * 通用操作，支持 children 排序、组件排序等
+     */
+    moveArrayElement(params: IMoveArrayElementParams): Promise<boolean>;
+
+    /**
+     * 删除数组元素
+     * 支持删除组件等数组属性中的元素（不支持 children）
+     */
+    removeArrayElement(params: IRemoveArrayElementParams): Promise<boolean>;
+
+    /**
+     * 锁定/解锁节点
+     */
+    changeNodeLock(params: IChangeNodeLockParams): Promise<void>;
 }
 
 ///

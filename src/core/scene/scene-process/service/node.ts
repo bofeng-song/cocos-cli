@@ -16,6 +16,9 @@ import {
     type IPasteNodeParams,
     type IDuplicateNodeParams,
     type ICutNodeParams,
+    type IMoveArrayElementParams,
+    type IRemoveArrayElementParams,
+    type IChangeNodeLockParams,
     NodeType,
     NodeEventType,
     ISetPropertyOptions
@@ -71,8 +74,9 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
             if (!assetUuid) {
                 throw new Error(`Asset not found for dbURL: ${params.dbURL}`);
             }
+            const assetInfo = await Rpc.getInstance().request('assetManager', 'queryAssetInfo', [assetUuid]);
             const canvasNeeded = params.canvasRequired || false;
-            return await this._createNode(assetUuid, canvasNeeded, false, params);
+            return await this._createNode(assetUuid, canvasNeeded, false, params, assetInfo?.type);
         } catch (error) {
             console.error(error);
             throw error;
@@ -81,7 +85,7 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
         }
     }
 
-    async _createNode(assetUuid: string | null, canvasNeeded: boolean, checkUITransform: boolean, params: ICreateByNodeTypeParams | ICreateByAssetParams): Promise<INode | null> {
+    async _createNode(assetUuid: string | null, canvasNeeded: boolean, checkUITransform: boolean, params: ICreateByNodeTypeParams | ICreateByAssetParams, assetType?: string): Promise<INode | null> {
         const currentScene = Service.Editor.getRootNode();
         if (!currentScene) {
             throw new Error('Failed to create node: the scene is not opened.');
@@ -98,7 +102,9 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
         if (assetUuid) {
             const { node, canvasRequired } = await createNodeByAsset({
                 uuid: assetUuid,
-                canvasRequired: canvasNeeded
+                canvasRequired: canvasNeeded,
+                type: assetType,
+                workMode: workMode,
             });
             resultNode = node;
             parent = await this.checkCanvasRequired(workMode.toLowerCase(), Boolean(canvasRequired), parent, params.position as Vec3) as Node;
@@ -653,6 +659,55 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
             }
 
             return copiedPaths;
+        } catch (error) {
+            console.error(error);
+            throw error;
+        } finally {
+            Service.Editor.unlock();
+        }
+    }
+
+    async moveArrayElement(params: IMoveArrayElementParams): Promise<boolean> {
+        try {
+            await Service.Editor.lock();
+            const node = NodeMgr.getNodeByPath(params.nodePath);
+            if (!node) {
+                throw new Error(`Node not found at path: ${params.nodePath}`);
+            }
+            return nodeMgr.moveArrayElement(node.uuid, params.path, params.target, params.offset);
+        } catch (error) {
+            console.error(error);
+            throw error;
+        } finally {
+            Service.Editor.unlock();
+        }
+    }
+
+    async removeArrayElement(params: IRemoveArrayElementParams): Promise<boolean> {
+        try {
+            await Service.Editor.lock();
+            const node = NodeMgr.getNodeByPath(params.nodePath);
+            if (!node) {
+                throw new Error(`Node not found at path: ${params.nodePath}`);
+            }
+            return nodeMgr.removeArrayElement(node.uuid, params.path, params.index);
+        } catch (error) {
+            console.error(error);
+            throw error;
+        } finally {
+            Service.Editor.unlock();
+        }
+    }
+
+    async changeNodeLock(params: IChangeNodeLockParams): Promise<void> {
+        try {
+            await Service.Editor.lock();
+            const uuids = params.paths.map(p => {
+                const node = NodeMgr.getNodeByPath(p);
+                if (!node) throw new Error(`Node not found at path: ${p}`);
+                return node.uuid;
+            });
+            nodeMgr.changeNodeLock(uuids, params.locked, params.loop ?? false);
         } catch (error) {
             console.error(error);
             throw error;
