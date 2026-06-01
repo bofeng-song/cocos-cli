@@ -3,6 +3,7 @@ import { Rpc } from './rpc';
 import { serviceManager } from './service/service-manager';
 import { Service as DecoratorService } from './service/core/decorator';
 import { ServiceEvents } from './service/core/global-events';
+import { initLocalI18n } from './i18n';
 
 import './service';
 
@@ -93,6 +94,7 @@ export async function startup(options: {
         await EditorExtends.init();
     }
     await Rpc.startup({ serverURL });
+    await initLocalI18n();
 
     cc.physics.selector.runInEditor = true;
 

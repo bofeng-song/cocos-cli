@@ -92,6 +92,7 @@ export type IPublicComponentService = Omit<IComponentService, keyof IServiceEven
     'reset' |
     'queryClasses' |
     'queryFunctionOfNode' |
+    'queryComponents' |
     'executeMethod' |
     'hasScript'
 >;
@@ -208,6 +209,12 @@ export interface IComponentService extends IServiceEvents {
     queryFunctionOfNode(path: string): Promise<any>;
 
     /**
+     * 查询所有已注册的组件菜单项
+     * @returns 组件菜单项数组，包含类名、类 ID 和菜单路径
+     */
+    queryComponents(): Promise<Array<{ name: string; cid: string; path: string }>>;
+
+    /**
      * 执行组件上的指定方法
      * @param options - 执行选项
      * @param options.path - 组件路径，如 'Canvas/cc.Label_1'
@@ -223,6 +230,14 @@ export interface IComponentService extends IServiceEvents {
      * @returns 存在返回 true，不存在返回 false
      */
     hasScript(name: string): Promise<boolean>;
+
+    /**
+     * 通过 uuid 获取组件的路径
+     *
+     * @param uuid - 组件的 uuid
+     * @returns 组件路径，组件不存在时返回空字符串
+     */
+    getPathByUuid(uuid: string): string;
 
     // ---- 内部接口，不对外暴露 ----
 
