@@ -1349,7 +1349,7 @@ export declare interface BundleRenderConfig {
     maxOptionList: Record<string, any[]>;
     minOptionList?: Record<string, any[]>;
 }
-export declare type CCEnvConstants = ConstantManager.CCEnvConstants;
+export declare type CCEnvConstants = StatsQuery.ConstantManager.CCEnvConstants;
 export declare type ChangeEvent = 'create' | 'update' | 'delete';
 export declare interface ChokidarOptions {
     	alwaysStat?: boolean;
@@ -1430,7 +1430,7 @@ export declare interface Config {
     optimizeDecorators: IOptimizeDecorators;
     treeShake?: ITreeShakeConfig;
 }
-declare namespace ConfigInterface {
+export declare namespace ConfigInterface {
     export {
         Config,
         IndexConfig,
@@ -4190,7 +4190,7 @@ export declare type ResolveImportMetaHook = (
 	prop: string | null,
 	options: { chunkId: string; format: InternalModuleFormat; moduleId: string }
 ) => string | null | void;
-declare namespace rollup {
+export declare namespace rollup {
     export {
         rollup_2 as rollup,
         watch,
@@ -4632,7 +4632,7 @@ export declare class StatsQuery {
     private _featureUnits;
     private _editorPublicModules;
 }
-declare namespace StatsQuery {
+export declare namespace StatsQuery {
     namespace ConstantManager {
         type PlatformType = 'WEB_EDITOR' | 'WEB_MOBILE' | 'WEB_DESKTOP' | 'WECHAT' | 'WECHAT_MINI_PROGRAM' | 'BYTEDANCE' | 'ALIPAY' | 'TAOBAO' | 'TAOBAO_MINIGAME' | 'OPPO' | 'VIVO' | 'HUAWEI' | 'HONOR' | 'COCOS_RUNTIME' | 'SUD' | 'SUDV2' | 'NATIVE_EDITOR' | 'ANDROID' | 'WINDOWS' | 'IOS' | 'MAC' | 'OHOS' | 'OPEN_HARMONY' | 'LINUX' | 'HTML5' | 'NATIVE' | 'NODEJS' | 'INVALID_PLATFORM';
         type IPlatformConfig = { [key in PlatformType]: boolean };

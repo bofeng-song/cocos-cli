@@ -51,6 +51,35 @@ function ensureBuilderFilesystemImports(content: string): string {
     return `${prefix}${insertion}${suffix}`;
 }
 
+function fixBareNamespaceReferences(content: string): string {
+    const bareRef = /(?<!\.)ConstantManager\./g;
+    const insideNamespace = /^export declare namespace StatsQuery \{/m;
+    if (!insideNamespace.test(content)) {
+        return content;
+    }
+
+    const nsStart = content.search(insideNamespace);
+    let braceDepth = 0;
+    let nsEnd = content.length;
+    for (let i = content.indexOf('{', nsStart); i < content.length; i++) {
+        if (content[i] === '{') braceDepth++;
+        if (content[i] === '}') braceDepth--;
+        if (braceDepth === 0) {
+            nsEnd = i + 1;
+            break;
+        }
+    }
+
+    const before = content.slice(0, nsStart);
+    const nsBlock = content.slice(nsStart, nsEnd);
+    const after = content.slice(nsEnd);
+
+    const fixedBefore = before.replace(bareRef, 'StatsQuery.ConstantManager.');
+    const fixedAfter = after.replace(bareRef, 'StatsQuery.ConstantManager.');
+
+    return `${fixedBefore}${nsBlock}${fixedAfter}`;
+}
+
 export function normalizeDtsRollupContent(fileName: string, content: string): string {
     if (fileName !== 'builder.d.ts') {
         return content;
@@ -88,6 +117,8 @@ export function normalizeDtsRollupContent(fileName: string, content: string): st
     if (normalized.includes('IAssetDeleteOptions') || normalized.includes('IAssetWriteFileOptions')) {
         normalized = ensureBuilderFilesystemImports(normalized);
     }
+
+    normalized = fixBareNamespaceReferences(normalized);
 
     return normalized;
 }
