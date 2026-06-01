@@ -5315,6 +5315,7 @@ export declare interface IBaseCreateNodeParams {
     position?: IVec3;
     keepWorldTransform?: boolean;
     canvasRequired?: boolean;
+    unlinkPrefab?: boolean;
 }
 export declare interface IBaseIdentifier {
     assetName: string;
@@ -5649,6 +5650,7 @@ export declare interface IPrefabService extends IServiceEvents {
     unpackPrefabInstance(params: IUnpackPrefabInstanceParams): Promise<INode>;
     isPrefabInstance(params: IIsPrefabInstanceParams): Promise<boolean>;
     getPrefabInfo(params: IGetPrefabInfoParams): Promise<IPrefab | null>;
+    unlinkPrefab(params: IUnlinkPrefabParams): Promise<boolean>;
     removePrefabInfoFromNode(node: Node_2, removeNested?: boolean): void;
 }
 export declare interface IPrefabStateInfo {
@@ -5919,6 +5921,10 @@ export declare interface IUndoService {
     snapshot(): void;
     reset(): void;
     isDirty(): boolean;
+}
+export declare interface IUnlinkPrefabParams {
+    nodePath: string;
+    removeNested?: boolean;
 }
 export declare interface IUnpackPrefabInstanceParams {
     nodePath: string;
@@ -7255,6 +7261,7 @@ export declare interface IBaseCreateNodeParams {
     position?: IVec3;
     keepWorldTransform?: boolean;
     canvasRequired?: boolean;
+    unlinkPrefab?: boolean;
 }
 export declare interface IBaseIdentifier {
     assetName: string;
@@ -7790,6 +7797,7 @@ export declare interface IPrefabService extends IServiceEvents {
     unpackPrefabInstance(params: IUnpackPrefabInstanceParams): Promise<INode>;
     isPrefabInstance(params: IIsPrefabInstanceParams): Promise<boolean>;
     getPrefabInfo(params: IGetPrefabInfoParams): Promise<IPrefab | null>;
+    unlinkPrefab(params: IUnlinkPrefabParams): Promise<boolean>;
     removePrefabInfoFromNode(node: Node_2, removeNested?: boolean): void;
 }
 export declare interface IPrefabStateInfo {
@@ -8120,6 +8128,10 @@ export declare interface IUndoService {
     snapshot(): void;
     reset(): void;
     isDirty(): boolean;
+}
+export declare interface IUnlinkPrefabParams {
+    nodePath: string;
+    removeNested?: boolean;
 }
 export declare interface IUnpackPrefabInstanceParams {
     nodePath: string;

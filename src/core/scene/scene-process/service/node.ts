@@ -121,8 +121,9 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
          * 默认创建节点是从 prefab 模板，所以初始是 prefab 节点
          * 是否要 unlink 为普通节点
          * 有 nodeType 说明是内置资源创建的，需要移除 prefab info
+         * createByAsset 时，如果 assetType 不是 cc.Prefab 或者 unlinkPrefab 为 true，也需要移除
          */
-        if ('nodeType' in params) {
+        if ('nodeType' in params || assetType !== 'cc.Prefab' || params.unlinkPrefab) {
             Service.Prefab.removePrefabInfoFromNode(resultNode, true);
         }
 

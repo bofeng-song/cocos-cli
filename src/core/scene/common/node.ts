@@ -218,6 +218,7 @@ interface IBaseCreateNodeParams {
     position?: IVec3;
     keepWorldTransform?: boolean;
     canvasRequired?: boolean;
+    unlinkPrefab?: boolean;
 }
 
 export interface ICreateByNodeTypeParams extends IBaseCreateNodeParams {
