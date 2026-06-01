@@ -13,7 +13,7 @@ import {
     IQueryClassesOptions,
     ISetPropertyOptions
 } from '../../common';
-import dumpUtil, { translateDumpI18n } from './dump';
+import dumpUtil from './dump';
 import compMgr from './component/index';
 import componentUtils from './component/utils';
 import getComponentFunctionOfNode from './component/get-component-function-of-node';
@@ -228,7 +228,7 @@ export class ComponentService extends BaseService<IComponentEvents> implements I
             compMgr.onComponentAddedFromEditor(comp);
             this.emit('node:change', node, { type: NodeEventType.CREATE_COMPONENT });
 
-            const dump = await translateDumpI18n(dumpUtil.dumpComponent(comp as Component)) as IComponent;
+            const dump = dumpUtil.dumpComponent(comp as Component) as IComponent;
             // hack: 以下字段不属于编辑器 dump 结构（IComponent），仅用于 proxy 层将复杂的 dump 转换为 CLI 所需的扁平结构
             (dump as any).__component_path__ = compMgr.getPathFromUuid(comp.uuid) ?? '';
             (dump as any).__compPrefab__ = (comp as any).__prefab || null;
@@ -329,7 +329,7 @@ export class ComponentService extends BaseService<IComponentEvents> implements I
             console.warn(`Query component failed: ${params.path} does not exist`);
             return null;
         }
-        const dump = await translateDumpI18n(dumpUtil.dumpComponent(comp as Component)) as IComponent;
+        const dump = dumpUtil.dumpComponent(comp as Component) as IComponent;
         // hack: 以下字段不属于编辑器 dump 结构（IComponent），仅用于 proxy 层将复杂的 dump 转换为 CLI 所需的扁平结构
         (dump as any).__component_path__ = compMgr.getPathFromUuid(comp.uuid) ?? '';
         (dump as any).__compPrefab__ = (comp as any).__prefab || null;
@@ -372,7 +372,7 @@ export class ComponentService extends BaseService<IComponentEvents> implements I
 
         // 恢复数据
         try {
-            await dumpUtil.restoreProperty(node, options.path, options.dump, true);
+            await dumpUtil.restoreProperty(node, options.path, options.dump);
         } catch (e) {
             console.error(e);
             return false;
@@ -464,6 +464,26 @@ export class ComponentService extends BaseService<IComponentEvents> implements I
             return {};
         }
         return getComponentFunctionOfNode(node);
+    }
+
+    async queryComponents(): Promise<Array<{ name: string; cid: string; path: string }>> {
+        // TODO: 需要根据 cocos.config.json 的 include modules 是否包含 3d 做过滤
+        // 参考 app/builtin/scene/source/script/3d/manager/scene/scene-manager.ts
+        const menus = EditorExtends.Component.getMenus();
+        if (menus.length > 0) {
+            return menus.map((item: any) => ({
+                name: cc.js.getClassName(item.component),
+                cid: cc.js.getClassId(item.component),
+                path: item.menuPath,
+            }));
+        }
+        // TODO: 这个是兜底的，等 EditorExtends.Component.getMenus() 完全实现了之后就可以删除了
+        const classes = await this.queryClasses({ extends: 'cc.Component', excludeSelf: true });
+        return classes.map(cls => ({
+            name: cls.name,
+            cid: '',
+            path: cls.name,
+        }));
     }
 
     public init() {
