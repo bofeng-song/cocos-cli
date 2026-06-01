@@ -5,7 +5,7 @@ export interface IEngineEvents {
     'engine:ticked': [];
 }
 
-export interface IPublicEngineService extends Omit<IEngineService, keyof IServiceEvents> {}
+export interface IPublicEngineService extends Omit<IEngineService, keyof IServiceEvents | 'pause' | 'resume'> {}
 
 export interface IEngineService extends IServiceEvents {
     /**

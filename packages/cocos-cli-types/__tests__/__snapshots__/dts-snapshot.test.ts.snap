@@ -777,8 +777,7 @@ export { }
 exports[`DTS API compatibility builder.d.ts should match snapshot 1`] = `
 "import EventEmitter from 'events';
 import { EventEmitter as EventEmitter_2 } from 'stream';
-import { IAssetDeleteOptions } from './filesystem';
-import { IAssetWriteFileOptions } from './filesystem';
+import { IAssetDeleteOptions, IAssetWriteFileOptions } from '@cocos/asset-db/libs/filesystem';
 import type { PluginItem } from '@babel/core';
 import { SpriteFrame } from 'cc';
 export declare interface AcornNode {
