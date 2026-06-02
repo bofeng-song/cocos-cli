@@ -133,6 +133,7 @@ export class NodeManager {
         compMgr.unregisterCompMgrEvents();
         this.unregisterNodeMgrEvents();
         this.clear();
+        stashInstants = null;
     }
 
 

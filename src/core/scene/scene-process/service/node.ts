@@ -417,6 +417,7 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
         });
         NodeMgr.clear();
         EditorExtends.Component.clear();
+        this._cutUuids = [];
     }
 
     public async previewSetProperty(options: ISetPropertyOptions): Promise<boolean> {
@@ -542,6 +543,8 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
         }
     }
 
+    private _cutUuids: string[] = [];
+
     async copy(params: ICopyParams): Promise<string[]> {
         try {
             await Service.Editor.lock();
@@ -556,6 +559,8 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
                 return node.uuid;
             });
 
+            // copy 覆盖之前的 cut 标记
+            this._cutUuids = [];
             const copiedUuids = nodeMgr.copy(uuids);
             return copiedUuids.map(uuid => {
                 const node = nodeMgr.query(uuid);
@@ -586,6 +591,18 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
                 parentUuid = parentNode.uuid;
             }
 
+            // 剪切粘贴：移动节点而非创建副本
+            if (this._cutUuids.length > 0) {
+                const cutUuids = this._cutUuids;
+                this._cutUuids = [];
+                const movedUuids = nodeMgr.setParent(parentUuid || root.uuid, cutUuids, !!params.keepWorldTransform);
+                return movedUuids.map(uuid => {
+                    const node = nodeMgr.query(uuid);
+                    return node ? NodeMgr.getNodePath(node) : '';
+                }).filter(Boolean);
+            }
+
+            // 普通粘贴：创建副本
             const copiedUuids = nodeMgr.getCopiedUuids();
             if (copiedUuids.length === 0) {
                 throw new Error('No nodes have been copied.');
@@ -645,21 +662,10 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
                 return node.uuid;
             });
 
-            const copiedUuids = nodeMgr.copy(uuids);
+            // 只标记为剪切，不立即删除；paste 时通过 setParent 移动节点
+            this._cutUuids = uuids;
 
-            const copiedPaths = copiedUuids.map(uuid => {
-                const node = nodeMgr.query(uuid);
-                return node ? NodeMgr.getNodePath(node) : '';
-            }).filter(Boolean);
-
-            for (const uuid of copiedUuids) {
-                const node = nodeMgr.query(uuid);
-                if (node) {
-                    nodeMgr.baseRemoveNode(node, false);
-                }
-            }
-
-            return copiedPaths;
+            return params.paths;
         } catch (error) {
             console.error(error);
             throw error;
