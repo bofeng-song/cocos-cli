@@ -12,10 +12,10 @@ import {
     type INodeEvents,
     type ISetParentParams,
     type IReorderParams,
-    type ICopyNodeParams,
-    type IPasteNodeParams,
-    type IDuplicateNodeParams,
-    type ICutNodeParams,
+    type ICopyParams,
+    type IPasteParams,
+    type IDuplicateParams,
+    type ICutParams,
     type IMoveArrayElementParams,
     type IRemoveArrayElementParams,
     type IChangeNodeLockParams,
@@ -542,7 +542,7 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
         }
     }
 
-    async copyNode(params: ICopyNodeParams): Promise<string[]> {
+    async copy(params: ICopyParams): Promise<string[]> {
         try {
             await Service.Editor.lock();
             const root = Service.Editor.getRootNode();
@@ -556,7 +556,7 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
                 return node.uuid;
             });
 
-            const copiedUuids = nodeMgr.copyNode(uuids);
+            const copiedUuids = nodeMgr.copy(uuids);
             return copiedUuids.map(uuid => {
                 const node = nodeMgr.query(uuid);
                 return node ? NodeMgr.getNodePath(node) : '';
@@ -569,7 +569,7 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
         }
     }
 
-    async pasteNode(params: IPasteNodeParams): Promise<string[]> {
+    async paste(params: IPasteParams): Promise<string[]> {
         try {
             await Service.Editor.lock();
             const root = Service.Editor.getRootNode();
@@ -591,7 +591,7 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
                 throw new Error('No nodes have been copied.');
             }
 
-            const newUuids = nodeMgr.pasteNode(parentUuid, copiedUuids, params.keepWorldTransform);
+            const newUuids = nodeMgr.paste(parentUuid, copiedUuids, params.keepWorldTransform);
             return newUuids.map(uuid => {
                 const node = nodeMgr.query(uuid);
                 return node ? NodeMgr.getNodePath(node) : '';
@@ -604,7 +604,7 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
         }
     }
 
-    async duplicateNode(params: IDuplicateNodeParams): Promise<string[]> {
+    async duplicate(params: IDuplicateParams): Promise<string[]> {
         try {
             await Service.Editor.lock();
             const root = Service.Editor.getRootNode();
@@ -618,7 +618,7 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
                 return node.uuid;
             });
 
-            const newUuids = nodeMgr.duplicateNode(uuids);
+            const newUuids = nodeMgr.duplicate(uuids);
             return newUuids.map(uuid => {
                 const node = nodeMgr.query(uuid);
                 return node ? NodeMgr.getNodePath(node) : '';
@@ -631,7 +631,7 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
         }
     }
 
-    async cutNode(params: ICutNodeParams): Promise<string[]> {
+    async cut(params: ICutParams): Promise<string[]> {
         try {
             await Service.Editor.lock();
             const root = Service.Editor.getRootNode();
@@ -645,7 +645,7 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
                 return node.uuid;
             });
 
-            const copiedUuids = nodeMgr.copyNode(uuids);
+            const copiedUuids = nodeMgr.copy(uuids);
 
             const copiedPaths = copiedUuids.map(uuid => {
                 const node = nodeMgr.query(uuid);

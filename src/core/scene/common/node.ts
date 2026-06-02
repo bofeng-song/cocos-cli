@@ -169,23 +169,23 @@ export interface IReorderParams {
 }
 
 // 节点拷贝参数接口
-export interface ICopyNodeParams {
+export interface ICopyParams {
     paths: string[];
 }
 
 // 节点粘贴参数接口
-export interface IPasteNodeParams {
+export interface IPasteParams {
     parentPath?: string;
     keepWorldTransform?: boolean;
 }
 
 // 节点复制参数接口
-export interface IDuplicateNodeParams {
+export interface IDuplicateParams {
     paths: string[];
 }
 
 // 节点剪切参数接口
-export interface ICutNodeParams {
+export interface ICutParams {
     paths: string[];
 }
 
@@ -266,10 +266,10 @@ export type IPublicNodeService = Omit<INodeService, keyof IServiceEvents |
     'setNodeAndChildrenLayer' |
     'setParent' | 
     'reorder' |
-    'copyNode' |
-    'pasteNode' |
-    'duplicateNode' |
-    'cutNode' |
+    'copy' |
+    'paste' |
+    'duplicate' |
+    'cut' |
     'moveArrayElement' |
     'removeArrayElement' |
     'changeNodeLock'
@@ -437,10 +437,10 @@ export interface INodeService extends IServiceEvents {
 
     setParent(params: ISetParentParams): Promise<string[]>;
     reorder(params: IReorderParams): Promise<boolean>;
-    copyNode(params: ICopyNodeParams): Promise<string[]>;
-    pasteNode(params: IPasteNodeParams): Promise<string[]>;
-    duplicateNode(params: IDuplicateNodeParams): Promise<string[]>;
-    cutNode(params: ICutNodeParams): Promise<string[]>;
+    copy(params: ICopyParams): Promise<string[]>;
+    paste(params: IPasteParams): Promise<string[]>;
+    duplicate(params: IDuplicateParams): Promise<string[]>;
+    cut(params: ICutParams): Promise<string[]>;
 
     /**
      * 移动数组元素位置

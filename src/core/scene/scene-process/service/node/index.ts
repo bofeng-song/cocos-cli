@@ -815,7 +815,7 @@ export class NodeManager {
      * 复制节点的动作，给下一步粘贴（创建）节点准备数据
      * @param {*} uuids 单个 string 或 array
      */
-    copyNode(uuids: string | string[]) {
+    copy(uuids: string | string[]) {
         if (!Array.isArray(uuids)) {
             uuids = [uuids];
         }
@@ -882,14 +882,14 @@ export class NodeManager {
         return stashInstants ? Object.keys(stashInstants) : [];
     }
 
-    duplicateNode(uuids: string | string[]) {
+    duplicate(uuids: string | string[]) {
         if (!Array.isArray(uuids)) {
             uuids = [uuids];
         }
 
         const newUuids: string[] = [];
         const oldStashInstants = stashInstants;
-        uuids = this.copyNode(uuids);
+        uuids = this.copy(uuids);
 
         for (const uuid of uuids) {
             const node = this.query(uuid);
@@ -909,7 +909,7 @@ export class NodeManager {
         return newUuids.filter(Boolean);
     }
 
-    pasteNode(target: string | null | undefined, uuids: string | string[], keepWorldTransform = false) {
+    paste(target: string | null | undefined, uuids: string | string[], keepWorldTransform = false) {
         if (!Array.isArray(uuids)) {
             uuids = [uuids];
         }
