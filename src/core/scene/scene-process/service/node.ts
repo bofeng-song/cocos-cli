@@ -16,6 +16,7 @@ import {
     type IPasteParams,
     type IDuplicateParams,
     type ICutParams,
+    type IClipboardState,
     type IMoveArrayElementParams,
     type IRemoveArrayElementParams,
     type IChangeNodeLockParams,
@@ -534,7 +535,7 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
                 throw new Error(`Parent node not found at path: ${params.path}`);
             }
 
-            return nodeMgr.moveArrayElement(parentNode.uuid, 'children', params.from, params.to);
+            return nodeMgr.moveArrayElement(parentNode.uuid, 'children', params.target, params.offset);
         } catch (error) {
             console.error(error);
             throw error;
@@ -672,6 +673,25 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
         } finally {
             Service.Editor.unlock();
         }
+    }
+
+    async queryClipboardState(): Promise<IClipboardState> {
+        if (this._cutUuids.length > 0) {
+            const paths = this._cutUuids.map(uuid => {
+                const node = nodeMgr.query(uuid);
+                return node ? NodeMgr.getNodePath(node) : '';
+            }).filter(Boolean);
+            return { type: 'cut', paths };
+        }
+        const copiedUuids = nodeMgr.getCopiedUuids();
+        if (copiedUuids.length > 0) {
+            const paths = copiedUuids.map(uuid => {
+                const node = nodeMgr.query(uuid);
+                return node ? NodeMgr.getNodePath(node) : '';
+            }).filter(Boolean);
+            return { type: 'copy', paths };
+        }
+        return { type: 'none', paths: [] };
     }
 
     async moveArrayElement(params: IMoveArrayElementParams): Promise<boolean> {

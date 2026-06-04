@@ -5377,6 +5377,10 @@ export declare interface ICLI {
     Scene: IServiceManager;
     SceneEvents: GlobalEventManager;
 }
+export declare interface IClipboardState {
+    type: 'cut' | 'copy' | 'none';
+    paths: string[];
+}
 export declare interface ICloseOptions {
     urlOrUUID?: string;
 }
@@ -5410,7 +5414,7 @@ export declare interface IComponentService extends IServiceEvents {
     init(): void;
     unregisterCompMgrEvents(): void;
 }
-export declare interface ICopyNodeParams {
+export declare interface ICopyParams {
     paths: string[];
 }
 export declare interface ICreateByAssetParams extends IBaseCreateNodeParams {
@@ -5431,7 +5435,7 @@ export declare interface ICreatePrefabFromNodeParams {
     overwrite?: boolean;
 }
 export declare type ICreateType = typeof CREATE_TYPES[number];
-export declare interface ICutNodeParams {
+export declare interface ICutParams {
     paths: string[];
 }
 export declare interface IDeleteNodeParams {
@@ -5441,7 +5445,7 @@ export declare interface IDeleteNodeParams {
 export declare interface IDeleteNodeResult {
     path: string;
 }
-export declare interface IDuplicateNodeParams {
+export declare interface IDuplicateParams {
     paths: string[];
 }
 export declare interface IEditorService extends IServiceEvents {
@@ -5584,10 +5588,11 @@ export declare interface INodeService extends IServiceEvents {
     getPathByUuid(uuid: string): string;
     setParent(params: ISetParentParams): Promise<string[]>;
     reorder(params: IReorderParams): Promise<boolean>;
-    copyNode(params: ICopyNodeParams): Promise<string[]>;
-    pasteNode(params: IPasteNodeParams): Promise<string[]>;
-    duplicateNode(params: IDuplicateNodeParams): Promise<string[]>;
-    cutNode(params: ICutNodeParams): Promise<string[]>;
+    copy(params: ICopyParams): Promise<string[]>;
+    paste(params: IPasteParams): Promise<string[]>;
+    duplicate(params: IDuplicateParams): Promise<string[]>;
+    cut(params: ICutParams): Promise<string[]>;
+    queryClipboardState(): Promise<IClipboardState>;
     moveArrayElement(params: IMoveArrayElementParams): Promise<boolean>;
     removeArrayElement(params: IRemoveArrayElementParams): Promise<boolean>;
     changeNodeLock(params: IChangeNodeLockParams): Promise<void>;
@@ -5630,7 +5635,7 @@ export declare interface IOriginAxesConfig {
     y: boolean;
     z: boolean;
 }
-export declare interface IPasteNodeParams {
+export declare interface IPasteParams {
     parentPath?: string;
     keepWorldTransform?: boolean;
 }
@@ -5749,8 +5754,8 @@ export declare interface IRemovedComponentInfo {
 }
 export declare interface IReorderParams {
     path: string;
-    from: number;
-    to: number;
+    target: number;
+    offset: number;
 }
 export declare interface IRevertToPrefabParams {
     nodePath: string;
@@ -7327,6 +7332,10 @@ export declare interface ICLI {
     Scene: IServiceManager;
     SceneEvents: GlobalEventManager;
 }
+export declare interface IClipboardState {
+    type: 'cut' | 'copy' | 'none';
+    paths: string[];
+}
 export declare interface ICloseOptions {
     urlOrUUID?: string;
 }
@@ -7389,7 +7398,7 @@ export declare interface IComponentService extends IServiceEvents {
 export declare interface IConfiguration {
     [key: string]: any;
 }
-export declare interface ICopyNodeParams {
+export declare interface ICopyParams {
     paths: string[];
 }
 export declare interface ICreateByAssetParams extends IBaseCreateNodeParams {
@@ -7435,7 +7444,7 @@ export declare interface ICustomJointTextureLayout {
     textureLength: number;
     contents: IChunkContent[];
 }
-export declare interface ICutNodeParams {
+export declare interface ICutParams {
     paths: string[];
 }
 export declare type IDefaultConfig = {
@@ -7468,7 +7477,7 @@ export declare interface IDisplayModuleItem extends IFeatureItem {
     _option?: string;
     options?: Record<string, IDisplayModuleItem>;
 }
-export declare interface IDuplicateNodeParams {
+export declare interface IDuplicateParams {
     paths: string[];
 }
 export declare interface IEditorService extends IServiceEvents {
@@ -7704,10 +7713,11 @@ export declare interface INodeService extends IServiceEvents {
     getPathByUuid(uuid: string): string;
     setParent(params: ISetParentParams): Promise<string[]>;
     reorder(params: IReorderParams): Promise<boolean>;
-    copyNode(params: ICopyNodeParams): Promise<string[]>;
-    pasteNode(params: IPasteNodeParams): Promise<string[]>;
-    duplicateNode(params: IDuplicateNodeParams): Promise<string[]>;
-    cutNode(params: ICutNodeParams): Promise<string[]>;
+    copy(params: ICopyParams): Promise<string[]>;
+    paste(params: IPasteParams): Promise<string[]>;
+    duplicate(params: IDuplicateParams): Promise<string[]>;
+    cut(params: ICutParams): Promise<string[]>;
+    queryClipboardState(): Promise<IClipboardState>;
     moveArrayElement(params: IMoveArrayElementParams): Promise<boolean>;
     removeArrayElement(params: IRemoveArrayElementParams): Promise<boolean>;
     changeNodeLock(params: IChangeNodeLockParams): Promise<void>;
@@ -7750,7 +7760,7 @@ export declare interface IOriginAxesConfig {
     y: boolean;
     z: boolean;
 }
-export declare interface IPasteNodeParams {
+export declare interface IPasteParams {
     parentPath?: string;
     keepWorldTransform?: boolean;
 }
@@ -7909,8 +7919,8 @@ export declare interface IRemovedComponentInfo {
 }
 export declare interface IReorderParams {
     path: string;
-    from: number;
-    to: number;
+    target: number;
+    offset: number;
 }
 export declare interface IRevertToPrefabParams {
     nodePath: string;

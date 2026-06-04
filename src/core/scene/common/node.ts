@@ -154,6 +154,11 @@ export interface IDeleteNodeResult {
     path: string; // 节点相对根节点路径
 }
 
+export interface IClipboardState {
+    type: 'cut' | 'copy' | 'none';
+    paths: string[];
+}
+
 // 节点移动参数接口
 export interface ISetParentParams {
     paths: string[];
@@ -161,11 +166,10 @@ export interface ISetParentParams {
     keepWorldTransform?: boolean;
 }
 
-// 节点排序参数接口
 export interface IReorderParams {
-    path: string; // 父节点路径
-    from: number; // 原索引
-    to: number;   // 目标索引
+    path: string;     // 父节点路径
+    target: number;   // 当前索引
+    offset: number;   // 偏移量
 }
 
 // 节点拷贝参数接口
@@ -270,6 +274,7 @@ export type IPublicNodeService = Omit<INodeService, keyof IServiceEvents |
     'paste' |
     'duplicate' |
     'cut' |
+    'queryClipboardState' |
     'moveArrayElement' |
     'removeArrayElement' |
     'changeNodeLock'
@@ -441,6 +446,7 @@ export interface INodeService extends IServiceEvents {
     paste(params: IPasteParams): Promise<string[]>;
     duplicate(params: IDuplicateParams): Promise<string[]>;
     cut(params: ICutParams): Promise<string[]>;
+    queryClipboardState(): Promise<IClipboardState>;
 
     /**
      * 移动数组元素位置
