@@ -1,12 +1,18 @@
 import { join } from 'path';
-import { IBuildCommandOption, Platform } from './builder/@types/protected';
+import { BuildExitCode, IBuildCommandOption, Platform } from './builder/@types/protected';
 import utils from './base/utils';
 import { newConsole } from './base/console';
 import { startServer, getServerUrl } from '../server';
 import { GlobalConfig, GlobalPaths } from '../global';
 import scripting from './scripting';
 import { startupScene } from './scene';
-import { spawn } from 'child_process';
+
+interface IPreviewStartOptions {
+    port?: number;
+    platform?: Platform | string;
+    open?: boolean;
+    buildOptions?: Partial<IBuildCommandOption>;
+}
 
 
 /**
@@ -18,6 +24,7 @@ export default class Launcher {
 
     private _init = false;
     private _import = false;
+    private _extensionHost?: { dispose(): void };
 
     constructor(projectPath: string) {
         this.projectPath = projectPath;
@@ -85,12 +92,129 @@ export default class Launcher {
         await startupScene(GlobalPaths.enginePath, this.projectPath);
     }
 
-    async startPreview(port?: number) {
+    async startPreview(options: number | IPreviewStartOptions = {}) {
+        const previewOptions: IPreviewStartOptions = typeof options === 'number' ? { port: options } : options;
+        const platform = previewOptions.platform || previewOptions.buildOptions?.platform || 'web-desktop';
+        if (!platform.startsWith('web')) {
+            throw new Error(`Preview only supports web platforms, got: ${platform}`);
+        }
+
+        GlobalConfig.mode = 'simple';
         await this.import();
+        await startServer(previewOptions.port);
+
+        const { init, build } = await import('./builder');
+        await init(platform);
+
+        const buildOptions: Partial<IBuildCommandOption> = {
+            ...previewOptions.buildOptions,
+            platform,
+            outputName: previewOptions.buildOptions?.outputName || 'preview',
+            taskName: previewOptions.buildOptions?.taskName || 'preview',
+        };
+        if (buildOptions.debug === undefined) {
+            buildOptions.debug = true;
+        }
+
+        const result = await build(platform as Platform, buildOptions);
+        if (result.code !== BuildExitCode.BUILD_SUCCESS) {
+            throw new Error(result.reason || 'Preview build failed.');
+        }
+
+        const previewUrl = result.custom?.previewUrl;
+        if (!previewUrl) {
+            throw new Error('Preview build completed but did not return a preview URL.');
+        }
+
+        console.log(`Preview URL: ${previewUrl}`);
+        if (previewOptions.open !== false) {
+            const { openUrlAsync } = await import('./builder/platforms/web-common/utils');
+            await openUrlAsync(previewUrl);
+        }
+
+        return result;
+    }
+
+    /**
+     * 启动动态游戏预览（只托管不构建，对齐编辑器浏览器预览）。
+     * 与场景编辑器预览的区别：注册游戏预览中间件、开启热重载，不启动场景进程 / RPC。
+     */
+    async startGamePreview(options: { port?: number; scene?: string; open?: boolean } = {}) {
+        await this.import();
+        await startServer(options.port);
+
+        // getPreviewSettings 需要 builder 初始化
+        const { init: initBuilder } = await import('./builder');
+        await initBuilder();
+
+        // 先加载并注册项目扩展的预览后端（contributions.server + messages，跑扩展原码），
+        // 必须在 GamePreview 之前注册，使扩展具体路由优先于 scriptingRoutes 的宽泛正则。
+        // 失败隔离：扩展宿主任何异常都不应阻断预览启动。
+        try {
+            const { loadExtensionPreviewHost } = await import('./preview/extension-host');
+            this._extensionHost = await loadExtensionPreviewHost(this.projectPath);
+        } catch (err) {
+            console.warn('[ExtensionHost] init failed:', err);
+        }
+
+        // 注册游戏预览路由
+        const { middlewareService } = await import('../server/middleware');
+        const { default: GamePreviewMiddleware } = await import('./preview/game-preview.middleware');
+        middlewareService.register('GamePreview', GamePreviewMiddleware);
+
+        // 注册热重载
+        const { registerLiveReload } = await import('./preview/live-reload');
+        await registerLiveReload();
+
+        const serverUrl = getServerUrl();
+        const url = options.scene ? `${serverUrl}/?scene=${encodeURIComponent(options.scene)}` : serverUrl;
+        console.log(`Game preview: ${url}`);
+        await this.printPreviewScenes(serverUrl, options.scene);
+        if (options.open !== false) {
+            const { openUrlAsync } = await import('./builder/platforms/web-common/utils');
+            await openUrlAsync(url);
+        }
+    }
+
+    /**
+     * 打印当前启动场景与项目内可用场景列表，方便用 ?scene=<url|uuid> 切换。
+     */
+    private async printPreviewScenes(serverUrl: string, scene?: string) {
+        try {
+            const { assetManager } = await import('./assets');
+            const { getCachedPreviewSettings } = await import('./preview/preview-settings');
+            const { settings } = await getCachedPreviewSettings(scene || '');
+            const launchUuid = (settings as any)?.launch?.launchScene || '';
+            const launchInfo = launchUuid ? assetManager.queryAssetInfo(launchUuid) : null;
+            console.log(`Launch scene: ${launchInfo?.url || launchUuid || '(none)'}`);
+
+            const scenes = assetManager.queryAssetInfos({ ccType: 'cc.SceneAsset' });
+            if (scenes && scenes.length) {
+                console.log('Available scenes (switch via ?scene=<url-or-uuid>):');
+                for (const s of scenes) {
+                    console.log(`  ${serverUrl}/?scene=${encodeURIComponent(s.url)}`);
+                }
+            } else {
+                console.log('No scene asset found in project.');
+            }
+        } catch (err) {
+            console.warn('[Preview] Failed to list scenes:', err);
+        }
+    }
+
+    async startSceneEditorPreview(port?: number) {        await this.import();
         await startServer(port);
         // 初始化构建
         const { init: initBuilder } = await import('./builder');
         await initBuilder();
+
+        // 扩展预览后端（与游戏预览一致；需在 initScene 注册 SceneScripting 之前，使扩展路由优先）
+        try {
+            const { loadExtensionPreviewHost } = await import('./preview/extension-host');
+            this._extensionHost = await loadExtensionPreviewHost(this.projectPath);
+        } catch (err) {
+            console.warn('[ExtensionHost] init failed:', err);
+        }
 
         const { init: initScene } = await import('./scene');
         await initScene();
@@ -103,12 +227,8 @@ export default class Launcher {
         const { Rpc } = await import('./scene/main-process/rpc');
         await Rpc.startup();
 
-        const browserPath = process.platform === 'win32'
-            ? 'start'
-            : process.platform === 'darwin'
-                ? 'open'
-                : 'xdg-open';
-        spawn(browserPath, [getServerUrl()], { stdio: 'ignore', detached: true });
+        const { openUrlAsync } = await import('./builder/platforms/web-common/utils');
+        await openUrlAsync(getServerUrl());
     }
 
     /**
@@ -165,6 +285,13 @@ export default class Launcher {
     }
 
     async close() {
+        // 卸载扩展预览后端（调用各扩展自身的 unload，对齐 Creator 生命周期）
+        try {
+            this._extensionHost?.dispose();
+        } catch (err) {
+            console.warn('[ExtensionHost] dispose failed:', err);
+        }
+
         // 关闭服务器
         const { stopServer } = await import('../server');
         await stopServer();
