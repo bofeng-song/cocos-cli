@@ -3,7 +3,7 @@
 /**
  * 浏览器游戏预览运行时引导。
  *
- * 前半段（SystemJS + import-map + 引擎加载）与场景编辑器的 boot.js 一致；
+ * 前半段（SystemJS + import-map + 引擎加载）与场景编辑器的 scene-editor-boot.js 一致；
  * 区别在于结尾：这里调用 cc.game.init(settings) 并运行启动场景，而不是加载场景编辑器 bundle。
  * 流程对齐编辑器 preview-app/src/main.ts。
  */

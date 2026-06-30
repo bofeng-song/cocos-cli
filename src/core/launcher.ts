@@ -216,19 +216,36 @@ export default class Launcher {
             console.warn('[ExtensionHost] init failed:', err);
         }
 
+        const { middlewareService } = await import('../server/middleware');
+
+        // 运行视图（GameView, /game-view/）：独立 realm，PREVIEW 模式跑当前编辑场景，经 socket.io 中转
+        // Play/Stop/快照/实时同步。必须在 initScene 之前注册，使 /game-view/* 路由优先于场景中间件的
+        // 宽泛路由（/:dir/:uuid.:ext 等，否则会吞掉 /game-view/settings.js 等）。
+        const { default: GameViewMiddleware } = await import('./preview/game-view.middleware');
+        middlewareService.register('GameView', GameViewMiddleware);
+
         const { init: initScene } = await import('./scene');
         await initScene();
 
         // 注册调试用的中间件（仅 preview 模式）
-        const { middlewareService } = await import('../server/middleware');
         const { default: PreviewDebugMiddleware } = await import('./scene/preview.debug.middleware');
         middlewareService.register('PreviewDebug', PreviewDebugMiddleware);
+
+        // 注册热重载（脚本/资源变化广播 browser:reload）
+        const { registerLiveReload } = await import('./preview/live-reload');
+        await registerLiveReload();
 
         const { Rpc } = await import('./scene/main-process/rpc');
         await Rpc.startup();
 
+        const serverUrl = getServerUrl();
+        const sceneEditorUrl = `${serverUrl}/scene-editor/`;
+        const gameViewUrl = `${serverUrl}/game-view/`;
+        console.log(`Scene editor preview: ${sceneEditorUrl}`);
+        console.log(`Game view (run): ${gameViewUrl}`);
+
         const { openUrlAsync } = await import('./builder/platforms/web-common/utils');
-        await openUrlAsync(getServerUrl());
+        await openUrlAsync(sceneEditorUrl);
     }
 
     /**
