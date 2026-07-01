@@ -218,11 +218,15 @@ export default class Launcher {
 
         const { middlewareService } = await import('../server/middleware');
 
-        // 运行视图（GameView, /game-view/）：独立 realm，PREVIEW 模式跑当前编辑场景，经 socket.io 中转
-        // Play/Stop/快照/实时同步。必须在 initScene 之前注册，使 /game-view/* 路由优先于场景中间件的
-        // 宽泛路由（/:dir/:uuid.:ext 等，否则会吞掉 /game-view/settings.js 等）。
-        const { default: GameViewMiddleware } = await import('./preview/game-view.middleware');
-        middlewareService.register('GameView', GameViewMiddleware);
+        // 同时托管浏览器游戏预览（/），供场景编辑页“Preview”按钮启动。
+        // 需在 initScene 之前注册，使 / 及其资源路由（settings/assets/bundle）优先于场景中间件的宽泛路由
+        // （/:dir/:uuid.:ext 等，否则会把 /preview/settings.js、/assets/<bundle>/config.json 吞成 404）。
+        // 这些 handler 在非游戏预览资源时会 next() 放行，不影响场景编辑器自身请求。
+        const { default: GamePreviewMiddleware } = await import('./preview/game-preview.middleware');
+        middlewareService.register('GamePreview', GamePreviewMiddleware);
+        // 热重载：浏览器预览监听 browser:reload，脚本/资源变化后自动刷新
+        const { registerLiveReload } = await import('./preview/live-reload');
+        await registerLiveReload();
 
         const { init: initScene } = await import('./scene');
         await initScene();
@@ -231,18 +235,13 @@ export default class Launcher {
         const { default: PreviewDebugMiddleware } = await import('./scene/preview.debug.middleware');
         middlewareService.register('PreviewDebug', PreviewDebugMiddleware);
 
-        // 注册热重载（脚本/资源变化广播 browser:reload）
-        const { registerLiveReload } = await import('./preview/live-reload');
-        await registerLiveReload();
-
         const { Rpc } = await import('./scene/main-process/rpc');
         await Rpc.startup();
 
         const serverUrl = getServerUrl();
         const sceneEditorUrl = `${serverUrl}/scene-editor/`;
-        const gameViewUrl = `${serverUrl}/game-view/`;
         console.log(`Scene editor preview: ${sceneEditorUrl}`);
-        console.log(`Game view (run): ${gameViewUrl}`);
+        console.log(`Browser preview: ${serverUrl}/`);
 
         const { openUrlAsync } = await import('./builder/platforms/web-common/utils');
         await openUrlAsync(sceneEditorUrl);

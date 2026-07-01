@@ -27,8 +27,7 @@ export async function getLibraryDirs(): Promise<string[]> {
 
 /**
  * 游戏运行时共享的资源路由（settings / 原始资源 / bundle config / bundle index / 启动场景 JSON）。
- * 浏览器游戏预览（/）与编辑器内运行视图（/game-view/）共用同一套——它们都是「以 PREVIEW 模式跑游戏」，
- * 只是入口页与承载位置不同。这里抽出来导出，避免在两个 middleware 里重复定义。
+ * 浏览器游戏预览（/）使用；抽出为具名导出便于维护。
  */
 export const gamePreviewResourceRoutes = [
     {

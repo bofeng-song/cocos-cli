@@ -16,7 +16,6 @@ import {
 import { PrefabEditor, SceneEditor } from './editors';
 import { IAssetInfo } from '../../../assets/@types/public';
 import { Rpc } from '../rpc';
-import { sceneUtils } from './scene/utils';
 import { enrichMissingDependencyError } from './error-utils';
 
 /**
@@ -112,22 +111,6 @@ export class EditorService extends BaseService<IEditorEvents> implements IEditor
     getRootNode(): cc.Scene | cc.Node | null {
         const editor = this.currentEditorUuid && this.editorMap.get(this.currentEditorUuid);
         return editor ? editor.getRootNode() : null;
-    }
-
-    /**
-     * 序列化当前打开的场景为 JSON 字符串（格式同磁盘 .json / loadWithJson 入参），
-     * 供运行视图（GameView）以当前编辑场景的快照启动。仅场景编辑器有效。
-     */
-    async querySceneJson(): Promise<string | null> {
-        const editor = this.currentEditorUuid && this.editorMap.get(this.currentEditorUuid);
-        if (!editor || !(editor instanceof SceneEditor)) {
-            return null;
-        }
-        const root = editor.getRootNode();
-        if (!root) {
-            return null;
-        }
-        return sceneUtils.serialize(root as cc.Scene);
     }
 
     async open(params: IOpenOptions): Promise<TEditorEntity> {

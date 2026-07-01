@@ -180,6 +180,10 @@
                     <span id="sceneStatus" class="info-text">Not loaded</span>
                 </div>
                 <div class="row">
+                    <button class="btn btn-primary" id="btnPreview" onclick="openBrowserPreview()">▶ Preview (Browser)</button>
+                    <span class="info-text">opens /</span>
+                </div>
+                <div class="row">
                     <label>Script</label>
                     <input type="text" id="scriptNameInput" placeholder="TestComponent" value="TestComponent" style="flex:1;background:#2a2a2a;color:#ddd;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;">
                 </div>
@@ -188,18 +192,6 @@
                     <button class="btn" onclick="doDeleteScript()">Delete Script</button>
                     <button class="btn" onclick="doCheckMenus()">Check Menus</button>
                     <span id="scriptStatus" class="info-text">-</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- GameView (run) -->
-        <div class="panel-section" id="sec-gameview">
-            <h3 onclick="toggleSection('sec-gameview')">GameView (Run)</h3>
-            <div class="section-body">
-                <div class="row">
-                    <button class="btn btn-primary" id="btnPlay" onclick="doPlay()">▶ Play</button>
-                    <button class="btn" id="btnStop" onclick="doStop()">■ Stop</button>
-                    <span id="gameviewStatus" class="info-text">Play opens a tab</span>
                 </div>
             </div>
         </div>
@@ -408,8 +400,6 @@
             serverURL: '<%= serverURL %>'
         };
     </script>
-    <!-- socket.io 客户端：向运行视图（/game-view/）转发 Play/Stop + 当前场景快照 -->
-    <script src="/socket.io/socket.io.js"></script>
     <script type="module">
         const { default: boot } = await import("/static/web/scene-editor-boot.js");
         await boot();
@@ -447,154 +437,21 @@
             document.getElementById(id).classList.toggle('folded');
         }
 
-        /* ── GameView (run) ── */
-        // 编辑器 realm 与运行视图 realm 经服务端 socket.io 通信
-        var gvSocket = null;
-        var gvWindow = null;       // 运行视图标签句柄（复用，避免每次 Play 重开）
-        var gvLastSnapshot = null; // 最近一次 Play 的场景快照，用于给新连上的运行视图补发
-        function getGvSocket() {
-            if (!gvSocket && window.io) {
-                gvSocket = window.io(window.WebEnv.serverURL);
-                // 运行视图就绪（新标签连上）时补发当前快照，解决「先 Play 开标签、标签后连上」的时序
-                gvSocket.on('gameview:hello', function () {
-                    if (gvLastSnapshot) {
-                        gvSocket.emit('gameview:play', { sceneJson: gvLastSnapshot });
-                        log('GameView ready → snapshot re-sent', 'status-ok');
-                    }
-                });
-            }
-            return gvSocket;
-        }
-
-        // 确保运行视图标签已打开（复用具名窗口；用户点击手势内调用以避开弹窗拦截）
-        function ensureGameViewWindow() {
-            if (!gvWindow || gvWindow.closed) {
-                gvWindow = window.open('/game-view/', 'cocos-gameview');
-            } else {
-                try { gvWindow.focus(); } catch (e) { /* ignore */ }
-            }
-        }
-
-        // 实时增量同步：轮询当前选中节点的 transform，变化时推给运行视图（按 uuid 应用，不重载场景）。
-        // 这让「编辑器拖动物体」在运行视图里实时变化（仅对无脚本/物理覆盖的节点直观可见）。
-        var gvSyncTimer = null;
-        var gvLastXform = {};
-        function startGvSyncLoop() {
-            if (gvSyncTimer) return;
-            gvSyncTimer = setInterval(function () {
-                try {
-                    if (!gvSocket) return;
-                    var sel = window.cli && window.cli.Scene && window.cli.Scene.Selection;
-                    // Selection.query() 返回的是「层级路径」，不是 uuid
-                    var paths = (sel && sel.query && sel.query()) || [];
-                    if (!paths.length) return;
-                    var EE = (window.cc && window.cc.EditorExtends) || window.EditorExtends;
-                    if (!EE || !EE.Node) return;
-                    var nodes = [];
-                    for (var i = 0; i < paths.length; i++) {
-                        var selPath = paths[i];
-                        var n = EE.Node.getNodeByPath ? EE.Node.getNodeByPath(selPath) : null;
-                        if (!n) continue;
-                        var p = n.position, e = n.eulerAngles, s = n.scale;
-                        var sig = [p.x, p.y, p.z, e.x, e.y, e.z, s.x, s.y, s.z, n.active].join(',');
-                        if (gvLastXform[selPath] === sig) continue;
-                        gvLastXform[selPath] = sig;
-                        // 运行视图（PREVIEW，无 uuid）用 cc.find(path) 匹配同一节点
-                        var emitPath = n.getPathInHierarchy ? n.getPathInHierarchy() : selPath;
-                        nodes.push({ path: emitPath, pos: [p.x, p.y, p.z], rot: [e.x, e.y, e.z], scale: [s.x, s.y, s.z], active: n.active });
-                    }
-                    if (nodes.length) {
-                        gvSocket.emit('gameview:sync', { nodes: nodes });
-                    }
-                } catch (e) { /* ignore */ }
-            }, 50);
-            // 组件属性 / 引用 / 结构变化：增量套不住（运行视图是 PREVIEW 引擎，没有编辑器 set-property/引用解析），
-            // 改用「防抖重推快照」——重新序列化场景并让运行视图 loadWithJson 重载，完整覆盖脚本属性、节点引用、资源引用。
-            // 纯 transform（拖动）走上面的增量路径，这里跳过，避免拖动时整场景重载。
-            if (!gvChangeSubscribed && window.cli && window.cli.SceneEvents && window.cli.SceneEvents.on) {
-                window.cli.SceneEvents.on('node:change', function (node, opts) {
-                    if (opts && opts.type === 'transform-changed') return; // 拖动由增量同步处理
-                    scheduleResnapshot();
-                });
-                gvChangeSubscribed = true;
-            }
-        }
-
-        // 防抖重推当前场景快照（组件属性/引用/结构变化时）。重载会重置运行态，故防抖合并。
-        var gvChangeTimer = null;
-        var gvChangeSubscribed = false;
-        function scheduleResnapshot() {
-            if (gvChangeTimer) clearTimeout(gvChangeTimer);
-            gvChangeTimer = setTimeout(async function () {
-                gvChangeTimer = null;
-                try {
-                    if (!gvSocket) return;
-                    var json = await querySceneJson();
-                    if (!json) return;
-                    gvLastSnapshot = json;
-                    gvLastXform = {}; // 场景将重载，清空增量基线
-                    gvSocket.emit('gameview:play', { sceneJson: json });
-                } catch (e) { /* ignore */ }
-            }, 300);
-        }
-
-        // 序列化当前打开的场景为 JSON 字符串（loadWithJson 同格式）
-        async function querySceneJson() {
-            // 首选 Editor 服务的接口（scene-bundle 重新构建后可用）
+        // 打开浏览器预览（根路径 /，CC_PREVIEW 跑游戏）。默认预览“当前打开的场景”，
+        // 取不到时退回场景输入框里的 UUID/URL，再退回项目默认启动场景。
+        function openBrowserPreview() {
+            let scene = '';
             try {
-                const fn = window.cli && window.cli.Scene && window.cli.Scene.Editor && window.cli.Scene.Editor.querySceneJson;
-                if (typeof fn === 'function') {
-                    const json = await window.cli.Scene.Editor.querySceneJson();
-                    if (json) return json;
-                }
-            } catch (e) { /* 回退 */ }
-            // 回退：页面内直接序列化当前运行场景
-            const EditorExtends = (window.cc && window.cc.EditorExtends) || window.EditorExtends;
-            const scene = window.cc && window.cc.director && window.cc.director.getScene();
-            if (EditorExtends && scene) {
-                const asset = new window.cc.SceneAsset();
-                asset.scene = scene;
-                return EditorExtends.serialize(asset);
+                const ed = window.cli && window.cli.Scene && window.cli.Scene.Editor;
+                const uuid = ed && ed.getCurrentEditorUuid && ed.getCurrentEditorUuid();
+                if (uuid) scene = uuid;
+            } catch (e) { /* ignore */ }
+            if (!scene) {
+                const input = document.getElementById('sceneInput');
+                if (input && input.value.trim()) scene = input.value.trim();
             }
-            return null;
-        }
-
-        async function doPlay() {
-            const status = document.getElementById('gameviewStatus');
-            const socket = getGvSocket();
-            if (!socket) { log('socket.io unavailable', 'status-err'); return; }
-            try {
-                const sceneJson = await querySceneJson();
-                if (!sceneJson) {
-                    status.textContent = 'no scene to play';
-                    status.className = 'info-text status-warn';
-                    log('Play: no open scene', 'status-warn');
-                    return;
-                }
-                gvLastSnapshot = sceneJson;
-                // 在用户点击手势内打开/聚焦运行视图标签（避开弹窗拦截）
-                ensureGameViewWindow();
-                // 已打开的标签即时收到；刚新开的标签会在 connect 后通过 hello 握手补发
-                socket.emit('gameview:play', { sceneJson });
-                gvLastXform = {};      // 重置增量基线，避免沿用上次场景的签名
-                startGvSyncLoop();     // 开启实时 transform 同步
-                status.textContent = 'playing →';
-                status.className = 'info-text status-ok';
-                log('GameView play', 'status-ok');
-            } catch (e) {
-                log('Play error: ' + e.message, 'status-err');
-            }
-        }
-
-        function doStop() {
-            const status = document.getElementById('gameviewStatus');
-            const socket = getGvSocket();
-            if (!socket) { log('socket.io unavailable', 'status-err'); return; }
-            if (gvSyncTimer) { clearInterval(gvSyncTimer); gvSyncTimer = null; }
-            socket.emit('gameview:stop');
-            status.textContent = 'stopped';
-            status.className = 'info-text';
-            log('GameView stop', 'status-ok');
+            const url = scene ? '/?scene=' + encodeURIComponent(scene) : '/';
+            window.open(url, '_blank');
         }
 
         /* ── Scene ── */
@@ -1116,8 +973,7 @@
         window.safeCall = safeCall;
         window.togglePanel = togglePanel;
         window.toggleSection = toggleSection;
-        window.doPlay = doPlay;
-        window.doStop = doStop;
+        window.openBrowserPreview = openBrowserPreview;
     </script>
 </body>
 </html>
