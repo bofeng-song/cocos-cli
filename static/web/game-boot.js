@@ -73,6 +73,30 @@ export default async function gameBoot() {
 
         await cc.game.init(option);
 
+        // 分辨率适配策略（仅浏览器预览）：按项目 designResolution 设置套用 ResolutionPolicy，
+        // 使预览的拉伸/留边行为与真机构建一致。预览 settings 里的 screen.designResolution.policy
+        // 已由构建流程从 fitWidth/fitHeight 换算而来（SHOW_ALL / FIXED_WIDTH / FIXED_HEIGHT / NO_BORDER，
+        // 见 builder/worker/builder/index.ts），优先使用；缺省时回退到 fitWidth/fitHeight 规则。
+        // 场景编辑器（engine-bootstrap.ts）不走这里，保持 SHOW_ALL。
+        try {
+            const dr = settings && settings.screen && settings.screen.designResolution;
+            if (dr) {
+                const drWidth = Number(dr.width) || 1280;
+                const drHeight = Number(dr.height) || 720;
+                let drPolicy = dr.policy;
+                if (drPolicy === undefined || drPolicy === null) {
+                    drPolicy = cc.ResolutionPolicy.SHOW_ALL;
+                    const fw = dr.fitWidth !== false;
+                    const fh = dr.fitHeight === true;
+                    if (fw && !fh) drPolicy = cc.ResolutionPolicy.FIXED_WIDTH;
+                    else if (!fw && fh) drPolicy = cc.ResolutionPolicy.FIXED_HEIGHT;
+                }
+                cc.view.setDesignResolutionSize(drWidth, drHeight, drPolicy);
+            }
+        } catch (e) {
+            console.warn('[Game Preview] set design resolution failed:', e);
+        }
+
         await cc.game.run(async () => {
             cc.game.pause();
             const json = await (await fetch(`${env.serverURL}/scene/${encodeURIComponent(launchScene)}.json`)).json();
