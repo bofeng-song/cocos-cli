@@ -80,10 +80,22 @@ export const scriptingRoutes = [
                         filePath = fallbackPath;
                     }
                 }
-                if (await pathExists(filePath)) {
-                    res.status(200).send(await readFile(filePath));
+                // 目录白名单：只允许读取引擎目录下的文件（editor-stub 请求的路径均来自
+                // query-engine-info 返回的 native/typescript 路径），拒绝任意系统文件读取。
+                const { Engine } = await import('../engine');
+                const info: any = Engine.getInfo();
+                const allowedRoots = [GlobalPaths.enginePath, info?.native?.path, info?.typescript?.path]
+                    .filter((p): p is string => !!p)
+                    .map((p) => path.resolve(p));
+                const resolved = path.resolve(filePath);
+                const allowed = allowedRoots.some((root) => resolved === root || resolved.startsWith(root + path.sep));
+                if (!allowed) {
+                    return res.status(403).send('Forbidden');
+                }
+                if (await pathExists(resolved)) {
+                    res.status(200).send(await readFile(resolved));
                 } else {
-                    res.status(404).send('File not found: ' + filePath);
+                    res.status(404).send('File not found: ' + resolved);
                 }
             } catch (err) {
                 next(err);

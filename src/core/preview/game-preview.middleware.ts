@@ -1,6 +1,6 @@
 import type { IMiddlewareContribution } from '../../server/interfaces';
 import { Request, Response, NextFunction } from 'express';
-import { basename, join } from 'path';
+import { basename, join, relative, isAbsolute } from 'path';
 import { existsSync } from 'fs';
 import ejs from 'ejs';
 import { GlobalPaths } from '../../global';
@@ -62,10 +62,22 @@ export const gamePreviewResourceRoutes = [
                 if (!match) {
                     return next();
                 }
-                // 逐段 encode，兼容子资源 `@` 与含特殊字符的目录名
-                const tail = match[1].replace(/[^(\\|/|@)]+/g, encodeURIComponent);
+                // 逐段 encode，兼容子资源 `@` 与含特殊字符的目录名（仅保留分隔符 / \ 与 @ 不编码）
+                const tail = match[1].replace(/[^\\/@]+/g, encodeURIComponent);
                 const dirs = await getLibraryDirs();
-                const hit = dirs.map((d) => join(d, tail)).find((f) => existsSync(f));
+                // 防目录穿越：join 后必须仍位于 library 目录内，否则跳过（`..` 会逃逸出目录）
+                let hit: string | undefined;
+                for (const d of dirs) {
+                    const full = join(d, tail);
+                    const rel = relative(d, full);
+                    if (rel.startsWith('..') || isAbsolute(rel)) {
+                        continue;
+                    }
+                    if (existsSync(full)) {
+                        hit = full;
+                        break;
+                    }
+                }
                 if (!hit) {
                     return next();
                 }

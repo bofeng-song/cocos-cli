@@ -33,7 +33,7 @@ export class PreviewCommand extends BaseCommand {
                     const { default: Launcher } = await import('../core/launcher');
                     const launcher = new Launcher(resolvedPath);
                     if (options.sceneEditor) {
-                        await launcher.startSceneEditorPreview(port);
+                        await launcher.startSceneEditorPreview({ port, open: options.open });
                     } else if (options.build) {
                         let buildOptions: Record<string, any> = {};
                         if (options.buildConfig) {

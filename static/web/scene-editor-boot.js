@@ -1,56 +1,31 @@
-/* global window, document, System, globalThis, fetch */
+/* global System, globalThis */
 
-export default async function boot () {
-  try {
-    const env = window.WebEnv;
-    const envRes = await fetch(`${env.serverURL}/scripting/web-env`);
-    Object.assign(env, await envRes.json());
+import { loadEngine } from '/static/web/engine-loader.js';
 
-    await import('/static/web/polyfills.bundle.js');
-    await import('/scripting/systemjs/system.js');
-    await import('/scripting/systemjs/extras/named-register.js');
+/**
+ * 场景编辑器预览引导。
+ *
+ * 引擎加载流程与浏览器游戏预览的 game-boot.js 共用 engine-loader.js；区别在于这里以默认
+ * 编辑器模式加载（不覆盖 CC_EDITOR/CC_PREVIEW），并在结尾加载 scene-bundle 启动场景服务，
+ * 而不是运行游戏。
+ */
+export default async function boot() {
+    try {
+        const env = await loadEngine();
 
-    // Inject import maps. System.import naturally waits for them!
-    const sources = [
-        '/scripting/engine-dist/import-map.json',
-        '/scripting/x/pack-import-map-url',
-        '/scripting/import-map-global'
-    ];
-    sources.forEach(src => {
-        const script = document.createElement('script');
-        Object.assign(script, {
-            type: 'systemjs-importmap',
-            src
+        const _originalSystem = System;
+        console.log('[Scene] loading scene bundle');
+        // SystemJS natively awaits the attached import maps above
+        const SceneBundle = await System.import('/static/web/scene-bundle.js');
+        const { startup } = SceneBundle;
+
+        globalThis.System = _originalSystem;
+        await startup({
+            enginePath: env.enginePath,
+            serverURL: env.serverURL,
         });
-        document.head.appendChild(script);
-    });
-
-    System.setResolutionDetailMapCallback(function () {
-        const url = new URL('/scripting/x/resolution-detail-map', env.serverURL);
-        return fetch(url).then(function (response) {
-            return response.json();
-        }).then(function (json) {
-            return { json, url: url.href };
-        });
-    });
-
-    await import('/static/web/editor-stub-preload.js');
-    await import('/static/web/editor-extends.bundle.js');
-    await import('/scripting/engine-dist/bundled/index.js');
-
-    const _originalSystem = System;
-    console.log('[Scene] loading scene bundle');
-    // SystemJS natively awaits the attached import maps above
-    const SceneBundle = await System.import('/static/web/scene-bundle.js');
-    const { startup } = SceneBundle;
-
-    globalThis.System = _originalSystem;
-    await startup({
-        enginePath: env.enginePath,
-        serverURL: env.serverURL
-    });
-    console.log('Cocos Engine and Scene Services loaded successfully');
-  } catch (err) {
-    console.error('Failed to load Cocos Engine or Services:', err.stack || err);
-  }
+        console.log('Cocos Engine and Scene Services loaded successfully');
+    } catch (err) {
+        console.error('Failed to load Cocos Engine or Services:', err.stack || err);
+    }
 }

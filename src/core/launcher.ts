@@ -24,7 +24,6 @@ export default class Launcher {
 
     private _init = false;
     private _import = false;
-    private _extensionHost?: { dispose(): void };
 
     constructor(projectPath: string) {
         this.projectPath = projectPath;
@@ -137,7 +136,7 @@ export default class Launcher {
 
     /**
      * 启动动态游戏预览（只托管不构建，对齐编辑器浏览器预览）。
-     * 与场景编辑器预览的区别：注册游戏预览中间件、开启热重载，不启动场景进程 / RPC。
+     * 与场景编辑器预览的区别：不启动场景进程 / RPC。
      */
     async startGamePreview(options: { port?: number; scene?: string; open?: boolean } = {}) {
         await this.import();
@@ -147,24 +146,8 @@ export default class Launcher {
         const { init: initBuilder } = await import('./builder');
         await initBuilder();
 
-        // 先加载并注册项目扩展的预览后端（contributions.server + messages，跑扩展原码），
-        // 必须在 GamePreview 之前注册，使扩展具体路由优先于 scriptingRoutes 的宽泛正则。
-        // 失败隔离：扩展宿主任何异常都不应阻断预览启动。
-        try {
-            const { loadExtensionPreviewHost } = await import('./preview/extension-host');
-            this._extensionHost = await loadExtensionPreviewHost(this.projectPath);
-        } catch (err) {
-            console.warn('[ExtensionHost] init failed:', err);
-        }
-
-        // 注册游戏预览路由
-        const { middlewareService } = await import('../server/middleware');
-        const { default: GamePreviewMiddleware } = await import('./preview/game-preview.middleware');
-        middlewareService.register('GamePreview', GamePreviewMiddleware);
-
-        // 注册热重载
-        const { registerLiveReload } = await import('./preview/live-reload');
-        await registerLiveReload();
+        const { registerBrowserPreview } = await import('./preview/register');
+        await registerBrowserPreview(this.projectPath);
 
         const serverUrl = getServerUrl();
         const url = options.scene ? `${serverUrl}/?scene=${encodeURIComponent(options.scene)}` : serverUrl;
@@ -202,36 +185,21 @@ export default class Launcher {
         }
     }
 
-    async startSceneEditorPreview(port?: number) {        await this.import();
-        await startServer(port);
+    async startSceneEditorPreview(options: number | { port?: number; open?: boolean } = {}) {
+        const opts = typeof options === 'number' ? { port: options } : options;
+        await this.import();
+        await startServer(opts.port);
         // 初始化构建
         const { init: initBuilder } = await import('./builder');
         await initBuilder();
 
-        // 扩展预览后端（与游戏预览一致；需在 initScene 注册 SceneScripting 之前，使扩展路由优先）
-        try {
-            const { loadExtensionPreviewHost } = await import('./preview/extension-host');
-            this._extensionHost = await loadExtensionPreviewHost(this.projectPath);
-        } catch (err) {
-            console.warn('[ExtensionHost] init failed:', err);
-        }
-
-        const { middlewareService } = await import('../server/middleware');
-
-        // 同时托管浏览器游戏预览（/），供场景编辑页“Preview”按钮启动。
-        // 需在 initScene 之前注册，使 / 及其资源路由（settings/assets/bundle）优先于场景中间件的宽泛路由
-        // （/:dir/:uuid.:ext 等，否则会把 /preview/settings.js、/assets/<bundle>/config.json 吞成 404）。
-        // 这些 handler 在非游戏预览资源时会 next() 放行，不影响场景编辑器自身请求。
-        const { default: GamePreviewMiddleware } = await import('./preview/game-preview.middleware');
-        middlewareService.register('GamePreview', GamePreviewMiddleware);
-        // 热重载：浏览器预览监听 browser:reload，脚本/资源变化后自动刷新
-        const { registerLiveReload } = await import('./preview/live-reload');
-        await registerLiveReload();
-
+        // initScene() 内部会先注册浏览器游戏预览路由（/ 及资源路由），再注册场景中间件，
+        // 使浏览器预览与场景编辑器共用一台 server 且路由优先级正确（见 scene/index.ts init）。
         const { init: initScene } = await import('./scene');
         await initScene();
 
         // 注册调试用的中间件（仅 preview 模式）
+        const { middlewareService } = await import('../server/middleware');
         const { default: PreviewDebugMiddleware } = await import('./scene/preview.debug.middleware');
         middlewareService.register('PreviewDebug', PreviewDebugMiddleware);
 
@@ -243,8 +211,10 @@ export default class Launcher {
         console.log(`Scene editor preview: ${sceneEditorUrl}`);
         console.log(`Browser preview: ${serverUrl}/`);
 
-        const { openUrlAsync } = await import('./builder/platforms/web-common/utils');
-        await openUrlAsync(sceneEditorUrl);
+        if (opts.open !== false) {
+            const { openUrlAsync } = await import('./builder/platforms/web-common/utils');
+            await openUrlAsync(sceneEditorUrl);
+        }
     }
 
     /**
@@ -301,11 +271,12 @@ export default class Launcher {
     }
 
     async close() {
-        // 卸载扩展预览后端（调用各扩展自身的 unload，对齐 Creator 生命周期）
+        // 释放浏览器预览资源（扩展预览后端 + 热重载监听），对齐 Creator 生命周期
         try {
-            this._extensionHost?.dispose();
+            const { disposeBrowserPreview } = await import('./preview/register');
+            await disposeBrowserPreview();
         } catch (err) {
-            console.warn('[ExtensionHost] dispose failed:', err);
+            console.warn('[Preview] dispose failed:', err);
         }
 
         // 关闭服务器

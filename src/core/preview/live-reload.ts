@@ -12,6 +12,19 @@ import { invalidatePreviewSettings } from './preview-settings';
  */
 let timer: NodeJS.Timeout | null = null;
 let registered = false;
+// 保存已注册的监听源与回调，供 unregisterLiveReload 精确解绑，避免预览重启后监听泄漏。
+let scriptingRef: { off?: Function; removeListener?: Function } | null = null;
+let assetDBRef: { off?: Function; removeListener?: Function } | null = null;
+let onCompiled: (() => void) | null = null;
+let onRefreshFinish: (() => void) | null = null;
+
+function removeListener(emitter: { off?: Function; removeListener?: Function } | null, event: string, fn: Function | null): void {
+    if (!emitter || !fn) {
+        return;
+    }
+    const off = emitter.off || emitter.removeListener;
+    off?.call(emitter, event, fn);
+}
 
 function scheduleReload(): void {
     invalidatePreviewSettings();
@@ -45,8 +58,33 @@ export async function registerLiveReload(): Promise<void> {
     const { default: scripting } = await import('../scripting');
     const { assetDBManager } = await import('../assets');
 
+    onCompiled = () => scheduleReload();
+    onRefreshFinish = () => scheduleReload();
+    scriptingRef = scripting as any;
+    assetDBRef = assetDBManager as any;
+
     // 脚本重编译成功
-    scripting.on('compiled', () => scheduleReload());
+    scripting.on('compiled', onCompiled);
     // 资源批量刷新结束
-    assetDBManager.on('assets:refresh-finish', () => scheduleReload());
+    assetDBManager.on('assets:refresh-finish', onRefreshFinish);
+}
+
+/**
+ * 注销热重载监听并清理去抖定时器。预览关闭时调用，避免同进程内重启预览时监听/定时器泄漏。
+ */
+export function unregisterLiveReload(): void {
+    if (!registered) {
+        return;
+    }
+    if (timer) {
+        clearTimeout(timer);
+        timer = null;
+    }
+    removeListener(scriptingRef, 'compiled', onCompiled);
+    removeListener(assetDBRef, 'assets:refresh-finish', onRefreshFinish);
+    scriptingRef = null;
+    assetDBRef = null;
+    onCompiled = null;
+    onRefreshFinish = null;
+    registered = false;
 }
