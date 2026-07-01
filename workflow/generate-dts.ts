@@ -310,13 +310,16 @@ async function generate() {
 // stackSizeMb / maxOldGenerationSizeMb 取代命令行的 --stack-size / --max-old-space-size，
 // 成为栈/堆大小的唯一来源，避免两个数不一致又崩。
 if (isMainThread) {
-    // tsx 会 patch worker_threads，使 worker 能直接加载 .ts 入口（本进程经 tsx 启动）。
     // worker 入口用 cwd 拼路径而非 __filename：ESM 作用域无 __filename，且 npm 以仓库根为 cwd。
+    // execArgv 显式挂 tsx loader，使 worker 能加载 .ts 入口：不能依赖 tsx 对 worker_threads 的
+    // 自动 patch —— 该 patch 在部分环境（如 CI）下不生效，会报 ERR_UNKNOWN_FILE_EXTENSION ".ts"。
+    // 显式 --import tsx 跨环境确定生效。（worker 堆由 resourceLimits 控制，无需继承 --max-old-space-size。）
     const worker = new Worker(path.join(projectRoot, 'workflow', 'generate-dts.ts'), {
         resourceLimits: {
             stackSizeMb: 16,
             maxOldGenerationSizeMb: 4096,
         },
+        execArgv: ['--import', 'tsx'],
     });
     worker.on('error', (err) => {
         console.error(err);
