@@ -47,6 +47,18 @@ export async function getCachedPreviewSettings(startScene = ''): Promise<IPrevie
     const allScenes = assetManager.queryAssetInfos({ ccType: 'cc.SceneAsset' }) || [];
     (options as any).scenes = allScenes.map((scene) => ({ url: scene.url, uuid: scene.uuid }));
     const result = await getPreviewSettings(options);
+
+    // 动态预览「只托管不构建」，但 getPreviewSettings 给出的 rendering.effectSettingsPath 默认指向
+    // 构建产物 'src/effect.bin'（见 setting-task/utils/project-options.ts）。该文件在预览下不存在，
+    // 浏览器请求 GET /src/effect.bin 会 404，引擎再把 404 页面当二进制解析，报
+    // "RangeError: Offset is outside the bounds of the DataView"。
+    // 自定义渲染管线时改指向动态 effect-settings 路由，与场景编辑器（engine/index.ts）一致，
+    // 由服务端从 temp/asset-db/effect/effect.bin 提供。
+    const rendering: any = (result as any)?.settings?.rendering;
+    if (rendering && rendering.effectSettingsPath) {
+        rendering.effectSettingsPath = '/scripting/engine/effect-settings';
+    }
+
     cache.set(startScene, result);
     return result;
 }
