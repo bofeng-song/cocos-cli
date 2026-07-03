@@ -5713,6 +5713,7 @@ export declare interface IEditorService extends IServiceEvents {
 export declare interface IEngineService extends IServiceEvents {
     init(): Promise<void>;
     repaintInEditMode(): Promise<void>;
+    changeDebugOption(key: string, value: any): Promise<void>;
     initCustomLayer(layers?: ICustomLayerConfig[]): Promise<void>;
 }
 export declare interface IExecuteComponentMethodOptions {

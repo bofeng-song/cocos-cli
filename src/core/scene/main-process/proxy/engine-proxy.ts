@@ -7,5 +7,8 @@ export const EngineProxy: IPublicEngineService = {
     },
     repaintInEditMode() {
         return Rpc.getInstance().request('Engine', 'repaintInEditMode');
+    },
+    changeDebugOption(key: string, value: any) {
+        return Rpc.getInstance().request('Engine', 'changeDebugOption', [key, value]);
     }
 };

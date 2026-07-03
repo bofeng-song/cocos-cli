@@ -89,6 +89,45 @@ export class EngineService extends BaseService<IEngineEvents> implements IEngine
         }
     }
 
+    /**
+     * 渲染调试视图（DebugView）：单一通道调试 / 组合光照项开关 / 纯光照带固有色 / 级联阴影染色。
+     * 与 cocos-editor scene-facade-manager.changeDebugOption 对齐。
+     * @param key 'single' | 'composite' | 'LIGHTING_WITH_BASE_COLOR' | 'CSM_LAYER_COLORATION'
+     * @param value single: DebugViewSingleType 数值；composite: { key: DebugViewCompositeType | 10000(=ALL), value: boolean }；其余: boolean
+     */
+    public async changeDebugOption(key: string, value: any) {
+        // debugView 未在 Root 类型里声明；2D 或引擎未就绪时可能为空
+        const debugView = (director.root as any)?.debugView;
+        if (!debugView) {
+            return;
+        }
+        switch (key) {
+            case 'single':
+                // 渲染单项调试模式
+                debugView.singleMode = value;
+                break;
+            case 'composite':
+                // 渲染组合调试模式（key === 10000 表示全部）
+                if (value?.key === 10000) {
+                    debugView.enableAllCompositeMode(value.value);
+                } else {
+                    debugView.enableCompositeMode(value?.key, value?.value);
+                }
+                break;
+            case 'LIGHTING_WITH_BASE_COLOR':
+                // 光照信息带固有色（纯光照切换）
+                debugView.lightingWithAlbedo = value;
+                break;
+            case 'CSM_LAYER_COLORATION':
+                // 级联阴影染色
+                debugView.csmLayerColoration = value;
+                break;
+            default:
+                break;
+        }
+        void this.repaintInEditMode();
+    }
+
     public async initCustomLayer(layers?: ICustomLayerConfig[]) {
         if (!Array.isArray(layers)) {
             return;
