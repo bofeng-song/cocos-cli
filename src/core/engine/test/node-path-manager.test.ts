@@ -38,6 +38,51 @@ describe('NodePathManager parent updates', () => {
     });
 });
 
+describe('NodePathManager.updateUuid (rename)', () => {
+    let manager: NodePathManager;
+
+    beforeEach(() => {
+        manager = new NodePathManager();
+    });
+
+    it('remaps the renamed node and all descendant paths', () => {
+        // 模拟层级面板里给"带子节点的组件节点"（如 Button/EditBox）改名：Button 下有 Label，Label 下有 Icon
+        expect(manager.generateUniquePath('button', 'Button', 'scene')).toBe('Button');
+        expect(manager.generateUniquePath('label', 'Label', 'button')).toBe('Button/Label');
+        expect(manager.generateUniquePath('icon', 'Icon', 'label')).toBe('Button/Label/Icon');
+
+        manager.updateUuid('button', 'BtnOK', 'scene');
+
+        // 自身与所有子孙路径都应更新
+        expect(manager.getNodePath('button')).toBe('BtnOK');
+        expect(manager.getNodePath('label')).toBe('BtnOK/Label');
+        expect(manager.getNodePath('icon')).toBe('BtnOK/Label/Icon');
+        // 新路径能反查到 uuid
+        expect(manager.getNodeUuid('BtnOK')).toBe('button');
+        expect(manager.getNodeUuid('BtnOK/Label')).toBe('label');
+        expect(manager.getNodeUuid('BtnOK/Label/Icon')).toBe('icon');
+        // 旧路径应全部失效（不能残留在缓存里）
+        expect(manager.getNodeResult('Button').error).toBe('Not found');
+        expect(manager.getNodeResult('Button/Label').error).toBe('Not found');
+        expect(manager.getNodeResult('Button/Label/Icon').error).toBe('Not found');
+    });
+
+    it('uniquifies the new name against siblings and keeps descendants attached', () => {
+        expect(manager.generateUniquePath('a', 'A', 'scene')).toBe('A');
+        expect(manager.generateUniquePath('b', 'B', 'scene')).toBe('B');
+        expect(manager.generateUniquePath('bChild', 'C', 'b')).toBe('B/C');
+
+        // 改成与兄弟同名 A → 自增后缀，子孙跟随新前缀
+        manager.updateUuid('b', 'A', 'scene');
+
+        expect(manager.getNodePath('b')).toBe('A_001');
+        expect(manager.getNodePath('bChild')).toBe('A_001/C');
+        expect(manager.getNodeUuid('A_001/C')).toBe('bChild');
+        expect(manager.getNodeResult('B').error).toBe('Not found');
+        expect(manager.getNodeResult('B/C').error).toBe('Not found');
+    });
+});
+
 describe('NodePathManager.changeUuid', () => {
     let manager: NodePathManager;
 

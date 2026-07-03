@@ -224,28 +224,34 @@ export class NodePathManager {
 
     updateUuid(uuid: string, newName: string, parentUuid?: string) {
         const oldPath = this._uuidToPath.get(uuid);
-        // 生成新的唯一路径
-        const newPath = this.generateUniquePath(uuid, newName, parentUuid);
 
-        // 更新路径映射
-        this._uuidToPath.set(uuid, newPath);
-        this._pathToUuid.delete(oldPath!);
-        this._pathToUuid.set(newPath, uuid);
-
-        const oldLowerPath = oldPath!.toLowerCase();
-        const oldUuids = this._lowerPathToUuids.get(oldLowerPath);
-        if (oldUuids) {
-            oldUuids.delete(uuid);
-            if (oldUuids.size === 0) {
-                this._lowerPathToUuids.delete(oldLowerPath);
-            }
+        // 尚未建立索引（无旧路径）：直接生成唯一路径
+        if (oldPath === undefined) {
+            this.generateUniquePath(uuid, newName, parentUuid);
+            return;
         }
 
-        const newLowerPath = newPath.toLowerCase();
-        if (!this._lowerPathToUuids.has(newLowerPath)) {
-            this._lowerPathToUuids.set(newLowerPath, new Set());
+        // 重命名会改变该节点及其所有子孙的路径前缀，必须整棵子树一起重映射，
+        // 否则子孙节点在 _uuidToPath / _pathToUuid 里仍是旧路径，getNodeByPath 会查不到。
+        // 收集子树（含自身）的旧映射：路径等于 oldPath 或以 `oldPath/` 开头。
+        const subtreeEntries = Array.from(this._uuidToPath.entries())
+            .filter(([, path]) => path === oldPath || path.startsWith(`${oldPath}/`));
+
+        // 先移除旧映射
+        for (const [entryUuid, path] of subtreeEntries) {
+            this._removePathMapping(entryUuid, path);
         }
-        this._lowerPathToUuids.get(newLowerPath)!.add(uuid);
+
+        // 计算重命名后的新路径（同一父级、新名字，保证唯一）
+        const parentPath = parentUuid ? (this._uuidToPath.get(parentUuid) || '') : '';
+        const finalName = this.ensureUniqueName(parentUuid, this._sanitizeName(newName));
+        const newPath = parentPath ? `${parentPath}/${finalName}` : finalName;
+
+        // 以新前缀重建整棵子树（子孙节点名字不变，仅前缀替换）
+        for (const [entryUuid, path] of subtreeEntries) {
+            const suffix = path === oldPath ? '' : path.slice(oldPath.length);
+            this._addPathMapping(entryUuid, `${newPath}${suffix}`);
+        }
     }
 
     getNameSet(uuid: string): Set<string> | null {
