@@ -231,6 +231,34 @@ export const scriptingRoutes = [
         },
     },
     {
+        // 轻量接口：返回当前工程的设计分辨率，供场景进程在每次打开场景前刷新 cc.view。
+        // 直接读磁盘上的 cocos.config.json（配置真相源），绕开主进程配置缓存——
+        // configurationManager.reload() 的 load() 不会把新值同步回已注册的配置实例，
+        // Engine._config 也只在 configuration:save 时刷新，两者都可能慢一拍（改分辨率后要新建两次才生效的根因）。
+        url: '/scripting/engine/design-resolution',
+        async handler(req: Request, res: Response) {
+            const { Engine } = await import('../engine');
+            // 兜底：缓存/默认合并值
+            let dr = Engine.getConfig().designResolution as { width?: number; height?: number; fitWidth?: boolean; fitHeight?: boolean };
+            try {
+                const { configurationManager } = await import('../configuration');
+                const fse = await import('fs-extra');
+                const configPath = await configurationManager.getConfigPath();
+                if (await fse.pathExists(configPath)) {
+                    const json = await fse.readJSON(configPath);
+                    const disk = json?.engine?.designResolution;
+                    if (disk && typeof disk.width === 'number' && typeof disk.height === 'number') {
+                        // 以磁盘为准，缺失字段用缓存/默认补齐
+                        dr = { ...dr, ...disk };
+                    }
+                }
+            } catch (error) {
+                console.debug('[design-resolution] read cocos.config.json failed, fallback to cached:', error);
+            }
+            res.json(dr);
+        },
+    },
+    {
         url: '/scripting/engine/modules',
         async handler(req: Request, res: Response) {
             const { Engine } = await import('../engine');
