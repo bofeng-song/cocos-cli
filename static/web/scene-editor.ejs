@@ -196,9 +196,9 @@
             </div>
         </div>
 
-        <!-- DEBUG-VIEW-TEST-START 临时测试入口，验证 Engine.changeDebugOption，测完删除 -->
+        <!-- Debug View：调用 Engine.changeDebugOption 控制渲染调试视图（单一通道 / 组合光照项 / 纯光照 / CSM 染色） -->
         <div class="panel-section" id="sec-debugview">
-            <h3 onclick="toggleSection('sec-debugview')">Debug View (test)</h3>
+            <h3 onclick="toggleSection('sec-debugview')">Debug View</h3>
             <div class="section-body">
                 <div class="row">
                     <label>Lighting w/ albedo</label>
@@ -228,7 +228,7 @@
                 </div>
             </div>
         </div>
-        <!-- DEBUG-VIEW-TEST-END -->
+        <!-- Debug View END -->
 
         <!-- Camera -->
         <div class="panel-section" id="sec-camera">
@@ -358,8 +358,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Hierarchy 面板区已移除（相关 JS 保留但未使用） -->
 
         <!-- SceneView -->
         <div class="panel-section" id="sec-sceneview">
@@ -728,133 +726,6 @@
             }
         }
 
-        /* ── Hierarchy ── */
-        function getSelectedPaths() {
-            try {
-                if (window.cli.Scene && window.cli.Scene.Selection) {
-                    return window.cli.Scene.Selection.query() || [];
-                }
-            } catch(e) {}
-            return [];
-        }
-
-        function hStatus(msg, cls) {
-            const el = document.getElementById('hierarchyStatus');
-            el.textContent = msg;
-            el.className = 'info-text ' + (cls || '');
-        }
-
-        function hRefresh() {
-            try { window.cli.Scene.Engine.repaintInEditMode(); } catch(_) {}
-            refreshNodeList();
-            setTimeout(refreshState, 200);
-        }
-
-        function fillParentFromList() {
-            const sel = document.getElementById('nodeList');
-            const opt = sel.options[sel.selectedIndex];
-            if (opt && opt.textContent) {
-                document.getElementById('targetParentPath').value = opt.textContent;
-            }
-        }
-        window.fillParentFromList = fillParentFromList;
-
-        async function doCopyNode() {
-            const paths = getSelectedPaths();
-            if (paths.length === 0) { hStatus('No selection', 'status-warn'); return; }
-            try {
-                const result = await window.cli.Scene.Node.copyNode({ paths });
-                hStatus('Copied ' + (result ? result.length : 0) + ' node(s)', 'status-ok');
-                log('copyNode: ' + paths.join(', '), 'status-ok');
-            } catch(e) { hStatus('Copy failed: ' + e.message, 'status-err'); log('copyNode error: ' + e.message, 'status-err'); }
-        }
-        window.doCopyNode = doCopyNode;
-
-        async function doPasteNode() {
-            try {
-                const result = await window.cli.Scene.Node.pasteNode({});
-                console.log('[Hierarchy] pasteNode result:', result);
-                hStatus('Pasted ' + result.length + ' node(s)', 'status-ok');
-                log('pasteNode: ' + result.join(', '), 'status-ok');
-                hRefresh();
-            } catch(e) { console.error('[Hierarchy] pasteNode error:', e); hStatus('Paste failed: ' + e.message, 'status-err'); log('pasteNode error: ' + e.message, 'status-err'); }
-        }
-        window.doPasteNode = doPasteNode;
-
-        async function doPasteToParent() {
-            const parentPath = document.getElementById('targetParentPath').value.trim().replace(/\/+$/, '');
-            try {
-                const params = {};
-                if (parentPath) params.parentPath = parentPath;
-                const result = await window.cli.Scene.Node.pasteNode(params);
-                hStatus('Pasted ' + result.length + ' to ' + (parentPath || 'root'), 'status-ok');
-                log('pasteNode → ' + (parentPath || '/') + ': ' + result.join(', '), 'status-ok');
-                hRefresh();
-            } catch(e) { hStatus('Paste failed: ' + e.message, 'status-err'); log('pasteNode error: ' + e.message, 'status-err'); }
-        }
-        window.doPasteToParent = doPasteToParent;
-
-        async function doCutNode() {
-            const paths = getSelectedPaths();
-            if (paths.length === 0) { hStatus('No selection', 'status-warn'); return; }
-            try {
-                await window.cli.Scene.Node.cutNode({ paths });
-                hStatus('Cut ' + paths.length + ' node(s)', 'status-ok');
-                log('cutNode: ' + paths.join(', '), 'status-ok');
-                safeCall('Selection', 'clear');
-                hRefresh();
-            } catch(e) { hStatus('Cut failed: ' + e.message, 'status-err'); log('cutNode error: ' + e.message, 'status-err'); }
-        }
-        window.doCutNode = doCutNode;
-
-        async function doDuplicateNode() {
-            const paths = getSelectedPaths();
-            if (paths.length === 0) { hStatus('No selection', 'status-warn'); return; }
-            try {
-                const result = await window.cli.Scene.Node.duplicateNode({ paths });
-                hStatus('Duplicated → ' + result.join(', '), 'status-ok');
-                log('duplicateNode: ' + result.join(', '), 'status-ok');
-                hRefresh();
-            } catch(e) { hStatus('Duplicate failed: ' + e.message, 'status-err'); log('duplicateNode error: ' + e.message, 'status-err'); }
-        }
-        window.doDuplicateNode = doDuplicateNode;
-
-        async function doSetParent() {
-            const paths = getSelectedPaths();
-            const parentPath = document.getElementById('targetParentPath').value.trim();
-            if (paths.length === 0) { hStatus('No selection', 'status-warn'); return; }
-            if (!parentPath) { hStatus('Enter parent path', 'status-warn'); return; }
-            try {
-                const result = await window.cli.Scene.Node.setParent({ paths, parentPath });
-                hStatus('Moved ' + result.length + ' → ' + parentPath, 'status-ok');
-                log('setParent → ' + parentPath + ': ' + result.join(', '), 'status-ok');
-                hRefresh();
-            } catch(e) { hStatus('Move failed: ' + e.message, 'status-err'); log('setParent error: ' + e.message, 'status-err'); }
-        }
-        window.doSetParent = doSetParent;
-
-        async function doReorder(delta) {
-            const paths = getSelectedPaths();
-            if (paths.length !== 1) { hStatus('Select exactly 1 node', 'status-warn'); return; }
-            const nodePath = paths[0];
-            const parts = nodePath.split('/');
-            const parentPath = parts.slice(0, -1).join('/') || '/';
-            try {
-                const EN = (cc && cc.EditorExtends) || window.EditorExtends;
-                const node = EN.Node.getNodeByPath(nodePath);
-                if (!node || !node.parent) { hStatus('Node has no parent', 'status-warn'); return; }
-                const from = node.getSiblingIndex();
-                const to = from + delta;
-                if (to < 0 || to >= node.parent.children.length) { hStatus('Already at edge', 'status-warn'); return; }
-                const result = await window.cli.Scene.Node.reorder({ path: parentPath, from, to });
-                hStatus('Reordered ' + from + ' → ' + to, result ? 'status-ok' : 'status-warn');
-                log('reorder ' + parentPath + ': ' + from + ' → ' + to, 'status-ok');
-                hRefresh();
-                refreshNodeList();
-            } catch(e) { hStatus('Reorder failed: ' + e.message, 'status-err'); log('reorder error: ' + e.message, 'status-err'); }
-        }
-        window.doReorder = doReorder;
-
         /* ── State Refresh ── */
         function refreshState() {
             try {
@@ -1006,7 +877,7 @@
 
         // Expose all handlers globally
         window.safeCall = safeCall;
-        // DEBUG-VIEW-TEST-START 临时测试，验证 Engine.changeDebugOption，测完删除
+        // Debug View：构建单一通道(radio)/组合光照项(checkbox)分组控件，调用 Engine.changeDebugOption
         (function initDebugViewTest() {
             // Single 调试模式：单选(radio)，同一时刻只看一个通道；value = DebugViewSingleType 数值。
             // 分组与 cocos-editor debug-view.ts 一致。
@@ -1083,7 +954,7 @@
                 if (compList) { compList.querySelectorAll('input[data-comp]').forEach(function (c) { c.checked = true; }); }
             };
         })();
-        // DEBUG-VIEW-TEST-END
+        // Debug View END
         window.togglePanel = togglePanel;
         window.toggleSection = toggleSection;
         window.openBrowserPreview = openBrowserPreview;

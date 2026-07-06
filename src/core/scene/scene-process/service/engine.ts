@@ -92,6 +92,8 @@ export class EngineService extends BaseService<IEngineEvents> implements IEngine
     /**
      * 渲染调试视图（DebugView）：单一通道调试 / 组合光照项开关 / 纯光照带固有色 / 级联阴影染色。
      * 与 cocos-editor scene-facade-manager.changeDebugOption 对齐。
+     * 注意：不对外暴露为公共 API（未加入 IEngineService / EngineProxy，不生成到 cocos-cli-types）；
+     * 目前仅由场景编辑器页面（scene-editor.ejs）在浏览器内通过 window.cli.Scene.Engine 直接调用。
      * @param key 'single' | 'composite' | 'LIGHTING_WITH_BASE_COLOR' | 'CSM_LAYER_COLORATION'
      * @param value single: DebugViewSingleType 数值；composite: { key: DebugViewCompositeType | 10000(=ALL), value: boolean }；其余: boolean
      */
@@ -123,7 +125,8 @@ export class EngineService extends BaseService<IEngineEvents> implements IEngine
                 debugView.csmLayerColoration = value;
                 break;
             default:
-                break;
+                // 未知 key：不做任何变更，直接返回，避免空转重绘
+                return;
         }
         void this.repaintInEditMode();
     }
