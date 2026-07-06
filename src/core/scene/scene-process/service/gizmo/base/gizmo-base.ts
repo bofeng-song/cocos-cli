@@ -12,6 +12,20 @@ function getService(): any {
     }
 }
 
+/**
+ * 获取全局事件总线（惰性访问，避免循环依赖）。
+ * 广播事件必须走 ServiceEvents，而不是 getService()：后者返回的是 Service 注册表 Proxy，
+ * 其 get 陷阱对未注册的名字（如 'broadcast'）会 throw，`?.` 挡不住抛错，导致事件永远发不出去。
+ */
+function getServiceEvents(): any {
+    try {
+        const { ServiceEvents } = require('../../core/global-events');
+        return ServiceEvents;
+    } catch (e) {
+        return null;
+    }
+}
+
 class GizmoBase<T extends Component = Component> {
     private _hidden = true;
     private _target: T | null;
@@ -80,8 +94,8 @@ class GizmoBase<T extends Component = Component> {
         this._isControlBegin = true;
         this.recordChanges(propPath);
         try {
-            const svc = getService();
-            svc?.broadcast?.('gizmo:control-begin', propPath);
+            const svcEvents = getServiceEvents();
+            svcEvents?.broadcast?.('gizmo:control-begin', propPath);
         } catch (e) {
             // not ready
         }
@@ -97,8 +111,8 @@ class GizmoBase<T extends Component = Component> {
         this._isControlBegin = false;
         this.commitChanges();
         try {
-            const svc = getService();
-            svc?.broadcast?.('gizmo:control-end', propPath);
+            const svcEvents = getServiceEvents();
+            svcEvents?.broadcast?.('gizmo:control-end', propPath);
         } catch (e) {
             // not ready
         }
