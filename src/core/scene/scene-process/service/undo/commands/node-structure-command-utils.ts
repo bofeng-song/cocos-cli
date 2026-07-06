@@ -1,4 +1,4 @@
-import { Node } from 'cc';
+import { editorExtrasTag, Node } from 'cc';
 import { NodeEventType, type IUndoCommandMeta, type IUndoRedoResult } from '../../../../common';
 import nodeMgr from '../../node/index';
 import { editorPrefabUtils } from '../../prefab/prefab-editor-utils';
@@ -36,6 +36,12 @@ export interface INodeStructureCaptureTarget {
     path?: string;
 }
 
+export type NodeStructureSerialization = 'auto' | 'node' | 'prefab';
+
+export interface INodeStructureCaptureOptions {
+    serialization?: NodeStructureSerialization;
+}
+
 export function createNodeCommandMeta(type: string, label: string): IUndoCommandMeta {
     return {
         id: createUndoId(type),
@@ -46,7 +52,11 @@ export function createNodeCommandMeta(type: string, label: string): IUndoCommand
     };
 }
 
-export function captureNodeStructureSnapshot(node: Node, fallbackPath = ''): INodeStructureSnapshot | null {
+export function captureNodeStructureSnapshot(
+    node: Node,
+    fallbackPath = '',
+    options: INodeStructureCaptureOptions = {},
+): INodeStructureSnapshot | null {
     if (!node?.isValid) {
         return null;
     }
@@ -54,7 +64,7 @@ export function captureNodeStructureSnapshot(node: Node, fallbackPath = ''): INo
     const parent = node.parent as Node | null;
     let serializedJson = '';
     try {
-        serializedJson = editorPrefabUtils.serialize(node);
+        serializedJson = serializeNodeStructure(node, options.serialization ?? 'auto');
         if (!serializedJson) {
             return null;
         }
@@ -71,6 +81,43 @@ export function captureNodeStructureSnapshot(node: Node, fallbackPath = ''): INo
         serializedJson,
         uuidTree: captureUuidTree(node),
     };
+}
+
+function serializeNodeStructure(node: Node, serialization: NodeStructureSerialization): string {
+    const serialized = shouldSerializeAsPrefab(node, serialization)
+        ? editorPrefabUtils.serialize(node)
+        : EditorExtends.serialize(node);
+    return typeof serialized === 'string' ? serialized : JSON.stringify(serialized);
+}
+
+function shouldSerializeAsPrefab(node: Node, serialization: NodeStructureSerialization): boolean {
+    if (serialization === 'prefab') {
+        return true;
+    }
+    if (serialization === 'node') {
+        return false;
+    }
+    return hasPrefabData(node);
+}
+
+function hasPrefabData(node: Node): boolean {
+    if (node['_prefab']) {
+        return true;
+    }
+
+    if (hasMountedRoot(node)) {
+        return true;
+    }
+
+    if ((node.components ?? []).some(component => component.__prefab || hasMountedRoot(component))) {
+        return true;
+    }
+
+    return (node.children ?? []).some(child => hasPrefabData(child));
+}
+
+function hasMountedRoot(target: unknown): boolean {
+    return Boolean((target as any)?.[editorExtrasTag]?.mountedRoot);
 }
 
 function captureUuidTree(node: Node): INodeUuidSnapshot {

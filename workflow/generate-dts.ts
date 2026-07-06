@@ -315,19 +315,52 @@ if (isMainThread) {
     // 或 execArgv 挂 tsx，二者在部分环境（如 CI）下都不生效，会报 ERR_UNKNOWN_FILE_EXTENSION ".ts"。
     // 用 cwd 拼路径而非 __filename：ESM 作用域无 __filename，且 npm 以仓库根为 cwd。
     // worker 堆由 resourceLimits 控制，无需继承 --max-old-space-size。
-    const worker = new Worker(path.join(projectRoot, 'workflow', 'generate-dts-worker.mjs'), {
-        resourceLimits: {
-            stackSizeMb: 16,
-            maxOldGenerationSizeMb: 4096,
-        },
+    const workerPath = path.join(projectRoot, 'workflow', 'generate-dts-worker.mjs');
+
+    // 单次运行 worker，resolve 为退出码；worker 内未捕获异常走 reject。
+    const runWorkerOnce = (): Promise<number> => new Promise((resolve, reject) => {
+        const worker = new Worker(workerPath, {
+            resourceLimits: {
+                stackSizeMb: 16,
+                maxOldGenerationSizeMb: 4096,
+            },
+        });
+        worker.on('error', reject);
+        worker.on('exit', (code) => resolve(code ?? 0));
     });
-    worker.on('error', (err) => {
-        console.error(err);
-        process.exit(1);
-    });
-    worker.on('exit', (code) => {
-        process.exit(code ?? 0);
-    });
+
+    // 原生崩溃判定：退出码非 0 且非 1。api-extractor + TypeScript 在复杂类型图上会触发 Windows
+    // 上不可捕获的原生硬崩（0xC0000374 堆损坏 / 0xC0000409 栈溢出，退出码是 3221226xxx 这类大
+    // NTSTATUS 值），且时好时坏、重跑即过。而 generate() 内部抛错后是 process.exit(1) 的确定性
+    // 失败，重试只会重复同样的错误、掩盖真正问题，所以只对“原生崩溃码”重试。
+    const isNativeCrash = (code: number): boolean => code !== 0 && code !== 1;
+
+    const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+    void (async () => {
+        const MAX_ATTEMPTS = 3;
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            let code: number;
+            try {
+                code = await runWorkerOnce();
+            } catch (err) {
+                // worker 内未捕获异常：确定性错误，不重试。
+                console.error(err);
+                process.exit(1);
+            }
+
+            if (code === 0) process.exit(0);
+            if (!isNativeCrash(code)) process.exit(code); // 应用层确定性失败：直接失败。
+
+            const hex = (code >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            console.error(`[generate-dts] DTS worker 原生崩溃，退出码 ${code} (0x${hex})，第 ${attempt}/${MAX_ATTEMPTS} 次尝试`);
+            if (attempt === MAX_ATTEMPTS) {
+                console.error(`[generate-dts] 已重试 ${MAX_ATTEMPTS} 次仍崩溃，放弃。`);
+                process.exit(code);
+            }
+            await sleep(1000);
+        }
+    })();
 } else {
     generate().catch(err => {
         console.error(err);
