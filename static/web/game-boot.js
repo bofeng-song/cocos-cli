@@ -172,24 +172,6 @@ export default async function gameBoot() {
         await cc.game.run(async () => {
             cc.game.pause();
 
-            // 加载项目脚本（对齐场景编辑器 engine-bootstrap：在 game.run 之后、
-            // director.root / 渲染管线已就绪时才导入）。
-            // - 时机：必须在 game.run 之后。root 是在 run 触发首帧时创建的，若在 game.init 的
-            //   ProjectDataInitialization 阶段（如 settings.scripting.scriptPackages）导入，项目脚本
-            //   依赖图里的 custom-pipeline 模块会在 director.root 为 null 时构造 BuiltinPipelineBuilder
-            //   （读 root.pipelineEvent）而崩溃。此处 root 已就绪，不会崩。
-            // - 顺序：必须在 loadWithJson 之前。场景反序列化要用到已注册的用户组件类。
-            // - 入口：cce:/internal/x/prerequisite-imports 是 QuickPack 的项目脚本聚合入口（仅项目脚本，
-            //   import 'cc' 已被 pack import-map 重定向到全局 cc，见 scripting-routes.ts），执行它即
-            //   注册所有用户组件、并跑脚本的模块级副作用。此时 game 已 _inited，physics-settings 等
-            //   game.on(EVENT_GAME_INITED) 回调会在注册时立即触发（见 game.ts canRegisterEvent），
-            //   例如 2D 物理 debugDrawFlags 得以生效。
-            try {
-                await System.import('cce:/internal/x/prerequisite-imports');
-            } catch (e) {
-                console.warn('[Game Preview] load project scripts failed:', e);
-            }
-
             const json = await (await fetch(`${env.serverURL}/scene/${encodeURIComponent(launchScene)}.json`)).json();
             try {
                 launchScene = json[1]._id;
