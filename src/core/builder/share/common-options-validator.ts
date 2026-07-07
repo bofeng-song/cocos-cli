@@ -421,8 +421,20 @@ function resolveIncludeModulesFromEngineConfig(
     return includeModules?.length ? [...includeModules] : [];
 }
 
-export async function checkProjectSetting(options: IInternalBuildOptions | IInternalBundleBuildOptions) {
-    options.engineInfo = options.engineInfo || Engine.getInfo();
+/**
+ * Fill `options.includeModules` from the project engine config (cocos.config.json) when it is empty,
+ * so the preview path produces the same `includeModules` as a formal build (checkProjectSetting).
+ * Does not override an already non-empty `includeModules`.
+ */
+export async function fillIncludeModulesFromProjectConfig(
+    options: { includeModules?: string[]; engineModulesConfigKey?: string },
+): Promise<void> {
+    if (!options.includeModules || !options.includeModules.length) {
+        options.includeModules = resolveIncludeModulesFromEngineConfig(Engine.getConfig(), options.engineModulesConfigKey);
+    }
+}
+
+export async function checkProjectSetting(options: IInternalBuildOptions | IInternalBundleBuildOptions) {    options.engineInfo = options.engineInfo || Engine.getInfo();
 
     const engineConfig = Engine.getConfig();
     const { designResolution, renderPipeline, physicsConfig, customLayers, sortingLayers, macroConfig } = engineConfig;

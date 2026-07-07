@@ -95,6 +95,10 @@ jobs:
         env:
           MINIMAL_DOWNLOAD_TOOLS: 'true'
 
+      - name: Type check
+        id: type-check
+        run: npx tsc -b
+
       - name: Run unit tests
         id: unit-tests
         run: npm run test:quiet
