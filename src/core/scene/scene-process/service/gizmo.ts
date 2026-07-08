@@ -294,6 +294,17 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
         // 与 cocos-editor GizmoManager.init 一致：创建场景 Gizmo 相机 + WorldAxis
         this.createSceneGizmo();
 
+        // 与 cocos-editor scene-facade-manager 一致：监听 resize 事件更新场景 Gizmo 相机视口
+        // cocos-editor 通过 operationMgr.on('resize', ...) → dispatchEvents('onResize') 实现
+        try {
+            Service.Operation.addListener('resize' as any, () => this.onResize());
+        } catch (e) {
+            // Operation service not ready yet
+        }
+        if (typeof window !== 'undefined') {
+            window.addEventListener('resize', () => this.onResize());
+        }
+
         // Init GizmoOperation
         this._gizmoOperation = new GizmoOperation();
         this._gizmoOperation.init();
@@ -315,7 +326,7 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
                 // Camera not ready yet
             }
             this.onDimensionChanged(is2D);
-            ServiceEvents.broadcast('scene:dimension-changed', is2D);
+            ServiceEvents.emit('scene:dimension-changed', is2D);
             this.saveConfig();
         });
 
@@ -775,6 +786,7 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
                     gizmo.destroy();
                 }
             }
+            pool.clear();
         }
     }
 
@@ -863,11 +875,22 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
         });
     }
 
-    // ── Scene lifecycle (called by BaseService event hooks) ─────────────────────
+    private _rebindSelectedGizmos(): void {
+        const selectedPaths = Service.Selection?.query?.() ?? [];
+        this._selection.length = 0;
+        for (const path of selectedPaths) {
+            this.onSelectionSelect(path);
+        }
+    }
+
+    // ── 编辑器生命周期（由 BaseService 事件钩子调用）───────────────────────────
 
     onEditorOpened(): void {
+        this.clearAllGizmos();
         this._showIconGizmosForScene();
         this.initFromConfig();
+        // 编辑器打开/重载后节点和组件对象可能已重建，保留选择路径并重新挂到新组件上。
+        this._rebindSelectedGizmos();
         // Camera.onEditorOpened 有 200ms 延迟的 defaultFocus，需要等它完成后再显示世界坐标轴
         setTimeout(() => {
             // init 阶段编辑器相机还不存在，registerCameraMovedEvent 静默失败，此处补注册
@@ -880,27 +903,12 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
         }, 300);
     }
 
-    onSceneOpened(): void {
-        this.clearAllGizmos();
-        this._showIconGizmosForScene();
-        this.initFromConfig();
-        setTimeout(() => {
-            this._worldAxisController?.registerCameraMovedEvent();
-            if (!this.transformToolData.is2D) {
-                this._worldAxisController?.show();
-            }
-            this._worldAxisController?.onEditorCameraMoved();
-            Service.Engine?.repaintInEditMode?.();
-        }, 300);
-    }
-
-    onSceneClosed(): void {
+    onEditorClosed(): void {
         this.saveConfig();
     }
 
     onNodeChanged(node: Node, opts?: IChangeNodeOptions): void {
         if (!node) return;
-
         const has = this._selection.includes(node.uuid);
 
         walkNodeComponent(node, (component: Component) => {

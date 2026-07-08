@@ -5,6 +5,8 @@ import { Rpc } from '../rpc';
 import { BaseService, register } from './core';
 import { IScriptEvents, IScriptService } from '../../common';
 import utils from '../../../base/utils';
+import i18n from '../i18n';
+import { serviceManager } from './service-manager';
 
 /**
  * 异步迭代。有以下特点：
@@ -48,44 +50,8 @@ class AsyncIterationConcurrency1 {
  * 导入时异常的消息的标签。
  */
 const importExceptionLogTag = '::SceneExecutorImportExceptionHandler::';
-const importExceptionLogRegex = new RegExp(importExceptionLogTag);
 
-class GlobalEnv {
-    public async record(fn: () => Promise<void>) {
-        this.clear();
-        this._queue.push(async () => {
-            const beforeKeys = Object.keys(globalThis);
-            await fn();
-            const afterKeys = Object.keys(globalThis);
-            for (const afterKey of afterKeys) {
-                if (!beforeKeys.includes(afterKey)) {
-                    this._incrementalKeys.add(afterKey);
-                }
-            }
-            console.debug(`Incremental keys: ${Array.from(this._incrementalKeys)}`);
-        });
-        await this.processQueue(); // 处理队列
-    }
-
-    private clear() {
-        this._queue.push(async () => {
-            for (const incrementalKey of this._incrementalKeys) {
-                delete (globalThis as any)[incrementalKey];
-            }
-            this._incrementalKeys.clear();
-        });
-    }
-
-    private async processQueue() {
-        while (this._queue.length > 0) {
-            const next = this._queue.shift();
-            if (next) await next(); // 执行队列中的下一个任务
-        }
-    }
-
-    private _incrementalKeys = new Set<string>();
-    private _queue: (() => Promise<void>)[] = [];
-}
+import { GlobalEnv } from '../../common/global-env';
 
 const globalEnv = new GlobalEnv();
 
@@ -131,7 +97,7 @@ export class ScriptService extends BaseService<IScriptEvents> implements IScript
             ) {
                 this.customComponents.add(classConstructor);
                 EditorExtends.Component.addMenu(
-                    classConstructor, 'i18n:ENGINE.menu.custom_script/' + className, -1);
+                    classConstructor, `${i18n.transI18nName('i18n:ENGINE.menu.custom_script')}/${className}`, -1);
             }
         });
         const serializedPackLoaderContext = await Rpc.getInstance().request('programming', 'getPackerDriverLoaderContext', ['editor']);
@@ -140,41 +106,23 @@ export class ScriptService extends BaseService<IScriptEvents> implements IScript
         }
         const quickPackLoaderContext = QuickPackLoaderContext.deserialize(serializedPackLoaderContext);
 
-        const { loadDynamic } = await import('cc/preload');
         const cceModuleMap = await Rpc.getInstance().request('programming', 'queryCCEModuleMap');
+        const isWebEnv = typeof (globalThis as any).EditorExtends !== 'undefined' && typeof System !== 'undefined' && typeof System.import === 'function' && !(process as any)?.versions?.node;
+        let loadDynamic: any;
+        if (!isWebEnv) {
+            const preload = await import('cc/preload');
+            loadDynamic = preload.loadDynamic;
+        }
         this._executor = await Executor.create({
             // @ts-ignore
             importEngineMod: async (id) => {
-                return await loadDynamic(id) as Record<string, unknown>;
+                if (isWebEnv) {
+                    return await System.import(id) as Record<string, unknown>;
+                }
+                return await loadDynamic!(id) as Record<string, unknown>;
             },
             quickPackLoaderContext,
-            // 浏览器环境下提供自定义 evaluator：默认 evaluator 用 require.resolve + vm.compileFunction，
-            // 在浏览器中不可用。通过 fetch 获取 chunk 内容，用 new Function 执行。
-            // 执行前临时切换 globalThis.System 为 System-B（__internalSystem），
-            // 确保 System.register() 走 ExecutorSystem 的 patched register。
-            packModuleEvaluator: typeof window !== 'undefined' && (globalThis as any).__internalSystem ? {
-                async evaluate(file: string) {
-                    const normalized = file.replace(/\\/g, '/');
-                    const marker = 'packer-driver/targets/';
-                    const idx = normalized.indexOf(marker);
-                    if (idx === -1) return;
-                    const relativePath = normalized.substring(idx + marker.length);
-                    const serverURL = ((window as any).WebEnv && (window as any).WebEnv.serverURL) || '';
-                    const url = serverURL + '/scripting/pack-workspace/' + relativePath;
-                    const response = await fetch(url);
-                    if (!response.ok) return;
-                    const source = await response.text();
-                    const savedSystem = (globalThis as any).System;
-                    (globalThis as any).System = (globalThis as any).__internalSystem;
-                    try {
-                        new Function(source)();
-                    } finally {
-                        (globalThis as any).System = savedSystem;
-                    }
-                },
-            } : undefined,
             beforeUnregisterClass: (classConstructor) => {
-                // 清除 menu 里面的缓存
                 this.customComponents.delete(classConstructor);
                 EditorExtends.Component.removeMenu(classConstructor);
             },
@@ -197,8 +145,7 @@ export class ScriptService extends BaseService<IScriptEvents> implements IScript
         });
 
         globalThis.self = window;
-        const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-        if (!isBrowser && typeof require !== 'undefined' && require.resolve) {
+        if (!isWebEnv && typeof require !== 'undefined' && require.resolve) {
             this._executor.addPolyfillFile(require.resolve('@cocos/build-polyfills/prebuilt/editor/bundle'));
         }
         // 同步插件脚本列表
@@ -282,12 +229,33 @@ export class ScriptService extends BaseService<IScriptEvents> implements IScript
             this._suspendPromise = null;
 
             return globalEnv.record(
-                () => this._executor.reload().catch((err) => {
-                    console.warn('[ScriptService] Executor reload failed:', err);
-                }).finally(() => {
-                    this.emit('script:execution-finished');
-                }),
-            );
+                async () => {
+                    // Refresh pack import map before reload: after server-side recompilation,
+                    // chunk hashes change and the browser's cached import map becomes stale.
+                    const serverURL = serviceManager.getServerUrl();
+                    if (serverURL) {
+                        try {
+                            const res = await fetch(`${serverURL}/scripting/x/pack-import-map-url`);
+                            if (res.ok) {
+                                const map = await res.json();
+                                const script = document.createElement('script');
+                                script.type = 'systemjs-importmap';
+                                script.textContent = JSON.stringify(map);
+                                document.head.appendChild(script);
+                                // Force SystemJS to re-process all import maps
+                                if ((System as any).prepareImport) {
+                                    await (System as any).prepareImport(true);
+                                }
+                            }
+                        } catch {}
+                    }
+                    await this._executor.reload();
+                },
+            ).catch((err) => {
+                console.warn('[ScriptService] Executor reload failed:', err);
+            }).finally(() => {
+                this.emit('script:execution-finished');
+            });
         });
     }
 

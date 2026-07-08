@@ -16,7 +16,7 @@ import {
 } from './component-schema';
 
 import { description, param, result, title, tool } from '../decorator/decorator.js';
-import { COMMON_STATUS, CommonResultType } from '../base/schema-base';
+import { COMMON_STATUS, CommonResultType, getCommonErrorStatus } from '../base/schema-base';
 import { Scene, IComponentInfo } from '../../core/scene';
 import { ISetPropertyOptionsInfo } from '../../core/scene/common/cli/component';
 
@@ -38,7 +38,7 @@ export class ComponentApi {
             };
         } catch (e) {
             return {
-                code: COMMON_STATUS.FAIL,
+                code: getCommonErrorStatus(e),
                 reason: e instanceof Error ? e.message : String(e)
             };
         }
@@ -53,14 +53,14 @@ export class ComponentApi {
     @result(SchemaBooleanResult)
     async removeComponent(@param(SchemaRemoveComponent) component: TRemoveComponentOptions): Promise<CommonResultType<boolean>> {
         try {
-            const result = await Scene.Component.remove(component);
+            const result = await Scene.Component.remove({ path: component.componentPath });
             return {
                 code: COMMON_STATUS.SUCCESS,
                 data: result
             };
         } catch (e) {
             return {
-                code: COMMON_STATUS.FAIL,
+                code: getCommonErrorStatus(e),
                 reason: e instanceof Error ? e.message : String(e)
             };
         }
@@ -75,9 +75,9 @@ export class ComponentApi {
     @result(SchemaComponentResult)
     async queryComponent(@param(SchemaQueryComponent) component: TQueryComponentOptions): Promise<CommonResultType<TComponentResult | null>> {
         try {
-            const componentInfo = await Scene.Component.query(component);
+            const componentInfo = await Scene.Component.query({ path: component.componentPath });
             if (!componentInfo) {
-                throw new Error(`component not found: ${component.path}`);
+                throw new Error(`component not found: ${component.componentPath}`);
             }
             return {
                 code: COMMON_STATUS.SUCCESS,
@@ -85,7 +85,7 @@ export class ComponentApi {
             };
         } catch (e) {
             return {
-                code: COMMON_STATUS.FAIL,
+                code: getCommonErrorStatus(e),
                 reason: e instanceof Error ? e.message : String(e)
             };
         }
@@ -107,7 +107,7 @@ export class ComponentApi {
             };
         } catch (e) {
             return {
-                code: COMMON_STATUS.FAIL,
+                code: getCommonErrorStatus(e),
                 reason: e instanceof Error ? e.message : String(e)
             };
         }
@@ -129,7 +129,7 @@ export class ComponentApi {
             };
         } catch (e) {
             return {
-                code: COMMON_STATUS.FAIL,
+                code: getCommonErrorStatus(e),
                 reason: e instanceof Error ? e.message : String(e)
             };
         }

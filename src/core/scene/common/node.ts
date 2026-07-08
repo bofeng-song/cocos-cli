@@ -1,5 +1,5 @@
 import type { Node } from 'cc';
-import { IRemovedComponentInfo, ISetPropertyOptions } from './component';
+import { IRemovedComponentInfo, ISetPropertyOptions, IComponent } from './component';
 import { IVec3 } from './value-types';
 import { IServiceEvents } from '../scene-process/service/core';
 import { IPrefabStateInfo, ITargetOverrideInfo } from './prefab';
@@ -96,11 +96,15 @@ export enum MobilityMode {
     Movable = 2
 }
 
+// generateNodeDump / encode / open 共用的选项
+export interface INodeDumpOptions {
+    includeChildren?: boolean; // true: children 以 INodeIdentifier[] 返回，false/undefined: undefined
+    includeComponents?: boolean; // true: components 以 IComponentIdentifier[] 返回，false/undefined: undefined
+}
+
 // 节点查询参数接口
-export interface IQueryNodeParams {
+export interface IQueryNodeParams extends INodeDumpOptions {
     path: string; // 查询的节点路径
-    queryChildren: boolean; // 是否查询子节点信息
-    queryComponent: boolean; // 是否查询component的详细信息
 }
 
 export interface IPrefab {
@@ -135,7 +139,7 @@ export interface INode {
     children: IProperty[];
     parent: IProperty;
 
-    __comps__: IProperty[];
+    __comps__: IComponent[];
     __type__: string;
     __prefab__?: IPrefab;
     _prefabInstance?: any;
@@ -154,17 +158,66 @@ export interface IDeleteNodeResult {
     path: string; // 节点相对根节点路径
 }
 
-// 节点创建参数接口
-// export interface ICreateNodeParams {
-//     dbURL?: string; // 预制体资源路径 或 节点类型（NodeType）
-//     path: string; // 节点路径
-//     workMode?: '2d' | '3d';
-//     nodeType?: NodeType;
-//     name?: string;
-//     position?: IVec3;
-//     keepWorldTransform?: boolean;
-//     canvasRequired?: boolean;
-// }
+export interface IClipboardState {
+    type: 'cut' | 'copy' | 'none';
+    paths: string[];
+}
+
+// 节点移动参数接口
+export interface ISetParentParams {
+    paths: string[];
+    parentPath: string;
+    keepWorldTransform?: boolean;
+}
+
+export interface IReorderParams {
+    path: string;     // 父节点路径
+    target: number;   // 当前索引
+    offset: number;   // 偏移量
+}
+
+// 节点拷贝参数接口
+export interface ICopyParams {
+    paths: string[];
+}
+
+// 节点粘贴参数接口
+export interface IPasteParams {
+    parentPath?: string;
+    keepWorldTransform?: boolean;
+}
+
+// 节点复制参数接口
+export interface IDuplicateParams {
+    paths: string[];
+}
+
+// 节点剪切参数接口
+export interface ICutParams {
+    paths: string[];
+}
+
+// 移动数组元素参数接口
+export interface IMoveArrayElementParams {
+    nodePath: string;   // 节点路径
+    path: string;       // 数组属性路径，如 'children'、'__comps__'
+    target: number;     // 当前索引
+    offset: number;     // 偏移量
+}
+
+// 删除数组元素参数接口
+export interface IRemoveArrayElementParams {
+    nodePath: string;   // 节点路径
+    path: string;       // 数组属性路径
+    index: number;      // 要删除的元素索引
+}
+
+// 节点锁定参数接口
+export interface IChangeNodeLockParams {
+    paths: string[];    // 节点路径列表
+    locked: boolean;    // 是否锁定
+    loop?: boolean;     // 是否递归子节点
+}
 
 interface IBaseCreateNodeParams {
     path: string;
@@ -173,6 +226,7 @@ interface IBaseCreateNodeParams {
     position?: IVec3;
     keepWorldTransform?: boolean;
     canvasRequired?: boolean;
+    unlinkPrefab?: boolean;
 }
 
 export interface ICreateByNodeTypeParams extends IBaseCreateNodeParams {
@@ -217,7 +271,19 @@ export type IPublicNodeService = Omit<INodeService, keyof IServiceEvents |
     'reset' |
     'resetProperty' |
     'updatePropertyFromNull' |
-    'setNodeAndChildrenLayer'
+    'setNodeAndChildrenLayer' |
+    'setParent' | 
+    'reorder' |
+    'copy' |
+    'paste' |
+    'duplicate' |
+    'cut' |
+    'queryClipboardState' |
+    'moveArrayElement' |
+    'removeArrayElement' |
+    'changeNodeLock' |
+    'queryNodesByAssetUuid' |
+    'queryNodesMissAsset'
 >;
 
 /**
@@ -252,6 +318,16 @@ export interface INodeService extends IServiceEvents {
      * 查询节点树（层级管理器格式）
      */
     queryNodeTree(params: IQueryNodeTreeParams): Promise<INodeTreeItem | null>;
+
+    /**
+     * 查询当前场景中使用指定资源的节点 uuid 列表
+     */
+    queryNodesByAssetUuid(uuid: string): string[];
+
+    /**
+     * 查询当前场景中资源丢失的节点 uuid 列表
+     */
+    queryNodesMissAsset(): Promise<string[]>;
 
     // ---- 编辑器相关接口 ----
 
@@ -377,6 +453,33 @@ export interface INodeService extends IServiceEvents {
      * @returns 节点路径，节点不存在时返回空字符串
      */
     getPathByUuid(uuid: string): string;
+
+    // ---- 层级管理器操作 ----
+
+    setParent(params: ISetParentParams): Promise<string[]>;
+    reorder(params: IReorderParams): Promise<boolean>;
+    copy(params: ICopyParams): Promise<string[]>;
+    paste(params: IPasteParams): Promise<string[]>;
+    duplicate(params: IDuplicateParams): Promise<string[]>;
+    cut(params: ICutParams): Promise<string[]>;
+    queryClipboardState(): Promise<IClipboardState>;
+
+    /**
+     * 移动数组元素位置
+     * 通用操作，支持 children 排序、组件排序等
+     */
+    moveArrayElement(params: IMoveArrayElementParams): Promise<boolean>;
+
+    /**
+     * 删除数组元素
+     * 支持删除组件等数组属性中的元素（不支持 children）
+     */
+    removeArrayElement(params: IRemoveArrayElementParams): Promise<boolean>;
+
+    /**
+     * 锁定/解锁节点
+     */
+    changeNodeLock(params: IChangeNodeLockParams): Promise<void>;
 }
 
 ///

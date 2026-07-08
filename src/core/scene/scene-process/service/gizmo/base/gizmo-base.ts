@@ -12,6 +12,20 @@ function getService(): any {
     }
 }
 
+/**
+ * 获取全局事件总线（惰性访问，避免循环依赖）。
+ * 广播事件必须走 ServiceEvents，而不是 getService()：后者返回的是 Service 注册表 Proxy，
+ * 其 get 陷阱对未注册的名字（如 'broadcast'）会 throw，`?.` 挡不住抛错，导致事件永远发不出去。
+ */
+function getServiceEvents(): any {
+    try {
+        const { ServiceEvents } = require('../../core/global-events');
+        return ServiceEvents;
+    } catch (e) {
+        return null;
+    }
+}
+
 class GizmoBase<T extends Component = Component> {
     private _hidden = true;
     private _target: T | null;
@@ -78,10 +92,10 @@ class GizmoBase<T extends Component = Component> {
 
     onControlBegin(propPath: string | null) {
         this._isControlBegin = true;
-        this.recordChanges();
+        this.recordChanges(propPath);
         try {
-            const svc = getService();
-            svc?.broadcast?.('gizmo-control-begin', propPath);
+            const svcEvents = getServiceEvents();
+            svcEvents?.broadcast?.('gizmo:control-begin', propPath);
         } catch (e) {
             // not ready
         }
@@ -96,14 +110,22 @@ class GizmoBase<T extends Component = Component> {
     onControlEnd(propPath: string | null) {
         this._isControlBegin = false;
         this.commitChanges();
+        try {
+            const svcEvents = getServiceEvents();
+            svcEvents?.broadcast?.('gizmo:control-end', propPath);
+        } catch (e) {
+            // not ready
+        }
     }
 
-    recordChanges() {
+    recordChanges(propPath?: string | null) {
         if (!this._recorded) {
             const uuids = this.nodes.map(n => n.uuid);
             try {
                 const svc = getService();
-                this.undoID = svc?.Undo?.beginRecording?.(uuids) ?? '';
+                this.undoID = svc?.Undo?.beginRecording?.(uuids, {
+                    label: propPath ? `Gizmo ${propPath}` : 'Gizmo Change',
+                }) ?? '';
             } catch (e) {
                 this.undoID = '';
             }
@@ -114,11 +136,12 @@ class GizmoBase<T extends Component = Component> {
     commitChanges() {
         this._recorded = false;
         if (this.undoID !== '') {
+            const undoID = this.undoID;
             try {
                 const svc = getService();
-                svc?.Undo?.endRecording?.(this.undoID);
+                void svc?.Undo?.endRecording?.(undoID)?.catch?.((_error: unknown) => {});
             } catch (e) {
-                // not ready
+                // 服务还没初始化完成。
             }
         }
         this.undoID = '';
@@ -143,6 +166,11 @@ class GizmoBase<T extends Component = Component> {
     }
 
     destroy() {
+        // 拖拽还没正常结束时，gizmo 也可能因为节点删除、场景切换、工具切换被销毁。
+        // 这种情况下 onControlEnd 不会触发，所以这里主动结束录制，
+        // 避免该节点一直被认为正在录制，导致后续修改不再记录 undo。
+        // 没有开始录制时，commitChanges 不会产生额外影响。
+        this.commitChanges();
         if (this.onDestroy) {
             this.onDestroy();
         }

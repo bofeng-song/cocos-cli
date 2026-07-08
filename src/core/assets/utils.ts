@@ -1,7 +1,7 @@
 'use strict';
 
 import { Asset, VirtualAsset, queryUUID, Utils as dbUtils, queryAsset as dbQueryAsset, queryPath } from '@cocos/asset-db/index';
-import { extname, isAbsolute, join, relative, resolve } from 'path';
+import { extname, isAbsolute, join, resolve } from 'path';
 import { readFile, readJSON } from 'fs-extra';
 import type { Asset as CCAsset, Details } from 'cc';
 import type { CCON } from 'cc/editor/serialization';
@@ -11,6 +11,7 @@ import { IAsset, IExportData, ISerializedOptions, SerializedAsset } from './@typ
 import { DeleteAssetOptions } from './@types/public';
 import { removeAssetSource } from './manager/filesystem';
 import { MissingClass } from '../engine/editor-extends/missing-reporter/missing-class-reporter';
+export { pathToDbUrlIfAssetDBPath } from './asset-db-url';
 
 export function url2path(url: string) {
     if (isAbsolute(url)) {
@@ -22,6 +23,20 @@ export function url2path(url: string) {
     }
 
     return Utils.Path.resolveToRaw(url);
+}
+
+export function dirnameForDbUrlOrPath(pathOrUrlOrUUID: string) {
+    if (!pathOrUrlOrUUID.startsWith('db://')) {
+        return Utils.Path.dirname(pathOrUrlOrUUID);
+    }
+
+    const root = /^db:\/\/[^/]+/.exec(pathOrUrlOrUUID)?.[0];
+    if (!root || pathOrUrlOrUUID === root) {
+        return pathOrUrlOrUUID;
+    }
+
+    const index = pathOrUrlOrUUID.lastIndexOf('/');
+    return index <= root.length ? root : pathOrUrlOrUUID.slice(0, index);
 }
 
 /**

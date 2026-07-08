@@ -4,6 +4,11 @@ exports[`DTS API compatibility assets.d.ts should match snapshot 1`] = `
 "export declare interface AnimationClipAssetUserData {
     name: string;
 }
+export declare const animationGraphVariant: {
+    query(uuid: string): Promise<AnimGraphVariantDump>;
+    change(uuid: string, dump: AnimGraphVariantDump): Promise<AnimGraphVariantDump>;
+    save(uuid: string): Promise<void>;
+};
 export declare interface AnimationImportSetting {
     name: string;
     duration: number;
@@ -27,6 +32,33 @@ export declare interface AnimationImportSetting {
             refClip?: string;
         };
     }>;
+}
+export declare const animationMask: {
+    query(uuid: string): Promise<AnimationMaskDump>;
+    importSkeleton(uuid: string, skeletonSourceUuid: string): Promise<AnimationMaskDump>;
+    clearNodes(uuid: string): Promise<AnimationMaskDump>;
+    changeDump(uuid: string, changes: AnimationMaskChange[]): Promise<AnimationMaskDump>;
+    save(uuid: string): Promise<void>;
+};
+export declare interface AnimationMaskChange {
+    path: string;
+    enabled: boolean;
+    recursive?: boolean;
+}
+export declare interface AnimationMaskDump {
+    version: 1;
+    assetUuid: string;
+    joints: AnimationMaskJoint[];
+}
+export declare interface AnimationMaskJoint {
+    path: string;
+    enabled: boolean;
+    children?: AnimationMaskJoint[];
+}
+export declare interface AnimGraphVariantDump {
+    graphUuid: string | null;
+    clips: Record<string, string>;
+    invalids?: Record<string, string>;
 }
 export declare const ASSET_HANDLER_TYPES: string[];
 export declare interface AssetDBOptions {
@@ -86,6 +118,27 @@ export declare interface AssetOperationOption {
     overwrite?: boolean;
     rename?: boolean;
 }
+export declare interface AssetPropertySchema {
+    label: string;
+    description?: string;
+    type: AssetPropertySchemaType;
+    default?: unknown;
+    options?: AssetPropertySchemaOption[];
+    assetType?: string;
+    min?: number;
+    max?: number;
+    step?: number;
+    readOnly?: boolean;
+    order?: number;
+    properties?: Record<string, AssetPropertySchema>;
+    items?: AssetPropertySchema | AssetPropertySchema[];
+}
+export declare type AssetPropertySchemaMap = Record<string, AssetPropertySchema>;
+export declare interface AssetPropertySchemaOption {
+    label: string;
+    value: string | number | boolean;
+}
+export declare type AssetPropertySchemaType = 'string' | 'number' | 'boolean' | 'enum' | 'asset' | 'array' | 'object';
 export declare interface AssetUserDataMap {
     'animation-clip': AnimationClipAssetUserData;
     'auto-atlas': AutoAtlasAssetUserData;
@@ -299,7 +352,7 @@ export declare interface IAssetConfig {
     userDataConfig?: Record<string, IUerDataConfigItem>;
 }
 export declare interface IAssetDBInfo extends AssetDBOptions_2 {
-    state: 'none' | 'start' | 'startup' | 'refresh'; 
+    state: 'none' | 'start' | 'startup' | 'refresh';
     visible: boolean;
     preImportExtList: string[];
 }
@@ -316,36 +369,36 @@ export declare interface IAssetFileSystemProvider {
     copy?(sourcePath: string, destinationPath: string, options?: IAssetRenameOptions): Promise<void> | void;
 }
 export declare interface IAssetInfo {
-    name: string; 
-    source: string; 
-    loadUrl: string; 
-    url: string; 
-    file: string; 
-    uuid: string; 
-    importer: AssetHandlerType; 
-    imported: boolean; 
-    invalid: boolean; 
-    type: IAssetType; 
-    isDirectory: boolean; 
-    library: { [key: string]: string }; 
-    isBundle?: boolean; 
-    displayName?: string; 
-    readonly?: boolean; 
-    visible?: boolean; 
-    subAssets?: { [key: string]: IAssetInfo }; 
+    name: string;
+    source: string;
+    loadUrl: string;
+    url: string;
+    file: string;
+    uuid: string;
+    importer: AssetHandlerType;
+    imported: boolean;
+    invalid: boolean;
+    type: IAssetType;
+    isDirectory: boolean;
+    library: { [key: string]: string };
+    isBundle?: boolean;
+    displayName?: string;
+    readonly?: boolean;
+    visible?: boolean;
+    subAssets?: { [key: string]: IAssetInfo };
     instantiation?: string;
-    redirect?: IRedirectInfo; 
+    redirect?: IRedirectInfo;
     meta?: IAssetMeta,
     parent?: {
         source: string;
         library: { [key: string]: string };
         uuid: string;
     };
-    extends?: string[]; 
-    mtime?: number; 
-    depends?: string[]; 
-    dependeds?: string[]; 
-    temp?: string; 
+    extends?: string[];
+    mtime?: number;
+    depends?: string[];
+    dependeds?: string[];
+    temp?: string;
 }
 export declare interface IAssetMeta<T extends ISupportCreateType | 'unknown' = 'unknown'> {
     ver: string;
@@ -379,28 +432,28 @@ export declare interface IAssetRenameOptions extends IAssetOperationOptionsBase 
 }
 export declare type IAssetType =
 | ISupportCreateCCType
-| 'cc.Asset'               
-| 'cce.Database'           
-| 'cce.EffectHeader'       
-| 'cc.VideoClip'           
-| 'cc.TiledMapAsset'       
-| 'cc.TTFFont'             
-| 'cc.Texture2D'           
-| 'cc.SpriteFrame'         
-| 'cc.ImageAsset'          
-| 'cc.TextAsset'           
-| 'cc.JsonAsset'           
-| 'cc.AudioClip'           
-| 'cc.BitmapFont'          
-| 'cc.BufferAsset'         
-| 'cc.ParticleAsset'       
-| 'cc.RenderPipeline'     
-| 'cc.Skeleton'            
-| 'cc.Mesh'                
-| 'sp.SkeletonData'        
-| 'dragonBones.DragonBonesAsset'      
-| 'dragonBones.DragonBonesAtlasAsset' 
-| 'RenderStage'            
+| 'cc.Asset'
+| 'cce.Database'
+| 'cce.EffectHeader'
+| 'cc.VideoClip'
+| 'cc.TiledMapAsset'
+| 'cc.TTFFont'
+| 'cc.Texture2D'
+| 'cc.SpriteFrame'
+| 'cc.ImageAsset'
+| 'cc.TextAsset'
+| 'cc.JsonAsset'
+| 'cc.AudioClip'
+| 'cc.BitmapFont'
+| 'cc.BufferAsset'
+| 'cc.ParticleAsset'
+| 'cc.RenderPipeline'
+| 'cc.Skeleton'
+| 'cc.Mesh'
+| 'sp.SkeletonData'
+| 'dragonBones.DragonBonesAsset'
+| 'dragonBones.DragonBonesAtlasAsset'
+| 'RenderStage'
 | 'RenderFlow';
 export declare interface IAssetWriteFileOptions extends IAssetOperationOptionsBase {
     create?: boolean;
@@ -446,29 +499,76 @@ export declare function init(): Promise<void>;
 export declare interface IPluginScriptInfo extends PluginScriptInfo {
     url: string;
 }
+export declare interface IProperty {
+    value: { [key: string]: IPropertyValueType } | IPropertyValueType;
+    default?: any;
+    values?: ({ [key: string]: IPropertyValueType } | IPropertyValueType)[];
+    lock?: { [key in keyof Vec4]?: IPropertyLock };
+    cid?: string;
+    type?: string;
+    ui?: { name: string; data?: any };
+    readonly?: boolean;
+    visible?: boolean;
+    name?: string;
+    elementTypeData?: IProperty;
+    path: string;
+    isArray?: boolean;
+    invalid?: boolean;
+    extends?: string[];
+    displayName?: string;
+    displayOrder?: number;
+    help?: string;
+    group?: IPropertyGroupOptions;
+    tooltip?: string;
+    editor?: any;
+    animatable?: boolean;
+    radioGroup?: boolean;
+    enumList?: any[];
+    bitmaskList?: any[];
+    min?: number;
+    max?: number;
+    step?: number;
+    slide?: boolean;
+    unit?: string;
+    radian?: boolean;
+    multiline?: boolean;
+    optionalTypes?: string[];
+    userData?: { [key: string]: any };
+}
+export declare interface IPropertyGroupOptions {
+    id: string
+    name: string,
+    displayOrder: number,
+    style: string
+}
+export declare type IPropertyLock = {
+    default: number;
+    message: string
+};
+export declare type IPropertyValueType = IProperty | IProperty[] | null | undefined | number | boolean | string | Vec4 | Vec3 | Vec2 | Mat4 | any | Array<unknown>
 export declare interface IRedirectInfo {
     type: string;
     uuid: string;
 }
 export declare type ISupportCreateCCType =
-| 'cc.AnimationClip'        
-| 'cc.Script'               
-| 'cc.SpriteAtlas'          
-| 'cc.EffectAsset'          
-| 'cc.SceneAsset'           
-| 'cc.Prefab'               
-| 'cc.Material'             
-| 'cc.TextureCube'          
-| 'cc.TerrainAsset'         
-| 'cc.PhysicsMaterial'      
-| 'cc.LabelAtlas'           
-| 'cc.RenderTexture'        
-| 'cc.AnimationGraph'       
-| 'cc.AnimationMask'        
+| 'cc.AnimationClip'
+| 'cc.Script'
+| 'cc.SpriteAtlas'
+| 'cc.EffectAsset'
+| 'cc.SceneAsset'
+| 'cc.Prefab'
+| 'cc.Material'
+| 'cc.TextureCube'
+| 'cc.TerrainAsset'
+| 'cc.PhysicsMaterial'
+| 'cc.LabelAtlas'
+| 'cc.RenderTexture'
+| 'cc.AnimationGraph'
+| 'cc.AnimationMask'
 | 'cc.AnimationGraphVariant';
 export declare type ISupportCreateType = typeof SUPPORT_CREATE_TYPES[number];
 export declare interface IUerDataConfigItem {
-    key?: string; 
+    key?: string;
     label?: string;
     description?: string;
     default?: any;
@@ -517,6 +617,24 @@ export declare const enum LogLevel {
     WARN = 2,
     LOG = 3,
     DEBUG = 4
+}
+export declare interface Mat4 {
+    m00: number;
+    m01: number;
+    m02: number;
+    m03: number;
+    m04: number;
+    m05: number;
+    m06: number;
+    m07: number;
+    m08: number;
+    m09: number;
+    m10: number;
+    m11: number;
+    m12: number;
+    m13: number;
+    m14: number;
+    m15: number;
 }
 export declare interface MeshClusterOptions {
     enable: boolean;
@@ -628,11 +746,11 @@ export declare function queryAssetInfo(urlOrUUIDOrPath: string, dataKeys?: strin
 export declare function queryAssetInfos(options?: QueryAssetsOption): Promise<IAssetInfo[]>;
 export declare function queryAssetMeta(urlOrUUIDOrPath: string): Promise<IAssetMeta<'unknown'> | null>;
 export declare interface QueryAssetsOption {
-    ccType?: string | string[], 
-    isBundle?: boolean, 
-    importer?: string | string[], 
-    pattern?: string, 
-    extname?: string | string[], 
+    ccType?: string | string[],
+    isBundle?: boolean,
+    importer?: string | string[],
+    pattern?: string,
+    extname?: string | string[],
     userData?: Record<string, boolean | string | number>;
     type?: string;
 }
@@ -641,6 +759,8 @@ export declare function queryAssetUserDataConfig(urlOrUuidOrPath: string): Promi
 export declare function queryAssetUsers(uuidOrUrl: string, type?: QueryAssetType): Promise<string[]>;
 export declare function queryCreateMap(): Promise<ICreateMenuInfo[]>;
 export declare function queryPath(urlOrUuid: string): Promise<string>;
+export declare function queryPropertySchema(importer: string): Promise<AssetPropertySchemaMap>;
+export declare function querySerializedData(uuidOrUrlOrPath: string): Promise<SerializedAssetQueryResult>;
 export declare function querySortedPlugins(filterOptions?: FilterPluginOptions): Promise<IPluginScriptInfo[]>;
 export declare function queryThumbnailHandlers(): string[];
 export declare function queryUrl(uuidOrPath: string): Promise<string>;
@@ -658,10 +778,11 @@ export declare interface RtSpriteFrameAssetUserData {
     height?: number;
 }
 export declare function saveAsset(pathOrUrlOrUUID: string, data: string | Buffer): Promise<IAssetInfo>;
-export declare function saveAssetMeta(uuid: string, meta: IAssetMeta): Promise<void>;
+export declare function saveSerializedData(uuidOrUrlOrPath: string, patch: SerializedAssetPatch): Promise<SerializedAssetQueryResult>;
 export declare interface ScriptModuleUserData {
     isPlugin: false;
 }
+export declare type SerializedAssetDump = Record<string, IProperty> | IProperty;
 export declare interface SerializedAssetFinder {
     meshes?: Array<string | null>;
     animations?: Array<string | null>;
@@ -670,6 +791,18 @@ export declare interface SerializedAssetFinder {
     materials?: Array<string | null>;
     scenes?: Array<string | null>;
 }
+export declare type SerializedAssetPatch = SerializedAssetDump | Partial<Record<string, IProperty | unknown>>;
+export declare interface SerializedAssetQueryResult {
+    uuid: string;
+    url: string;
+    type: string;
+    importer: string;
+    dump: SerializedAssetDump;
+}
+export declare const serializedData: {
+    query: typeof querySerializedData;
+    save: typeof saveSerializedData;
+};
 export declare function setFileSystemProvider(provider: IAssetFileSystemProvider): void;
 export declare interface SimplifyOptions {
     targetRatio?: number;
@@ -724,7 +857,7 @@ export declare interface SpriteFrameVertices {
     maxPos: number[];
 }
 export declare function start(): Promise<void>;
-export declare const SUPPORT_CREATE_TYPES: readonly ["animation-clip", "typescript", "auto-atlas", "effect", "scene", "prefab", "material", "terrain", "physics-material", "label-atlas", "render-texture", "directory", "effect-header"];
+export declare const SUPPORT_CREATE_TYPES: readonly ["animation-clip", "typescript", "auto-atlas", "effect", "scene", "prefab", "material", "texture-cube", "terrain", "physics-material", "label-atlas", "render-texture", "directory", "effect-header"];
 export declare enum TangentImportSetting {
     exclude = 0,
     optional = 1,
@@ -758,11 +891,27 @@ export declare interface TextureCubeAssetUserData extends TextureBaseAssetUserDa
 }
 export declare interface ThumbnailInfo {
     type: 'icon' | 'image',
-    value: string; 
+    value: string;
 }
 export declare type ThumbnailSize = 'large' | 'small' | 'middle' | 'origin';
-export declare function updateAssetUserData(urlOrUuidOrPath: string, path: string, value: any): Promise<any>;
+export declare function updateAssetUserData(urlOrUuidOrPath: string, userData: Record<string, any>): Promise<any>;
+export declare function updateAssetUserDataByPath(urlOrUuidOrPath: string, path: string, value: any): Promise<any>;
 export declare function updateDefaultUserData(handler: string, path: string, value: any): Promise<void>;
+export declare interface Vec2 {
+    x: number;
+    y: number;
+}
+export declare interface Vec3 {
+    x: number;
+    y: number;
+    z: number;
+}
+export declare interface Vec4 {
+    x: number;
+    y: number;
+    z: number;
+    w: number;
+}
 export declare type WrapMode = 'repeat' | 'clamp-to-edge' | 'mirrored-repeat';
 export { }
 "
@@ -777,7 +926,8 @@ export { }
 exports[`DTS API compatibility builder.d.ts should match snapshot 1`] = `
 "import EventEmitter from 'events';
 import { EventEmitter as EventEmitter_2 } from 'stream';
-import { IAssetDeleteOptions, IAssetWriteFileOptions } from '@cocos/asset-db/libs/filesystem';
+import { IAssetDeleteOptions } from './filesystem';
+import { IAssetWriteFileOptions } from './filesystem';
 import type { PluginItem } from '@babel/core';
 import { SpriteFrame } from 'cc';
 export declare interface AcornNode {
@@ -856,6 +1006,7 @@ export declare interface appTemplateData {
 }
 export declare type ArrayItem = {
     label: string;
+    labelI18nKey?: string;
     value: string;
 };
 export declare class Asset extends VirtualAsset {
@@ -1040,10 +1191,12 @@ export declare interface BuildBundleConfiguration {
     custom: CustomBundleConfigMap;
 }
 export declare function buildBundleOnly(bundleOptions: IBundleBuildOptions): Promise<IBuildResultData>;
+export declare type BuildCacheScope = 'project' | 'global' | 'all';
 export declare interface BuildCheckResult {
-    error: string;
-    newValue: any;
-    level: IConsoleType;
+    valid: boolean;
+    level?: 'error' | 'warn';
+    message?: string;
+    fixedValue?: unknown;
 }
 export declare interface BuildConfiguration {
     common: IBuildCommonOptions;
@@ -1118,6 +1271,9 @@ export declare namespace BuildHook {
     export type onAfterBuild = IBaseHooks;
     export type onAfterMake = IBuildStageHooks;
     export type onBeforeMake = IBuildStageHooks;
+    export type onBeforeUpload = IBuildStageHooks;
+    export type upload = IBuildStageHooks;
+    export type onAfterUpload = IBuildStageHooks;
     export type load = () => Promise<void> | void;
     export type unload = () => Promise<void> | void;
 }
@@ -1139,6 +1295,7 @@ export declare class BuildResult implements IBuildResult {
     getJsonPathInfo(uuid: string): IImportAssetPathInfo[];
     getImportAssetPaths(uuid: string): IImportAssetPathInfo[];
 }
+export declare type BuildStageProgressCallback = (message: string, progress: number) => void;
 export declare class BuildStageTask extends BuildTaskBase implements IBuildStageTask {
     options: IBuildOptionBase;
     hooksInfo: IBuildHooksInfo;
@@ -1200,11 +1357,24 @@ export declare abstract class BuildTaskBase extends EventEmitter {
     abstract hookMap: Record<string, string>;
     hookWeight: number;
     id: string;
+    protected progressHeartbeatEnabled: boolean;
     buildExitRes: IBuildResultSuccess;
+    private progressHeartbeatTimer?;
+    private lastProgressMessage;
+    private displayProgress;
+    private heartbeatProgressMax;
     constructor(id: string, name: string);
     break(reason: string): void;
     onError(error: Error, throwError?: boolean): void;
     updateProcess(message: string, increment?: number, outputType?: IConsoleType): void;
+    protected startProgressStep(message: string, stepWeight: number, outputType?: IConsoleType): void;
+    protected stopProgressHeartbeat(): void;
+    private scheduleProgressHeartbeat;
+    private emitProgressHeartbeat;
+    protected prepareProgressHeartbeat(stepWeight: number): void;
+    private syncDisplayProgress;
+    private emitProgressUpdate;
+    private getNextHeartbeatProgress;
     abstract handleHook(func: Function, internal: boolean, ...args: any[]): Promise<void>;
     abstract run(): Promise<boolean>;
     runPluginTask(funcName: string, weight?: number): Promise<void>;
@@ -1231,7 +1401,9 @@ export declare interface BuildTemplateConfig {
         destUrl: string;
     }[];
     displayName?: string;
+    displayNameI18nKey?: string;
     version: string;
+    pkgName?: string;
     dirname?: string;
 }
 export declare const enum BuiltinBundleName {
@@ -1349,8 +1521,10 @@ export declare interface BundleRenderConfig {
     maxOptionList: Record<string, any[]>;
     minOptionList?: Record<string, any[]>;
 }
-export declare type CCEnvConstants = StatsQuery.ConstantManager.CCEnvConstants;
+export declare type CCEnvConstants = ConstantManager.CCEnvConstants;
 export declare type ChangeEvent = 'create' | 'update' | 'delete';
+export declare function checkBuildOption(platform: string, key: string, value: unknown, options: IBuildTaskOption): Promise<BuildCheckResult>;
+export declare function checkBuildOptions(platform: string, options: IBuildTaskOption): Promise<Record<string, BuildCheckResult>>;
 export declare interface ChokidarOptions {
     	alwaysStat?: boolean;
     	atomic?: boolean | number;
@@ -1372,6 +1546,11 @@ export declare interface ChokidarOptions {
     	persistent?: boolean;
     	useFsEvents?: boolean;
     	usePolling?: boolean;
+}
+export declare function clearCache(scope: BuildCacheScope): Promise<ClearCacheResult>;
+export declare interface ClearCacheResult {
+    scope: BuildCacheScope;
+    cleared: string[];
 }
 export declare class CocosParams<T> {
     platformParams: T;
@@ -1430,7 +1609,7 @@ export declare interface Config {
     optimizeDecorators: IOptimizeDecorators;
     treeShake?: ITreeShakeConfig;
 }
-export declare namespace ConfigInterface {
+declare namespace ConfigInterface {
     export {
         Config,
         IndexConfig,
@@ -1453,6 +1632,7 @@ export declare interface Context {
 }
 export declare function createBuildStageTask(taskId: string, stageName: string, options: IBuildStageOptions): Promise<BuildStageTask>;
 export declare function createBuildTask<P extends Platform>(platform: P, options?: IBuildCommandOption): Promise<BuildTask>;
+export declare function createBuildTemplate(nameOrPlatform: string): Promise<void>;
 export declare function createBundleBuildTask(bundleOptions: IBundleBuildOptions): Promise<BundleManager>;
 export declare interface CustomBundleConfig {
     displayName: string;
@@ -1566,23 +1746,24 @@ export declare interface EmittedChunk {
 export declare type EmittedFile = EmittedAsset | EmittedChunk;
 export declare interface EngineInfo {
     typescript: {
-        type: 'builtin' | 'custom'; 
-        builtin: string, 
-        path: string; 
+        type: 'builtin' | 'custom';
+        builtin: string,
+        path: string;
     },
     native: {
-        type: 'builtin' | 'custom'; 
-        builtin: string, 
-        path: string; 
+        type: 'builtin' | 'custom';
+        builtin: string,
+        path: string;
     },
     tmpDir: string;
     version: string;
 }
 export declare type EnumItem = string | {
     label: string;
+    labelI18nKey?: string;
     value: string | number;
 };
-export declare function executeBuildStageTask(taskId: string, stageName: string, options: IBuildStageOptions): Promise<IBuildResultData>;
+export declare function executeBuildStageTask(taskId: string, stageName: string, options: IBuildStageOptions, onProgress?: BuildStageProgressCallback): Promise<IBuildResultData>;
 export declare interface ExecuteHookTaskOption {
     pkgName: string;
     hook: string;
@@ -1713,6 +1894,7 @@ export declare interface GetManualChunkApi {
     	getModuleInfo: GetModuleInfo;
 }
 export declare type GetModuleInfo = (moduleId: string) => ModuleInfo | null;
+export declare function getPlatformBuildSchema(platform: Platform | string): Promise<PlatformBuildSchema>;
 export declare function getPreviewSettings<P extends Platform>(options?: IBuildTaskOption<P>): Promise<IPreviewSettingsResult>;
 export declare function getRegisteredPlatforms(): Promise<string[]>;
 export declare type GlobalsOption = { [name: string]: string } | ((name: string) => string);
@@ -1810,36 +1992,36 @@ export declare interface IAssetInfo extends IAssetInfo_2 {
     mtime: number;
 }
 export declare interface IAssetInfo_2 {
-    name: string; 
-    source: string; 
-    loadUrl: string; 
-    url: string; 
-    file: string; 
-    uuid: string; 
-    importer: AssetHandlerType; 
-    imported: boolean; 
-    invalid: boolean; 
-    type: IAssetType; 
-    isDirectory: boolean; 
-    library: { [key: string]: string }; 
-    isBundle?: boolean; 
-    displayName?: string; 
-    readonly?: boolean; 
-    visible?: boolean; 
-    subAssets?: { [key: string]: IAssetInfo_2 }; 
+    name: string;
+    source: string;
+    loadUrl: string;
+    url: string;
+    file: string;
+    uuid: string;
+    importer: AssetHandlerType;
+    imported: boolean;
+    invalid: boolean;
+    type: IAssetType;
+    isDirectory: boolean;
+    library: { [key: string]: string };
+    isBundle?: boolean;
+    displayName?: string;
+    readonly?: boolean;
+    visible?: boolean;
+    subAssets?: { [key: string]: IAssetInfo_2 };
     instantiation?: string;
-    redirect?: IRedirectInfo; 
+    redirect?: IRedirectInfo;
     meta?: IAssetMeta,
     parent?: {
         source: string;
         library: { [key: string]: string };
         uuid: string;
     };
-    extends?: string[]; 
-    mtime?: number; 
-    depends?: string[]; 
-    dependeds?: string[]; 
-    temp?: string; 
+    extends?: string[];
+    mtime?: number;
+    depends?: string[];
+    dependeds?: string[];
+    temp?: string;
 }
 export declare type IAssetInfoMap = Record<UUID, IAssetInfo>;
 export declare interface IAssetMeta<T extends ISupportCreateType | 'unknown' = 'unknown'> {
@@ -1869,28 +2051,28 @@ export declare interface IAssetPathInfo extends IAssetPathBase {
 }
 export declare type IAssetType =
 | ISupportCreateCCType
-| 'cc.Asset'               
-| 'cce.Database'           
-| 'cce.EffectHeader'       
-| 'cc.VideoClip'           
-| 'cc.TiledMapAsset'       
-| 'cc.TTFFont'             
-| 'cc.Texture2D'           
-| 'cc.SpriteFrame'         
-| 'cc.ImageAsset'          
-| 'cc.TextAsset'           
-| 'cc.JsonAsset'           
-| 'cc.AudioClip'           
-| 'cc.BitmapFont'          
-| 'cc.BufferAsset'         
-| 'cc.ParticleAsset'       
-| 'cc.RenderPipeline'     
-| 'cc.Skeleton'            
-| 'cc.Mesh'                
-| 'sp.SkeletonData'        
-| 'dragonBones.DragonBonesAsset'      
-| 'dragonBones.DragonBonesAtlasAsset' 
-| 'RenderStage'            
+| 'cc.Asset'
+| 'cce.Database'
+| 'cce.EffectHeader'
+| 'cc.VideoClip'
+| 'cc.TiledMapAsset'
+| 'cc.TTFFont'
+| 'cc.Texture2D'
+| 'cc.SpriteFrame'
+| 'cc.ImageAsset'
+| 'cc.TextAsset'
+| 'cc.JsonAsset'
+| 'cc.AudioClip'
+| 'cc.BitmapFont'
+| 'cc.BufferAsset'
+| 'cc.ParticleAsset'
+| 'cc.RenderPipeline'
+| 'cc.Skeleton'
+| 'cc.Mesh'
+| 'sp.SkeletonData'
+| 'dragonBones.DragonBonesAsset'
+| 'dragonBones.DragonBonesAtlasAsset'
+| 'RenderStage'
 | 'RenderFlow';
 export declare type IASTCQuality = 'veryfast' | 'fast' | 'medium' | 'thorough' | 'exhaustive';
 export declare interface IAtlasInfo {
@@ -2190,12 +2372,15 @@ export declare interface IBuildStageConfig extends IBuildStageItem {
     root: string;
     hooksInfo: IBuildHooksInfo;
     buildTaskOptions: IBuildOptionBase;
+    progressHeartbeat?: boolean;
 }
 export declare type IBuildStageHooks = (root: string, options: IBuildOptionBase) => Promise<void> | void;
 export declare interface IBuildStageItem {
     name: string;
     displayName?: string;
+    displayNameI18nKey?: string;
     description?: string;
+    descriptionI18nKey?: string;
     hidden?: boolean;
     parallelism?: 'none' | 'all' | 'other';
     hook: string;
@@ -2205,6 +2390,8 @@ export declare interface IBuildStageOptions {
     dest: string;
     platform: Platform | string;
     taskName?: string;
+    logDest?: string;
+    packages?: Record<string, Record<string, unknown>>;
 }
 export declare interface IBuildStagesInfo {
     pkgNameOrder: string[];
@@ -2440,6 +2627,22 @@ export declare interface ICMakeConfig {
     [propName: string]: any;
     USE_SERVER_MODE: string;
 }
+export declare interface ICocosConfigurationPropertySchema {
+    type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+    default?: unknown;
+    title?: string;
+    description?: string;
+    enum?: Array<string | number | boolean>;
+    enumDescriptions?: string[];
+    minimum?: number;
+    maximum?: number;
+    step?: number;
+    order?: number;
+    properties?: Record<string, ICocosConfigurationPropertySchema>;
+    items?: ICocosConfigurationPropertySchema | ICocosConfigurationPropertySchema[];
+    additionalProperties?: boolean | ICocosConfigurationPropertySchema;
+    required?: string[];
+}
 export declare interface ICollisionMatrix {
     [x: string]: number;
 }
@@ -2500,7 +2703,9 @@ export declare interface IConfigItemArray extends IConfigItemBase {
 export declare interface IConfigItemBase {
     key?: string;
     label?: string;
+    labelI18nKey?: string;
     description?: string;
+    descriptionI18nKey?: string;
     default?: any;
 }
 export declare interface IConfigItemBoolean extends IConfigItemBase {
@@ -2712,6 +2917,7 @@ export declare interface IInternalBuildOptions extends IInternalBundleBuildOptio
 export declare interface IInternalBuildPluginConfig extends IBuildPluginConfig {
     doc?: string;
     displayName?: string;
+    displayNameI18nKey?: string;
     hooks?: string;
     priority?: number;
     options?: IDisplayOptions;
@@ -2764,6 +2970,9 @@ export declare namespace IInternalHook {
     export type onBeforeMake = IInternalStageTaskHooks;
     export type make = IInternalStageTaskHooks;
     export type onAfterMake = IInternalStageTaskHooks;
+    export type onBeforeUpload = IInternalStageTaskHooks;
+    export type upload = IInternalStageTaskHooks;
+    export type onAfterUpload = IInternalStageTaskHooks;
 }
 export declare interface IInternalPackOptions {
     maxWidth: number;
@@ -3033,14 +3242,14 @@ export declare interface IPhysicsConfig {
     };
 }
 export declare interface IPhysicsConfig_2 {
-    gravity: IVec3Like_2; 
-    allowSleep: boolean; 
-    sleepThreshold: number; 
-    autoSimulation: boolean; 
-    fixedTimeStep: number; 
-    maxSubSteps: number; 
-    defaultMaterial?: string; 
-    useNodeChains: boolean; 
+    gravity: IVec3Like_2;
+    allowSleep: boolean;
+    sleepThreshold: number;
+    autoSimulation: boolean;
+    fixedTimeStep: number;
+    maxSubSteps: number;
+    defaultMaterial?: string;
+    useNodeChains: boolean;
     collisionMatrix: ICollisionMatrix_2;
     physicsEngine: string;
     physX?: {
@@ -3072,7 +3281,11 @@ export declare interface IPlatformConfig {
     type: IPlatformType;
     platformType: StatsQuery.ConstantManager.PlatformType;
     name: string;
+    nameI18nKey?: string;
+    doc?: string;
+    pluginPath?: string;
     createTemplateLabel: string;
+    createTemplateLabelI18nKey?: string;
 }
 export declare interface IPlatformInfo {
     label: string;
@@ -3082,6 +3295,7 @@ export declare interface IPlatformRegisterInfo {
     config: IPlatformBuildPluginConfig;
     platform: string;
     path: string;
+    conifgPath: string;
     hooks?: string;
     pkgName?: string;
     type: 'register';
@@ -3306,20 +3520,20 @@ export declare interface ISuffixMap {
     import: Record<string, string[]>;
 }
 export declare type ISupportCreateCCType =
-| 'cc.AnimationClip'        
-| 'cc.Script'               
-| 'cc.SpriteAtlas'          
-| 'cc.EffectAsset'          
-| 'cc.SceneAsset'           
-| 'cc.Prefab'               
-| 'cc.Material'             
-| 'cc.TextureCube'          
-| 'cc.TerrainAsset'         
-| 'cc.PhysicsMaterial'      
-| 'cc.LabelAtlas'           
-| 'cc.RenderTexture'        
-| 'cc.AnimationGraph'       
-| 'cc.AnimationMask'        
+| 'cc.AnimationClip'
+| 'cc.Script'
+| 'cc.SpriteAtlas'
+| 'cc.EffectAsset'
+| 'cc.SceneAsset'
+| 'cc.Prefab'
+| 'cc.Material'
+| 'cc.TextureCube'
+| 'cc.TerrainAsset'
+| 'cc.PhysicsMaterial'
+| 'cc.LabelAtlas'
+| 'cc.RenderTexture'
+| 'cc.AnimationGraph'
+| 'cc.AnimationMask'
 | 'cc.AnimationGraphVariant';
 export declare type ISupportCreateType = typeof SUPPORT_CREATE_TYPES[number];
 export declare interface ISupportFormat {
@@ -3831,6 +4045,7 @@ export declare class PacInfo implements IPacInfo {
     private queryInvalidSpriteAssets;
     toJSON(): void;
 }
+export declare function packAutoAtlas(pacUuid: string, option?: Partial<IPackOptions>): Promise<PreviewPackResult | null>;
 export declare interface PacStoreInfo {
     pac: StoreInfo;
     sprites: ISpriteFrameInfo[];
@@ -3922,6 +4137,10 @@ export declare interface ParticleAssetUserData {
 }
 export declare type Physics = 'cannon' | 'ammo' | 'builtin';
 export declare type Platform = InternalPlatform | string;
+export declare interface PlatformBuildSchema {
+    common: ICocosConfigurationPropertySchema;
+    platformOptions: ICocosConfigurationPropertySchema;
+}
 export declare interface PlatformBundleConfig {
     platformName: string;
     platformType: BundlePlatformType;
@@ -3930,6 +4149,17 @@ export declare interface PlatformBundleConfig {
 export declare interface PlatformCompressConfig {
     platformType: ITextureCompressPlatform;
     support: ISupportFormat;
+}
+export declare interface PlatformConfigItem {
+    platform: string;
+    displayName: string;
+    platformType: StatsQuery.ConstantManager.PlatformType;
+    isNative: boolean;
+    doc?: string;
+    pluginPath: string;
+    createTemplateLabel?: string;
+    supportTextureCompress: boolean;
+    customBuildStages?: IBuildStageItem[];
 }
 export declare interface PlatformPackageOptionMap {
     'web-desktop': webDesktopOptions;
@@ -4028,25 +4258,34 @@ export declare class PluginManager extends EventEmitter {
     private registerPlatform;
     private internalRegister;
     _registerI18n(registerInfo: IBuilderRegisterInfo): void;
+    private translateConfigItemDisplayFields;
+    private translateConfigItemsDisplayFields;
+    private translateConfigDisplayFields;
+    refreshDisplayI18nFields(): void;
     getCommonOptionConfigs(platform: Platform): Record<string, IBuilderConfigItem>;
     getCommonOptionConfigByKey(key: keyof IBuildTaskOption, options: IBuildTaskOption): IBuilderConfigItem | null;
     getPackageOptionConfigByKey(key: string, pkgName: string, options: IBuildTaskOption): IBuilderConfigItem | null;
     getOptionConfigByKey(key: keyof IBuildTaskOption, options: IBuildTaskOption): IBuilderConfigItem | null;
+    private hasFixedValue;
+    private getFixedValue;
     checkOptions(options: MakeRequired<IBuildCommandOption, 'platform' | 'mainBundleCompressionType'>): Promise<undefined | IBuildTaskOption>;
     checkCommonOptions(options: IBuildTaskOption): Promise<Record<string, BuildCheckResult>>;
     checkCommonOptionByKey(key: keyof IBuildTaskOption, value: any, options: IBuildTaskOption): Promise<BuildCheckResult>;
+    private createVerifyOptions;
+    private checkPlatformOptionByKey;
+    checkBuildOption(platform: string, key: string, value: unknown, options: IBuildTaskOption): Promise<BuildCheckResult>;
+    checkBuildOptions(platform: string, options: IBuildTaskOption): Promise<Record<string, BuildCheckResult>>;
     private checkPluginOptions;
     shouldGenerateOptions(platform: Platform | string): boolean;
     getOptionsByPlatform<P extends Platform | string>(platform: P): Promise<IBuildTaskOption>;
     getTexturePlatformConfigs(): Record<string, ITextureCompressConfig>;
-    queryPlatformConfig(): {
-        platform: string;
-        displayName: string;
-        platformType: PlatformType;
-        isNative: boolean;
-        createTemplateLabel: string;
-        supportTextureCompress: boolean;
-    }[];
+    private cloneDisplayOptions;
+    private cloneConfigItem;
+    private applySupportedCompressionTypes;
+    private collectPlatformConfigItems;
+    private toRenderSchema;
+    getPlatformBuildSchema(platform: Platform | string): PlatformBuildSchema;
+    queryPlatformConfig(): PlatformConfigItem[];
     getRegisteredPlatforms(): string[];
     queryBundleConfig(): Record<string, BundleQueryConfig>;
     queryTextureCompressConfig(): TextureCompressFullRenderConfig;
@@ -4055,9 +4294,10 @@ export declare class PluginManager extends EventEmitter {
     private sortPkgNameWidthPriority;
     getHooksInfo(platform: Platform | string): IBuildHooksInfo;
     getBuildTemplateConfig(platform: string): BuildTemplateConfig;
+    createBuildTemplate(nameOrPlatform: string): Promise<void>;
     getAssetHandlers(type: ICustomAssetHandlerType): {
         pkgNameOrder: string[];
-        handles: Record<string, Function>;
+        handles: Record<string, (...args: unknown[]) => unknown>;
     };
 }
 export declare const pluginManager: PluginManager;
@@ -4110,10 +4350,13 @@ export declare interface PreviewPackResult {
 }
 export declare type PureModulesOption = boolean | string[] | IsPureModule;
 export declare function queryAssetsInBundle(uuid: string, bundleFilterConfig?: BundleFilterConfig[]): Promise<string[]>;
+export declare function queryAutoAtlasFileCache(pacUuid: string): Promise<PreviewPackResult | null>;
 export declare function queryBuildConfig(): Promise<BuildConfiguration>;
 export declare function queryBundleConfig(): Promise<Record<string, BundleQueryConfig>>;
 export declare function queryDefaultBuildConfigByPlatform(platform: Platform): Promise<IBuildTaskOption<string>>;
+export declare function queryPlatformConfig(): Promise<PlatformConfigItem[]>;
 export declare function queryTextureCompressConfig(): Promise<TextureCompressFullRenderConfig>;
+export declare function refreshDisplayI18nFields(): Promise<void>;
 export declare type RenderChunkHook = (
 	this: PluginContext,
 	code: string,
@@ -4190,7 +4433,7 @@ export declare type ResolveImportMetaHook = (
 	prop: string | null,
 	options: { chunkId: string; format: InternalModuleFormat; moduleId: string }
 ) => string | null | void;
-export declare namespace rollup {
+declare namespace rollup {
     export {
         rollup_2 as rollup,
         watch,
@@ -4632,7 +4875,7 @@ export declare class StatsQuery {
     private _featureUnits;
     private _editorPublicModules;
 }
-export declare namespace StatsQuery {
+declare namespace StatsQuery {
     namespace ConstantManager {
         type PlatformType = 'WEB_EDITOR' | 'WEB_MOBILE' | 'WEB_DESKTOP' | 'WECHAT' | 'WECHAT_MINI_PROGRAM' | 'BYTEDANCE' | 'ALIPAY' | 'TAOBAO' | 'TAOBAO_MINIGAME' | 'OPPO' | 'VIVO' | 'HUAWEI' | 'HONOR' | 'COCOS_RUNTIME' | 'SUD' | 'SUDV2' | 'NATIVE_EDITOR' | 'ANDROID' | 'WINDOWS' | 'IOS' | 'MAC' | 'OHOS' | 'OPEN_HARMONY' | 'LINUX' | 'HTML5' | 'NATIVE' | 'NODEJS' | 'INVALID_PLATFORM';
         type IPlatformConfig = { [key in PlatformType]: boolean };
@@ -4695,7 +4938,7 @@ export declare interface StoreInfo {
     uuid: string;
     mtime: number;
 }
-export declare const SUPPORT_CREATE_TYPES: readonly ["animation-clip", "typescript", "auto-atlas", "effect", "scene", "prefab", "material", "terrain", "physics-material", "label-atlas", "render-texture", "directory", "effect-header"];
+export declare const SUPPORT_CREATE_TYPES: readonly ["animation-clip", "typescript", "auto-atlas", "effect", "scene", "prefab", "material", "texture-cube", "terrain", "physics-material", "label-atlas", "render-texture", "directory", "effect-header"];
 export declare type SyncPluginHooks =
 	| 'augmentChunkHash'
 	| 'outputOptions'
@@ -4872,6 +5115,7 @@ export declare interface TypedEventEmitter<T extends { [event: string]: (...args
     	removeListener<K extends keyof T>(event: K, listener: T[K]): this;
     	setMaxListeners(n: number): this;
 }
+export declare function upload(platform: Platform, dest: string, accessToken?: string): Promise<IBuildResultData>;
 export declare type Url = string;
 export declare interface UserCompressConfig {
     customConfigs: Record<string, ICustomConfig>;
@@ -5233,36 +5477,36 @@ export declare interface IApplyPrefabChangesParams {
     nodePath: string;
 }
 export declare interface IAssetInfo {
-    name: string; 
-    source: string; 
-    loadUrl: string; 
-    url: string; 
-    file: string; 
-    uuid: string; 
-    importer: AssetHandlerType; 
-    imported: boolean; 
-    invalid: boolean; 
-    type: IAssetType; 
-    isDirectory: boolean; 
-    library: { [key: string]: string }; 
-    isBundle?: boolean; 
-    displayName?: string; 
-    readonly?: boolean; 
-    visible?: boolean; 
-    subAssets?: { [key: string]: IAssetInfo }; 
+    name: string;
+    source: string;
+    loadUrl: string;
+    url: string;
+    file: string;
+    uuid: string;
+    importer: AssetHandlerType;
+    imported: boolean;
+    invalid: boolean;
+    type: IAssetType;
+    isDirectory: boolean;
+    library: { [key: string]: string };
+    isBundle?: boolean;
+    displayName?: string;
+    readonly?: boolean;
+    visible?: boolean;
+    subAssets?: { [key: string]: IAssetInfo };
     instantiation?: string;
-    redirect?: IRedirectInfo; 
+    redirect?: IRedirectInfo;
     meta?: IAssetMeta,
     parent?: {
         source: string;
         library: { [key: string]: string };
         uuid: string;
     };
-    extends?: string[]; 
-    mtime?: number; 
-    depends?: string[]; 
-    dependeds?: string[]; 
-    temp?: string; 
+    extends?: string[];
+    mtime?: number;
+    depends?: string[];
+    dependeds?: string[];
+    temp?: string;
 }
 export declare interface IAssetMeta<T extends ISupportCreateType | 'unknown' = 'unknown'> {
     ver: string;
@@ -5284,28 +5528,28 @@ export declare interface IAssetService extends IServiceEvents {
 }
 export declare type IAssetType =
 | ISupportCreateCCType
-| 'cc.Asset'               
-| 'cce.Database'           
-| 'cce.EffectHeader'       
-| 'cc.VideoClip'           
-| 'cc.TiledMapAsset'       
-| 'cc.TTFFont'             
-| 'cc.Texture2D'           
-| 'cc.SpriteFrame'         
-| 'cc.ImageAsset'          
-| 'cc.TextAsset'           
-| 'cc.JsonAsset'           
-| 'cc.AudioClip'           
-| 'cc.BitmapFont'          
-| 'cc.BufferAsset'         
-| 'cc.ParticleAsset'       
-| 'cc.RenderPipeline'     
-| 'cc.Skeleton'            
-| 'cc.Mesh'                
-| 'sp.SkeletonData'        
-| 'dragonBones.DragonBonesAsset'      
-| 'dragonBones.DragonBonesAtlasAsset' 
-| 'RenderStage'            
+| 'cc.Asset'
+| 'cce.Database'
+| 'cce.EffectHeader'
+| 'cc.VideoClip'
+| 'cc.TiledMapAsset'
+| 'cc.TTFFont'
+| 'cc.Texture2D'
+| 'cc.SpriteFrame'
+| 'cc.ImageAsset'
+| 'cc.TextAsset'
+| 'cc.JsonAsset'
+| 'cc.AudioClip'
+| 'cc.BitmapFont'
+| 'cc.BufferAsset'
+| 'cc.ParticleAsset'
+| 'cc.RenderPipeline'
+| 'cc.Skeleton'
+| 'cc.Mesh'
+| 'sp.SkeletonData'
+| 'dragonBones.DragonBonesAsset'
+| 'dragonBones.DragonBonesAtlasAsset'
+| 'RenderStage'
 | 'RenderFlow';
 export declare interface IBaseCreateNodeParams {
     path: string;
@@ -5314,6 +5558,7 @@ export declare interface IBaseCreateNodeParams {
     position?: IVec3;
     keepWorldTransform?: boolean;
     canvasRequired?: boolean;
+    unlinkPrefab?: boolean;
 }
 export declare interface IBaseIdentifier {
     assetName: string;
@@ -5358,6 +5603,11 @@ export declare interface ICameraService {
     setOriginAxes3D(config: IOriginAxesConfig): void;
     onUpdate(deltaTime: number): void;
 }
+export declare interface IChangeNodeLockParams {
+    paths: string[];
+    locked: boolean;
+    loop?: boolean;
+}
 export declare interface IChangeNodeOptions {
     source?: 'editor' | 'undo' | 'engine';
     type?: NodeEventType;
@@ -5370,8 +5620,13 @@ export declare interface ICLI {
     Scene: IServiceManager;
     SceneEvents: GlobalEventManager;
 }
+export declare interface IClipboardState {
+    type: 'cut' | 'copy' | 'none';
+    paths: string[];
+}
 export declare interface ICloseOptions {
     urlOrUUID?: string;
+    save?: boolean;
 }
 export declare interface IComponent extends IProperty {
     value: {
@@ -5380,6 +5635,7 @@ export declare interface IComponent extends IProperty {
         name: IPropertyValueType;
     } & Record<string, IPropertyValueType>;
     mountedRoot?: string;
+    component_path?: string;
 }
 export declare interface IComponentService extends IServiceEvents {
     add(params: IAddComponentOptions): Promise<IComponent>;
@@ -5403,6 +5659,9 @@ export declare interface IComponentService extends IServiceEvents {
     init(): void;
     unregisterCompMgrEvents(): void;
 }
+export declare interface ICopyParams {
+    paths: string[];
+}
 export declare interface ICreateByAssetParams extends IBaseCreateNodeParams {
     dbURL: string;
 }
@@ -5421,12 +5680,22 @@ export declare interface ICreatePrefabFromNodeParams {
     overwrite?: boolean;
 }
 export declare type ICreateType = typeof CREATE_TYPES[number];
+export declare interface ICustomLayerConfig {
+    name: string;
+    value: number;
+}
+export declare interface ICutParams {
+    paths: string[];
+}
 export declare interface IDeleteNodeParams {
     path: string;
     keepWorldTransform?: boolean;
 }
 export declare interface IDeleteNodeResult {
     path: string;
+}
+export declare interface IDuplicateParams {
+    paths: string[];
 }
 export declare interface IEditorService extends IServiceEvents {
     getCurrentEditorType(): 'scene' | 'prefab' | 'unknown';
@@ -5444,8 +5713,7 @@ export declare interface IEditorService extends IServiceEvents {
 export declare interface IEngineService extends IServiceEvents {
     init(): Promise<void>;
     repaintInEditMode(): Promise<void>;
-    pause(): void;
-    resume(): void;
+    initCustomLayer(layers?: ICustomLayerConfig[]): Promise<void>;
 }
 export declare interface IExecuteComponentMethodOptions {
     path: string;
@@ -5528,6 +5796,12 @@ export declare interface ImageMeta {
     uri?: string;
     remap?: string;
 }
+export declare interface IMoveArrayElementParams {
+    nodePath: string;
+    path: string;
+    target: number;
+    offset: number;
+}
 export declare interface INode {
     path: string;
     active: IProperty;
@@ -5541,12 +5815,16 @@ export declare interface INode {
     uuid: IProperty;
     children: IProperty[];
     parent: IProperty;
-    __comps__: IProperty[];
+    __comps__: IComponent[];
     __type__: string;
     __prefab__?: IPrefab;
     _prefabInstance?: any;
     removedComponents?: IRemovedComponentInfo[];
     mountedRoot?: string;
+}
+export declare interface INodeDumpOptions {
+    includeChildren?: boolean;
+    includeComponents?: boolean;
 }
 export declare interface INodeService extends IServiceEvents {
     createByType(params: ICreateByNodeTypeParams): Promise<INode | null>;
@@ -5554,6 +5832,8 @@ export declare interface INodeService extends IServiceEvents {
     delete(params: IDeleteNodeParams): Promise<IDeleteNodeResult | null>;
     query(params?: IQueryNodeParams): Promise<INode | IScene | null>;
     queryNodeTree(params: IQueryNodeTreeParams): Promise<INodeTreeItem | null>;
+    queryNodesByAssetUuid(uuid: string): string[];
+    queryNodesMissAsset(): Promise<string[]>;
     previewSetProperty(options: ISetPropertyOptions): Promise<boolean>;
     cancelPreviewSetProperty(options: ISetPropertyOptions): Promise<boolean>;
     setProperty(options: ISetPropertyOptions): Promise<boolean>;
@@ -5562,6 +5842,16 @@ export declare interface INodeService extends IServiceEvents {
     updatePropertyFromNull(options: ISetPropertyOptions): Promise<boolean>;
     setNodeAndChildrenLayer(options: ISetPropertyOptions): Promise<void>;
     getPathByUuid(uuid: string): string;
+    setParent(params: ISetParentParams): Promise<string[]>;
+    reorder(params: IReorderParams): Promise<boolean>;
+    copy(params: ICopyParams): Promise<string[]>;
+    paste(params: IPasteParams): Promise<string[]>;
+    duplicate(params: IDuplicateParams): Promise<string[]>;
+    cut(params: ICutParams): Promise<string[]>;
+    queryClipboardState(): Promise<IClipboardState>;
+    moveArrayElement(params: IMoveArrayElementParams): Promise<boolean>;
+    removeArrayElement(params: IRemoveArrayElementParams): Promise<boolean>;
+    changeNodeLock(params: IChangeNodeLockParams): Promise<void>;
 }
 export declare interface INodeTreeComponent {
     isCustom: boolean;
@@ -5583,9 +5873,8 @@ export declare interface INodeTreeItem {
     readonly: boolean;
     components: INodeTreeComponent[];
 }
-export declare interface IOpenOptions {
+export declare interface IOpenOptions extends INodeDumpOptions {
     urlOrUUID: string;
-    simpleNode?: boolean;
 }
 export declare interface IOperationService {
     addListener(type: OperationEvent, listener: Function, priority?: number): void;
@@ -5600,6 +5889,10 @@ export declare interface IOriginAxesConfig {
     x: boolean;
     y: boolean;
     z: boolean;
+}
+export declare interface IPasteParams {
+    parentPath?: string;
+    keepWorldTransform?: boolean;
 }
 export declare interface IPrefab {
     uuid: string;
@@ -5617,6 +5910,7 @@ export declare interface IPrefabService extends IServiceEvents {
     unpackPrefabInstance(params: IUnpackPrefabInstanceParams): Promise<INode>;
     isPrefabInstance(params: IIsPrefabInstanceParams): Promise<boolean>;
     getPrefabInfo(params: IGetPrefabInfoParams): Promise<IPrefab | null>;
+    unlinkPrefab(params: IUnlinkPrefabParams): Promise<boolean>;
     removePrefabInfoFromNode(node: Node_2, removeNested?: boolean): void;
 }
 export declare interface IPrefabStateInfo {
@@ -5628,65 +5922,51 @@ export declare interface IPrefabStateInfo {
     isNested: boolean;
     assetUuid: string;
 }
-export declare interface IPreviewInstance {
-    onMouseDown(event: any): void;
-    onMouseMove(event: any): void;
-    onMouseUp(event: any): void;
-    onMouseWheel(event: any): void;
-    viewToggle(): void;
-    is2DView(): boolean;
-    resetCameraView(): void;
-    hide(): void;
-}
-export declare interface IPreviewService {
-    open(uuid: string): Promise<IPreviewInstance | null>;
-    generateThumbnail(uuid: string, assetType: string, width?: number, height?: number): Promise<any>;
-}
 export declare interface IProperty {
     value: { [key: string]: IPropertyValueType } | IPropertyValueType;
-    default?: any; 
+    default?: any;
     values?: ({ [key: string]: IPropertyValueType } | IPropertyValueType)[];
     lock?: { [key in keyof Vec4]?: IPropertyLock };
     cid?: string;
     type?: string;
-    ui?: { name: string; data?: any }; 
+    ui?: { name: string; data?: any };
     readonly?: boolean;
     visible?: boolean;
     name?: string;
-    elementTypeData?: IProperty; 
-    path: string; 
+    elementTypeData?: IProperty;
+    path: string;
     isArray?: boolean;
     invalid?: boolean;
-    extends?: string[]; 
-    displayName?: string; 
-    displayOrder?: number; 
-    help?: string; 
-    group?: IPropertyGroupOptions; 
-    tooltip?: string; 
-    editor?: any; 
-    animatable?: boolean; 
-    radioGroup?: boolean; 
-    enumList?: any[]; 
+    extends?: string[];
+    displayName?: string;
+    displayOrder?: number;
+    help?: string;
+    group?: IPropertyGroupOptions;
+    tooltip?: string;
+    editor?: any;
+    animatable?: boolean;
+    radioGroup?: boolean;
+    enumList?: any[];
     bitmaskList?: any[];
-    min?: number; 
-    max?: number; 
-    step?: number; 
-    slide?: boolean; 
-    unit?: string; 
-    radian?: boolean; 
-    multiline?: boolean; 
-    optionalTypes?: string[]; 
-    userData?: { [key: string]: any }; 
+    min?: number;
+    max?: number;
+    step?: number;
+    slide?: boolean;
+    unit?: string;
+    radian?: boolean;
+    multiline?: boolean;
+    optionalTypes?: string[];
+    userData?: { [key: string]: any };
 }
 export declare interface IPropertyGroupOptions {
-    id: string 
+    id: string
     name: string,
-    displayOrder: number, 
-    style: string 
+    displayOrder: number,
+    style: string
 }
-export declare type IPropertyLock = { 
-    default: number; 
-    message: string 
+export declare type IPropertyLock = {
+    default: number;
+    message: string
 };
 export declare type IPropertyValueType = IProperty | IProperty[] | null | undefined | number | boolean | string | Vec4 | Vec3 | Vec2 | Mat4 | any | Array<unknown>
 export declare interface IQueryClassesOptions {
@@ -5696,10 +5976,8 @@ export declare interface IQueryClassesOptions {
 export declare interface IQueryComponentOptions {
     path: string;
 }
-export declare interface IQueryNodeParams {
+export declare interface IQueryNodeParams extends INodeDumpOptions {
     path: string;
-    queryChildren: boolean;
-    queryComponent: boolean;
 }
 export declare interface IQueryNodeTreeParams {
     path?: string;
@@ -5712,8 +5990,18 @@ export declare interface IRedirectInfo {
     type: string;
     uuid: string;
 }
+export declare interface IRedoService {
+    redo(): Promise<IUndoRedoResult>;
+    canRedo(): boolean;
+}
 export declare interface IReloadOptions {
     urlOrUUID?: string;
+    preserveUndoHistory?: boolean;
+}
+export declare interface IRemoveArrayElementParams {
+    nodePath: string;
+    path: string;
+    index: number;
 }
 export declare interface IRemoveComponentOptions {
     path: string;
@@ -5721,6 +6009,11 @@ export declare interface IRemoveComponentOptions {
 export declare interface IRemovedComponentInfo {
     name: string;
     fileID: string;
+}
+export declare interface IReorderParams {
+    path: string;
+    target: number;
+    offset: number;
 }
 export declare interface IRevertToPrefabParams {
     nodePath: string;
@@ -5838,11 +6131,16 @@ export declare interface IServiceManager {
     Selection: ISelectionService;
     Operation: IOperationService;
     Undo: IUndoService;
+    Redo: IRedoService;
     Camera: ICameraService;
     Gizmo: IGizmoService;
     SceneView: ISceneViewService;
-    Preview: IPreviewService;
     UI: IUIService;
+}
+export declare interface ISetParentParams {
+    paths: string[];
+    parentPath: string;
+    keepWorldTransform?: boolean;
 }
 export declare interface ISetPropertyOptions {
     nodePath: string;
@@ -5851,20 +6149,20 @@ export declare interface ISetPropertyOptions {
     record?: boolean;
 }
 export declare type ISupportCreateCCType =
-| 'cc.AnimationClip'        
-| 'cc.Script'               
-| 'cc.SpriteAtlas'          
-| 'cc.EffectAsset'          
-| 'cc.SceneAsset'           
-| 'cc.Prefab'               
-| 'cc.Material'             
-| 'cc.TextureCube'          
-| 'cc.TerrainAsset'         
-| 'cc.PhysicsMaterial'      
-| 'cc.LabelAtlas'           
-| 'cc.RenderTexture'        
-| 'cc.AnimationGraph'       
-| 'cc.AnimationMask'        
+| 'cc.AnimationClip'
+| 'cc.Script'
+| 'cc.SpriteAtlas'
+| 'cc.EffectAsset'
+| 'cc.SceneAsset'
+| 'cc.Prefab'
+| 'cc.Material'
+| 'cc.TextureCube'
+| 'cc.TerrainAsset'
+| 'cc.PhysicsMaterial'
+| 'cc.LabelAtlas'
+| 'cc.RenderTexture'
+| 'cc.AnimationGraph'
+| 'cc.AnimationMask'
 | 'cc.AnimationGraphVariant';
 export declare type ISupportCreateType = typeof SUPPORT_CREATE_TYPES[number];
 export declare interface ITargetOverrideInfo {
@@ -5875,18 +6173,64 @@ export declare interface ITargetOverrideInfo {
     targetInfo?: string[];
 }
 export declare interface IUIService {
-    alignSelection(type: UIAlignType): void;
-    distributeSelection(type: UIAlignType): void;
+    alignSelection(type: UIAlignType): Promise<void>;
+    distributeSelection(type: UIAlignType): Promise<void>;
+}
+export declare interface IUndoBeginOptions {
+    label?: string;
+    tag?: string;
+    customCommand?: IUndoCommand;
+}
+export declare interface IUndoCommand {
+    meta: IUndoCommandMeta;
+    undo(): Promise<IUndoRedoResult>;
+    redo(): Promise<IUndoRedoResult>;
+}
+export declare interface IUndoCommandMeta {
+    id: string;
+    label: string;
+    type: string;
+    scope: IUndoScope;
+    timestamp: number;
+}
+export declare interface IUndoGroupOptions {
+    label?: string;
+}
+export declare interface IUndoRedoResult {
+    success: boolean;
+    commandId?: string;
+    label?: string;
+    reason?: string;
+}
+export declare interface IUndoScope {
+    assetUuid?: string;
+    assetUrl?: string;
+    editorType?: 'scene' | 'prefab' | 'animation' | string;
+    mode?: 'general' | 'prefab' | 'animation' | 'preview' | string;
 }
 export declare interface IUndoService {
-    beginRecording(uuids: string[], options?: any): string;
-    endRecording(commandId: string): void;
+    beginRecording(uuids: string[], options?: IUndoBeginOptions): string;
+    endRecording(commandId: string): Promise<void>;
     cancelRecording(commandId: string): void;
-    undo(): Promise<void>;
-    redo(): Promise<void>;
-    snapshot(): void;
+    undo(): Promise<IUndoRedoResult>;
+    redo(): Promise<IUndoRedoResult>;
+    beginGroup(options?: IUndoGroupOptions): string;
+    endGroup(groupId: string): IUndoRedoResult;
+    cancelGroup(groupId: string): IUndoRedoResult;
+    isGroupActive(): boolean;
+    push(command: IUndoCommand): void;
     reset(): void;
+    clearHistory(): void;
     isDirty(): boolean;
+    canUndo(): boolean;
+    canRedo(): boolean;
+    markSaved(): void;
+    hasActiveRecording(uuid?: string): boolean;
+    isApplying(): boolean;
+}
+export declare interface IUnlinkPrefabParams {
+    nodePath: string;
+    removeNested?: boolean;
 }
 export declare interface IUnpackPrefabInstanceParams {
     nodePath: string;
@@ -6184,7 +6528,7 @@ export declare interface SpriteFrameVertices {
     minPos: number[];
     maxPos: number[];
 }
-export declare const SUPPORT_CREATE_TYPES: readonly ["animation-clip", "typescript", "auto-atlas", "effect", "scene", "prefab", "material", "terrain", "physics-material", "label-atlas", "render-texture", "directory", "effect-header"];
+export declare const SUPPORT_CREATE_TYPES: readonly ["animation-clip", "typescript", "auto-atlas", "effect", "scene", "prefab", "material", "texture-cube", "terrain", "physics-material", "label-atlas", "render-texture", "directory", "effect-header"];
 export declare enum TangentImportSetting {
     exclude = 0,
     optional = 1,
@@ -6328,14 +6672,14 @@ export declare type CCEModuleMap = {
 };
 export declare interface EngineInfo {
     typescript: {
-        type: 'builtin' | 'custom'; 
-        builtin: string, 
-        path: string; 
+        type: 'builtin' | 'custom';
+        builtin: string,
+        path: string;
     },
     native: {
-        type: 'builtin' | 'custom'; 
-        builtin: string, 
-        path: string; 
+        type: 'builtin' | 'custom';
+        builtin: string,
+        path: string;
     },
     tmpDir: string;
     version: string;
@@ -6383,8 +6727,8 @@ export declare interface IDesignResolution {
 }
 export declare interface IDisplayModuleCache {
     _value: boolean;
-    _option?: string; 
-    _flags?: IFlags_2; 
+    _option?: string;
+    _flags?: IFlags_2;
 }
 export declare interface IDisplayModuleItem extends IFeatureItem {
     _value: boolean;
@@ -6457,14 +6801,14 @@ export declare type IModules = Record<string, IModuleItem>;
 export declare function init(projectPath: string): Promise<void>;
 export declare function initEngine(enginePath: string, projectPath: string, serverURL?: string): Promise<void>;
 export declare interface IPhysicsConfig {
-    gravity: IVec3Like; 
-    allowSleep: boolean; 
-    sleepThreshold: number; 
-    autoSimulation: boolean; 
-    fixedTimeStep: number; 
-    maxSubSteps: number; 
-    defaultMaterial?: string; 
-    useNodeChains: boolean; 
+    gravity: IVec3Like;
+    allowSleep: boolean;
+    sleepThreshold: number;
+    autoSimulation: boolean;
+    fixedTimeStep: number;
+    maxSubSteps: number;
+    defaultMaterial?: string;
+    useNodeChains: boolean;
     collisionMatrix: ICollisionMatrix;
     physicsEngine: string;
     physX?: {
@@ -6475,10 +6819,10 @@ export declare interface IPhysicsConfig {
     };
 }
 export declare interface IPhysicsMaterial {
-    friction: number; 
-    rollingFriction: number; 
-    spinningFriction: number; 
-    restitution: number; 
+    friction: number;
+    rollingFriction: number;
+    spinningFriction: number;
+    restitution: number;
 }
 export declare interface ISplashBackgroundColor {
     x: number;
@@ -6537,18 +6881,19 @@ export { }
 exports[`DTS API compatibility index.d.ts should match snapshot 1`] = `
 "import { __private } from 'cc';
 import { ChunkInfo } from '@cocos/creator-programming-quick-pack/lib/loader';
-import type { Component } from 'cc';
 import { EventEmitter } from 'events';
 import { default as i18n_2 } from 'i18next';
 import { NextFunction } from 'express';
-import type { Node as Node_2 } from 'cc';
 import { Request as Request_2 } from 'express';
 import { Response as Response_2 } from 'express';
-import type { Scene as Scene_2 } from 'cc';
-import type { Vec3 as Vec3_2 } from 'cc';
 export declare interface AnimationClipAssetUserData {
     name: string;
 }
+export declare const animationGraphVariant: {
+    query(uuid: string): Promise<AnimGraphVariantDump>;
+    change(uuid: string, dump: AnimGraphVariantDump): Promise<AnimGraphVariantDump>;
+    save(uuid: string): Promise<void>;
+};
 export declare interface AnimationImportSetting {
     name: string;
     duration: number;
@@ -6572,6 +6917,33 @@ export declare interface AnimationImportSetting {
             refClip?: string;
         };
     }>;
+}
+export declare const animationMask: {
+    query(uuid: string): Promise<AnimationMaskDump>;
+    importSkeleton(uuid: string, skeletonSourceUuid: string): Promise<AnimationMaskDump>;
+    clearNodes(uuid: string): Promise<AnimationMaskDump>;
+    changeDump(uuid: string, changes: AnimationMaskChange[]): Promise<AnimationMaskDump>;
+    save(uuid: string): Promise<void>;
+};
+export declare interface AnimationMaskChange {
+    path: string;
+    enabled: boolean;
+    recursive?: boolean;
+}
+export declare interface AnimationMaskDump {
+    version: 1;
+    assetUuid: string;
+    joints: AnimationMaskJoint[];
+}
+export declare interface AnimationMaskJoint {
+    path: string;
+    enabled: boolean;
+    children?: AnimationMaskJoint[];
+}
+export declare interface AnimGraphVariantDump {
+    graphUuid: string | null;
+    clips: Record<string, string>;
+    invalids?: Record<string, string>;
 }
 export declare const ASSET_HANDLER_TYPES: string[];
 export declare enum AssetActionEnum {
@@ -6645,6 +7017,27 @@ export declare interface AssetOperationOption {
     overwrite?: boolean;
     rename?: boolean;
 }
+export declare interface AssetPropertySchema {
+    label: string;
+    description?: string;
+    type: AssetPropertySchemaType;
+    default?: unknown;
+    options?: AssetPropertySchemaOption[];
+    assetType?: string;
+    min?: number;
+    max?: number;
+    step?: number;
+    readOnly?: boolean;
+    order?: number;
+    properties?: Record<string, AssetPropertySchema>;
+    items?: AssetPropertySchema | AssetPropertySchema[];
+}
+export declare type AssetPropertySchemaMap = Record<string, AssetPropertySchema>;
+export declare interface AssetPropertySchemaOption {
+    label: string;
+    value: string | number | boolean;
+}
+export declare type AssetPropertySchemaType = 'string' | 'number' | 'boolean' | 'enum' | 'asset' | 'array' | 'object';
 export declare namespace Assets {
     export {
         init,
@@ -6657,7 +7050,6 @@ export declare namespace Assets {
         refresh,
         queryAssetInfo,
         queryAssetMeta,
-        saveAssetMeta,
         queryCreateMap,
         queryAssetInfos,
         queryAssetDBInfos,
@@ -6666,6 +7058,8 @@ export declare namespace Assets {
         importAsset,
         reimportAsset,
         saveAsset,
+        querySerializedData,
+        saveSerializedData,
         queryUUID,
         queryPath,
         queryUrl,
@@ -6677,7 +7071,9 @@ export declare namespace Assets {
         updateDefaultUserData,
         queryAssetUserDataConfig,
         updateAssetUserData,
+        updateAssetUserDataByPath,
         queryAssetConfigMap,
+        queryPropertySchema,
         queryThumbnailHandlers,
         generateThumbnail,
         onAssetAdded,
@@ -6691,6 +7087,11 @@ export declare namespace Assets {
         QueryAssetType,
         FilterPluginOptions,
         IPluginScriptInfo,
+        AnimGraphVariantDump,
+        animationGraphVariant,
+        animationMask,
+        serializedData,
+        IProperty,
         IAssetDeleteOptions,
         IAssetFileSystemProvider,
         IAssetOperationContext,
@@ -6699,9 +7100,19 @@ export declare namespace Assets {
         IAssetRenameOptions,
         IAssetWriteFileOptions,
         IAssetMeta,
+        SerializedAssetDump,
+        SerializedAssetPatch,
+        SerializedAssetQueryResult,
+        AssetPropertySchemaType,
+        AssetPropertySchemaOption,
+        AssetPropertySchema,
+        AssetPropertySchemaMap,
         IAssetInfo,
         AssetOperationOption,
         DeleteAssetOptions,
+        AnimationMaskDump,
+        AnimationMaskJoint,
+        AnimationMaskChange,
         AssetInfo,
         IRedirectInfo,
         QueryAssetsOption,
@@ -6834,7 +7245,6 @@ export declare namespace Configuration {
     }
 }
 export declare type ConfigurationScope = 'default' | 'project';
-export declare const CREATE_TYPES: readonly ["scene", "prefab"];
 export declare function createAsset(options: CreateAssetOptions): Promise<IAssetInfo>;
 export declare function createAssetByType(ccType: ISupportCreateType, dirOrUrl: string, baseName: string, options?: CreateAssetByTypeOptions): Promise<IAssetInfo>;
 export declare interface CreateAssetByTypeOptions extends AssetOperationOption {
@@ -6917,14 +7327,14 @@ export declare namespace Engine {
 }
 export declare interface EngineInfo {
     typescript: {
-        type: 'builtin' | 'custom'; 
-        builtin: string, 
-        path: string; 
+        type: 'builtin' | 'custom';
+        builtin: string,
+        path: string;
     },
     native: {
-        type: 'builtin' | 'custom'; 
-        builtin: string, 
-        path: string; 
+        type: 'builtin' | 'custom';
+        builtin: string,
+        path: string;
     },
     tmpDir: string;
     version: string;
@@ -6990,19 +7400,6 @@ export declare function getStatus_2(): {
     url?: string;
 };
 export declare function getUrl(): string | undefined;
-export declare class GlobalEventManager {
-    on<TEvents extends Record<string, any>>(event: keyof TEvents, listener: TEvents[keyof TEvents] extends void ? () => void : (payload: TEvents[keyof TEvents]) => void): void;
-    on(event: string, listener: (...args: any[]) => void): void;
-    once<TEvents extends Record<string, any>>(event: keyof TEvents, listener: TEvents[keyof TEvents] extends void ? () => void : (payload: TEvents[keyof TEvents]) => void): void;
-    once(event: string, listener: (...args: any[]) => void): void;
-    off<TEvents extends Record<string, any>>(event: keyof TEvents, listener: TEvents[keyof TEvents] extends void ? () => void : (payload: TEvents[keyof TEvents]) => void): void;
-    off(event: string, listener: (...args: any[]) => void): void;
-    emit<TEvents extends Record<string, any>>(event: keyof TEvents, ...args: TEvents[keyof TEvents]): void;
-    emit(event: string, ...args: any[]): void;
-    broadcast<TEvents extends Record<string, any>>(event: keyof TEvents, ...args: TEvents[keyof TEvents]): void;
-    broadcast(event: string, ...args: any[]): void;
-    clear(event?: string): void;
-}
 export declare interface GltfAnimationAssetUserData {
     gltfIndex: number;
     events: Array<{
@@ -7081,13 +7478,6 @@ export declare namespace i18n {
         i18n_2 as default
     }
 }
-export declare interface IAddComponentOptions {
-    nodePath: string;
-    component: string;
-}
-export declare interface IApplyPrefabChangesParams {
-    nodePath: string;
-}
 export declare interface IAssetConfig {
     displayName?: string;
     description?: string;
@@ -7095,7 +7485,7 @@ export declare interface IAssetConfig {
     userDataConfig?: Record<string, IUerDataConfigItem>;
 }
 export declare interface IAssetDBInfo extends AssetDBOptions {
-    state: 'none' | 'start' | 'startup' | 'refresh'; 
+    state: 'none' | 'start' | 'startup' | 'refresh';
     visible: boolean;
     preImportExtList: string[];
 }
@@ -7112,36 +7502,36 @@ export declare interface IAssetFileSystemProvider {
     copy?(sourcePath: string, destinationPath: string, options?: IAssetRenameOptions): Promise<void> | void;
 }
 export declare interface IAssetInfo {
-    name: string; 
-    source: string; 
-    loadUrl: string; 
-    url: string; 
-    file: string; 
-    uuid: string; 
-    importer: AssetHandlerType; 
-    imported: boolean; 
-    invalid: boolean; 
-    type: IAssetType; 
-    isDirectory: boolean; 
-    library: { [key: string]: string }; 
-    isBundle?: boolean; 
-    displayName?: string; 
-    readonly?: boolean; 
-    visible?: boolean; 
-    subAssets?: { [key: string]: IAssetInfo }; 
+    name: string;
+    source: string;
+    loadUrl: string;
+    url: string;
+    file: string;
+    uuid: string;
+    importer: AssetHandlerType;
+    imported: boolean;
+    invalid: boolean;
+    type: IAssetType;
+    isDirectory: boolean;
+    library: { [key: string]: string };
+    isBundle?: boolean;
+    displayName?: string;
+    readonly?: boolean;
+    visible?: boolean;
+    subAssets?: { [key: string]: IAssetInfo };
     instantiation?: string;
-    redirect?: IRedirectInfo; 
+    redirect?: IRedirectInfo;
     meta?: IAssetMeta,
     parent?: {
         source: string;
         library: { [key: string]: string };
         uuid: string;
     };
-    extends?: string[]; 
-    mtime?: number; 
-    depends?: string[]; 
-    dependeds?: string[]; 
-    temp?: string; 
+    extends?: string[];
+    mtime?: number;
+    depends?: string[];
+    dependeds?: string[];
+    temp?: string;
 }
 export declare interface IAssetMeta<T extends ISupportCreateType | 'unknown' = 'unknown'> {
     ver: string;
@@ -7173,34 +7563,30 @@ export declare type IAssetOperationOrigin = 'direct-op' | 'watcher';
 export declare interface IAssetRenameOptions extends IAssetOperationOptionsBase {
     overwrite?: boolean;
 }
-export declare interface IAssetService extends IServiceEvents {
-    assetChanged(uuid: string): Promise<void>;
-    assetDeleted(uuid: string): Promise<void>;
-}
 export declare type IAssetType =
 | ISupportCreateCCType
-| 'cc.Asset'               
-| 'cce.Database'           
-| 'cce.EffectHeader'       
-| 'cc.VideoClip'           
-| 'cc.TiledMapAsset'       
-| 'cc.TTFFont'             
-| 'cc.Texture2D'           
-| 'cc.SpriteFrame'         
-| 'cc.ImageAsset'          
-| 'cc.TextAsset'           
-| 'cc.JsonAsset'           
-| 'cc.AudioClip'           
-| 'cc.BitmapFont'          
-| 'cc.BufferAsset'         
-| 'cc.ParticleAsset'       
-| 'cc.RenderPipeline'     
-| 'cc.Skeleton'            
-| 'cc.Mesh'                
-| 'sp.SkeletonData'        
-| 'dragonBones.DragonBonesAsset'      
-| 'dragonBones.DragonBonesAtlasAsset' 
-| 'RenderStage'            
+| 'cc.Asset'
+| 'cce.Database'
+| 'cce.EffectHeader'
+| 'cc.VideoClip'
+| 'cc.TiledMapAsset'
+| 'cc.TTFFont'
+| 'cc.Texture2D'
+| 'cc.SpriteFrame'
+| 'cc.ImageAsset'
+| 'cc.TextAsset'
+| 'cc.JsonAsset'
+| 'cc.AudioClip'
+| 'cc.BitmapFont'
+| 'cc.BufferAsset'
+| 'cc.ParticleAsset'
+| 'cc.RenderPipeline'
+| 'cc.Skeleton'
+| 'cc.Mesh'
+| 'sp.SkeletonData'
+| 'dragonBones.DragonBonesAsset'
+| 'dragonBones.DragonBonesAtlasAsset'
+| 'RenderStage'
 | 'RenderFlow';
 export declare interface IAssetWriteFileOptions extends IAssetOperationOptionsBase {
     create?: boolean;
@@ -7216,75 +7602,9 @@ export declare interface IBaseConfiguration extends EventEmitterMethods {
     remove(key: string, scope?: ConfigurationScope): Promise<boolean>;
     save(): Promise<boolean>;
 }
-export declare interface IBaseCreateNodeParams {
-    path: string;
-    name?: string;
-    workMode?: '2d' | '3d';
-    position?: IVec3;
-    keepWorldTransform?: boolean;
-    canvasRequired?: boolean;
-}
-export declare interface IBaseIdentifier {
-    assetName: string;
-    assetUuid: string;
-    assetUrl: string;
-    assetType: string;
-}
-export declare interface ICameraConfig {
-    color: number[];
-    fov: number;
-    far: number;
-    near: number;
-    wheelSpeed: number;
-    wanderSpeed: number;
-    enableAcceleration: boolean;
-    aperture: number;
-    shutter: number;
-    iso: number;
-}
-export declare interface ICameraService {
-    init(): void;
-    initFromConfig(): Promise<void>;
-    is2D: boolean;
-    focus(nodes?: string[] | null, editorCameraInfo?: any, immediate?: boolean): void;
-    defaultFocus(uuid: string): void;
-    rotateCameraToDir(dir: Vec3_2, rotateByViewDist: boolean): void;
-    changeProjection(): void;
-    setGridVisible(value: boolean): void;
-    isGridVisible(): boolean;
-    setCameraProperty(options: any): void;
-    resetCameraProperty(): void;
-    queryConfig(): ICameraConfig;
-    updateConfig(config: Partial<ICameraConfig>): void;
-    getCameraFov(): number;
-    zoomUp(): void;
-    zoomDown(): void;
-    zoomReset(): void;
-    alignNodeToSceneView(nodes: string[]): void;
-    alignSceneViewToNode(nodes: string[]): void;
-    setGridColor(color: number[]): void;
-    setOriginAxes2D(config: IOriginAxesConfig): void;
-    setOriginAxes3D(config: IOriginAxesConfig): void;
-    onUpdate(deltaTime: number): void;
-}
-export declare interface IChangeNodeOptions {
-    source?: 'editor' | 'undo' | 'engine';
-    type?: NodeEventType;
-    propPath?: string;
-    index?: number;
-    record?: boolean;
-    dumpImmediately?: boolean;
-}
 export declare interface IChunkContent {
     skeleton: null | string;
     clips: string[];
-}
-export declare interface ICLI {
-    Scene: IServiceManager;
-    SceneEvents: GlobalEventManager;
-}
-export declare interface ICloseOptions {
-    urlOrUUID?: string;
 }
 export declare interface ICocosConfigurationNode {
     id: string;
@@ -7312,44 +7632,8 @@ export declare interface ICocosConfigurationPropertySchema {
 export declare interface ICollisionMatrix {
     [x: string]: number;
 }
-export declare interface IComponent extends IProperty {
-    value: {
-        enabled: IPropertyValueType;
-        uuid: IPropertyValueType;
-        name: IPropertyValueType;
-    } & Record<string, IPropertyValueType>;
-    mountedRoot?: string;
-}
-export declare interface IComponentService extends IServiceEvents {
-    add(params: IAddComponentOptions): Promise<IComponent>;
-    remove(params: IRemoveComponentOptions): Promise<boolean>;
-    setProperty(params: ISetPropertyOptions): Promise<boolean>;
-    query(params: IQueryComponentOptions | string): Promise<IComponent | null>;
-    queryAll(): Promise<string[]>;
-    reset(params: IQueryComponentOptions): Promise<boolean>;
-    queryClasses(options?: IQueryClassesOptions): Promise<{
-        name: string;
-    }[]>;
-    queryFunctionOfNode(path: string): Promise<any>;
-    queryComponents(): Promise<Array<{
-        name: string;
-        cid: string;
-        path: string;
-    }>>;
-    executeMethod(options: IExecuteComponentMethodOptions): Promise<any>;
-    hasScript(name: string): Promise<boolean>;
-    getPathByUuid(uuid: string): string;
-    init(): void;
-    unregisterCompMgrEvents(): void;
-}
 export declare interface IConfiguration {
     [key: string]: any;
-}
-export declare interface ICreateByAssetParams extends IBaseCreateNodeParams {
-    dbURL: string;
-}
-export declare interface ICreateByNodeTypeParams extends IBaseCreateNodeParams {
-    nodeType: NodeType;
 }
 export declare interface ICreateMenuInfo {
     label: string;
@@ -7361,18 +7645,6 @@ export declare interface ICreateMenuInfo {
     group?: string;
     fileNameCheckConfigs?: FileNameCheckConfig[];
 }
-export declare interface ICreateOptions {
-    type: ICreateType;
-    baseName: string;
-    targetDirectory: string;
-    templateType?: TSceneTemplateType;
-}
-export declare interface ICreatePrefabFromNodeParams {
-    nodePath: string;
-    dbURL: string;
-    overwrite?: boolean;
-}
-export declare type ICreateType = typeof CREATE_TYPES[number];
 export declare type ICroppingConfig = {
     name: string;
     flags: IFlags_2,
@@ -7394,13 +7666,6 @@ export declare type IDefaultConfig = {
     diyConfig: (cache: Record<string, IDisplayModuleCache>, flags: IFlags_2, includeModules: string[]) => void;
 }
 export declare type IDefaultConfigKeys = 'defaultConfig' | 'default2d' | 'default3d' | 'defaultNative' | 'defaultSmallGames'
-export declare interface IDeleteNodeParams {
-    path: string;
-    keepWorldTransform?: boolean;
-}
-export declare interface IDeleteNodeResult {
-    path: string;
-}
 export declare interface IDesignResolution {
     height: number;
     width: number;
@@ -7410,26 +7675,13 @@ export declare interface IDesignResolution {
 }
 export declare interface IDisplayModuleCache {
     _value: boolean;
-    _option?: string; 
-    _flags?: IFlags_2; 
+    _option?: string;
+    _flags?: IFlags_2;
 }
 export declare interface IDisplayModuleItem extends IFeatureItem {
     _value: boolean;
     _option?: string;
     options?: Record<string, IDisplayModuleItem>;
-}
-export declare interface IEditorService extends IServiceEvents {
-    getCurrentEditorType(): 'scene' | 'prefab' | 'unknown';
-    open(params: IOpenOptions): Promise<TEditorEntity>;
-    close(params: ICloseOptions): Promise<boolean>;
-    save(params: ISaveOptions): Promise<IAssetInfo>;
-    reload(params: IReloadOptions): Promise<ReloadResult>;
-    create(params: ICreateOptions): Promise<IBaseIdentifier>;
-    hasOpen(): Promise<boolean>;
-    queryCurrent(): Promise<TEditorEntity | null>;
-    getRootNode(): TEditorInstance | null;
-    lock(): Promise<void>;
-    unlock(): void;
 }
 export declare interface IEngineConfig extends IEngineModuleConfig {
     physicsConfig: IPhysicsConfig;
@@ -7463,17 +7715,6 @@ export declare interface IEngineProjectConfig extends Exclude<IEngineConfig, 'in
     configs?: Record<string, IEngineModuleProjectConfig>;
     globalConfigKey?: string;
 }
-export declare interface IEngineService extends IServiceEvents {
-    init(): Promise<void>;
-    repaintInEditMode(): Promise<void>;
-    pause(): void;
-    resume(): void;
-}
-export declare interface IExecuteComponentMethodOptions {
-    path: string;
-    name: string;
-    args: any[];
-}
 export declare interface IFbxSetting {
     unitConversion?: 'geometry-level' | 'hierarchy-level' | 'disabled';
     animationBakeRate?: 0 | 24 | 25 | 30 | 60;
@@ -7498,62 +7739,11 @@ export declare interface IGetPostConfig {
     url: string | RegExp;
     handler: (req: Request_2, res: Response_2, next?: NextFunction) => Promise<void>;
 }
-export declare interface IGetPrefabInfoParams {
-    nodePath: string;
-}
-export declare interface IGizmoService {
-    gizmoRootNode: any;
-    foregroundNode: any;
-    backgroundNode: any;
-    transformToolData: any;
-    transformToolName: string;
-    isViewMode: boolean;
-    is2D: boolean;
-    init(): void;
-    initFromConfig(): Promise<void>;
-    saveConfig(): Promise<void>;
-    changeTool(name: string): void;
-    setCoordinate(coord: 'local' | 'global'): void;
-    setPivot(pivot: 'pivot' | 'center'): void;
-    lockGizmoTool(locked: boolean): void;
-    isGizmoToolLocked(): boolean;
-    setIconVisible(visible: boolean): void;
-    showAllGizmoOfNode(node: any, recursive?: boolean): void;
-    removeAllGizmoOfNode(node: any, recursive?: boolean): void;
-    clearAllGizmos(): void;
-    callAllGizmoFuncOfNode(node: any, funcName: string, ...params: any[]): boolean;
-    onUpdate(deltaTime: number): void;
-    queryToolsVisibility3d(): boolean;
-    setToolsVisibility3d(value: boolean): void;
-    isIconGizmo3D(): boolean;
-    setIconGizmo3D(value: boolean): void;
-    queryIconGizmoSize(): number;
-    setIconGizmoSize(size: number): void;
-    queryGridColor(): number[];
-    setGridColor(color: number[]): void;
-    queryOriginAxes2D(): IOriginAxesConfig;
-    setOriginAxes2D(config: IOriginAxesConfig): void;
-    queryOriginAxes3D(): IOriginAxesConfig;
-    setOriginAxes3D(config: IOriginAxesConfig): void;
-    queryTransformSnapConfigs(): any;
-    setTransformSnapConfigs(name: string, value: any): void;
-    queryRectSnapConfig(): IRectSnapConfigData;
-    setRectSnapConfig(config: Partial<IRectSnapConfigData>): void;
-    querySelectNodes(): any[];
-    hasSelected(uuid: string): boolean;
-    onResize(): void;
-    showSelectionRegion(left: number, right: number, top: number, bottom: number): void;
-    hideSelectionRegion(): void;
-    execGizmoMethods(name: string, funcName: string, params?: any[]): any;
-}
 export declare interface IInitEngineInfo {
     importBase: string;
     nativeBase: string;
     writablePath: string;
     serverURL?: string;
-}
-export declare interface IIsPrefabInstanceParams {
-    nodePath: string;
 }
 export declare interface ImageAssetUserData {
     type: ImageImportType;
@@ -7611,88 +7801,15 @@ export declare function init_6(): Promise<void>;
 export declare function init_7(projectPath: string): Promise<void>;
 export declare function initEngine(enginePath: string, projectPath: string, serverURL?: string): Promise<void>;
 export declare function initProgrammingFacet(): Promise<ProgrammingFacet>;
-export declare interface INode {
-    path: string;
-    active: IProperty;
-    locked: IProperty;
-    name: IProperty;
-    position: IProperty;
-    rotation: IProperty;
-    mobility: IProperty;
-    scale: IProperty;
-    layer: IProperty;
-    uuid: IProperty;
-    children: IProperty[];
-    parent: IProperty;
-    __comps__: IProperty[];
-    __type__: string;
-    __prefab__?: IPrefab;
-    _prefabInstance?: any;
-    removedComponents?: IRemovedComponentInfo[];
-    mountedRoot?: string;
-}
-export declare interface INodeService extends IServiceEvents {
-    createByType(params: ICreateByNodeTypeParams): Promise<INode | null>;
-    createByAsset(params: ICreateByAssetParams): Promise<INode | null>;
-    delete(params: IDeleteNodeParams): Promise<IDeleteNodeResult | null>;
-    query(params?: IQueryNodeParams): Promise<INode | IScene | null>;
-    queryNodeTree(params: IQueryNodeTreeParams): Promise<INodeTreeItem | null>;
-    previewSetProperty(options: ISetPropertyOptions): Promise<boolean>;
-    cancelPreviewSetProperty(options: ISetPropertyOptions): Promise<boolean>;
-    setProperty(options: ISetPropertyOptions): Promise<boolean>;
-    reset(path: string): Promise<boolean>;
-    resetProperty(options: ISetPropertyOptions): Promise<boolean>;
-    updatePropertyFromNull(options: ISetPropertyOptions): Promise<boolean>;
-    setNodeAndChildrenLayer(options: ISetPropertyOptions): Promise<void>;
-    getPathByUuid(uuid: string): string;
-}
-export declare interface INodeTreeComponent {
-    isCustom: boolean;
-    type: string;
-    value: string;
-    extends: string[];
-}
-export declare interface INodeTreeItem {
-    name: string;
-    active: boolean;
-    locked: boolean;
-    type: string;
-    uuid: string;
-    children: INodeTreeItem[];
-    prefab: IPrefabStateInfo;
-    parent: string;
-    path: string;
-    isScene: boolean;
-    readonly: boolean;
-    components: INodeTreeComponent[];
-}
-export declare interface IOpenOptions {
-    urlOrUUID: string;
-    simpleNode?: boolean;
-}
-export declare interface IOperationService {
-    addListener(type: OperationEvent, listener: Function, priority?: number): void;
-    removeListener(type: OperationEvent, listener: Function): void;
-    dispatch(type: OperationEvent, ...args: any[]): void;
-    emitMouseEvent(type: string, event: ISceneMouseEvent, dpr?: number): void;
-    requestPointerLock(): void;
-    exitPointerLock(): void;
-    changePointer(type: string): void;
-}
-export declare interface IOriginAxesConfig {
-    x: boolean;
-    y: boolean;
-    z: boolean;
-}
 export declare interface IPhysicsConfig {
-    gravity: IVec3Like; 
-    allowSleep: boolean; 
-    sleepThreshold: number; 
-    autoSimulation: boolean; 
-    fixedTimeStep: number; 
-    maxSubSteps: number; 
-    defaultMaterial?: string; 
-    useNodeChains: boolean; 
+    gravity: IVec3Like;
+    allowSleep: boolean;
+    sleepThreshold: number;
+    autoSimulation: boolean;
+    fixedTimeStep: number;
+    maxSubSteps: number;
+    defaultMaterial?: string;
+    useNodeChains: boolean;
     collisionMatrix: ICollisionMatrix;
     physicsEngine: string;
     physX?: {
@@ -7703,54 +7820,13 @@ export declare interface IPhysicsConfig {
     };
 }
 export declare interface IPhysicsMaterial {
-    friction: number; 
-    rollingFriction: number; 
-    spinningFriction: number; 
-    restitution: number; 
+    friction: number;
+    rollingFriction: number;
+    spinningFriction: number;
+    restitution: number;
 }
 export declare interface IPluginScriptInfo extends PluginScriptInfo {
     url: string;
-}
-export declare interface IPrefab {
-    uuid: string;
-    fileId: string;
-    rootUuid: string;
-    sync: boolean;
-    prefabStateInfo: IPrefabStateInfo;
-    targetOverrides?: ITargetOverrideInfo[];
-    instance?: IProperty;
-}
-export declare interface IPrefabService extends IServiceEvents {
-    createPrefabFromNode(params: ICreatePrefabFromNodeParams): Promise<INode>;
-    applyPrefabChanges(params: IApplyPrefabChangesParams): Promise<boolean>;
-    revertToPrefab(params: IRevertToPrefabParams): Promise<boolean>;
-    unpackPrefabInstance(params: IUnpackPrefabInstanceParams): Promise<INode>;
-    isPrefabInstance(params: IIsPrefabInstanceParams): Promise<boolean>;
-    getPrefabInfo(params: IGetPrefabInfoParams): Promise<IPrefab | null>;
-    removePrefabInfoFromNode(node: Node_2, removeNested?: boolean): void;
-}
-export declare interface IPrefabStateInfo {
-    state: PrefabState;
-    isUnwrappable: boolean;
-    isRevertable: boolean;
-    isApplicable: boolean;
-    isAddedChild: boolean;
-    isNested: boolean;
-    assetUuid: string;
-}
-export declare interface IPreviewInstance {
-    onMouseDown(event: any): void;
-    onMouseMove(event: any): void;
-    onMouseUp(event: any): void;
-    onMouseWheel(event: any): void;
-    viewToggle(): void;
-    is2DView(): boolean;
-    resetCameraView(): void;
-    hide(): void;
-}
-export declare interface IPreviewService {
-    open(uuid: string): Promise<IPreviewInstance | null>;
-    generateThumbnail(uuid: string, assetType: string, width?: number, height?: number): Promise<any>;
 }
 export declare interface IProject {
     get path(): string;
@@ -7767,211 +7843,54 @@ export declare interface IProject {
 }
 export declare interface IProperty {
     value: { [key: string]: IPropertyValueType } | IPropertyValueType;
-    default?: any; 
+    default?: any;
     values?: ({ [key: string]: IPropertyValueType } | IPropertyValueType)[];
     lock?: { [key in keyof Vec4]?: IPropertyLock };
     cid?: string;
     type?: string;
-    ui?: { name: string; data?: any }; 
+    ui?: { name: string; data?: any };
     readonly?: boolean;
     visible?: boolean;
     name?: string;
-    elementTypeData?: IProperty; 
-    path: string; 
+    elementTypeData?: IProperty;
+    path: string;
     isArray?: boolean;
     invalid?: boolean;
-    extends?: string[]; 
-    displayName?: string; 
-    displayOrder?: number; 
-    help?: string; 
-    group?: IPropertyGroupOptions; 
-    tooltip?: string; 
-    editor?: any; 
-    animatable?: boolean; 
-    radioGroup?: boolean; 
-    enumList?: any[]; 
+    extends?: string[];
+    displayName?: string;
+    displayOrder?: number;
+    help?: string;
+    group?: IPropertyGroupOptions;
+    tooltip?: string;
+    editor?: any;
+    animatable?: boolean;
+    radioGroup?: boolean;
+    enumList?: any[];
     bitmaskList?: any[];
-    min?: number; 
-    max?: number; 
-    step?: number; 
-    slide?: boolean; 
-    unit?: string; 
-    radian?: boolean; 
-    multiline?: boolean; 
-    optionalTypes?: string[]; 
-    userData?: { [key: string]: any }; 
+    min?: number;
+    max?: number;
+    step?: number;
+    slide?: boolean;
+    unit?: string;
+    radian?: boolean;
+    multiline?: boolean;
+    optionalTypes?: string[];
+    userData?: { [key: string]: any };
 }
 export declare interface IPropertyGroupOptions {
-    id: string 
+    id: string
     name: string,
-    displayOrder: number, 
-    style: string 
+    displayOrder: number,
+    style: string
 }
-export declare type IPropertyLock = { 
-    default: number; 
-    message: string 
+export declare type IPropertyLock = {
+    default: number;
+    message: string
 };
 export declare type IPropertyValueType = IProperty | IProperty[] | null | undefined | number | boolean | string | Vec4 | Vec3 | Vec2 | Mat4 | any | Array<unknown>
-export declare interface IQueryClassesOptions {
-    extends?: string | string[];
-    excludeSelf?: boolean;
-}
-export declare interface IQueryComponentOptions {
-    path: string;
-}
-export declare interface IQueryNodeParams {
-    path: string;
-    queryChildren: boolean;
-    queryComponent: boolean;
-}
-export declare interface IQueryNodeTreeParams {
-    path?: string;
-}
-export declare interface IRectSnapConfigData {
-    enableSnapping: boolean;
-    snapThreshold: number;
-}
 export declare interface IRedirectInfo {
     type: string;
     uuid: string;
-}
-export declare interface IReloadOptions {
-    urlOrUUID?: string;
-}
-export declare interface IRemoveComponentOptions {
-    path: string;
-}
-export declare interface IRemovedComponentInfo {
-    name: string;
-    fileID: string;
-}
-export declare interface IRevertToPrefabParams {
-    nodePath: string;
-}
-export declare interface ISaveOptions {
-    urlOrUUID?: string;
-}
-export declare interface IScene {
-    path: string;
-    name: IProperty;
-    active: IProperty;
-    locked: IProperty;
-    _globals: Record<string, IProperty>;
-    isScene: boolean;
-    autoReleaseAssets: IProperty;
-    uuid: IProperty;
-    children: IProperty[];
-    parent: string;
-    __type__: string;
-    targetOverrides?: ITargetOverrideInfo[];
-}
-export declare interface ISceneMouseEvent {
-    x: number;
-    y: number;
-    clientX: number;
-    clientY: number;
-    deltaX: number;
-    deltaY: number;
-    wheelDeltaX: number;
-    wheelDeltaY: number;
-    moveDeltaX: number;
-    moveDeltaY: number;
-    leftButton: boolean;
-    middleButton: boolean;
-    rightButton: boolean;
-    button: number;
-    buttons: number;
-    movementX: number;
-    movementY: number;
-    ctrlKey: boolean;
-    shiftKey: boolean;
-    altKey: boolean;
-    metaKey: boolean;
-    hitPoint?: any;
-    type?: string;
-    handleName?: string;
-}
-export declare interface ISceneViewService {
-    init(): void;
-    initFromConfig(): Promise<void>;
-    saveConfig(): Promise<void>;
-    setSceneLightOn(enable: boolean): void;
-    querySceneLightOn(): boolean;
-    onEditorOpened(): void;
-    onEditorClosed(): void;
-    onComponentAdded(comp: Component): void;
-    onComponentRemoved(comp: Component): void;
-}
-export declare interface IScriptService extends IServiceEvents {
-    investigatePackerDriver(): Promise<void>;
-    loadScript(): Promise<void>;
-    removeScript(): Promise<void>;
-    scriptChange(): Promise<void>;
-    queryScriptCid(uuid: string): Promise<string | null>;
-    queryScriptName(uuid: string): Promise<string | null>;
-    isCustomComponent(classConstructor: Function): boolean;
-    suspend(condition: Promise<any>): void;
-}
-export declare interface ISelectionService {
-    select(path: string): void;
-    unselect(path: string): void;
-    clear(): void;
-    query(): string[];
-    isSelect(path: string): boolean;
-    reset(): void;
-}
-export declare interface IServiceEvents {
-    onEditorOpened?(): void;
-    onEditorReload?(): void;
-    onEditorClosed?(): void;
-    onEditorSaved?(): void;
-    onNodeBeforeChanged?(node: Node_2): void;
-    onBeforeRemoveNode?(node: Node_2): void;
-    onBeforeAddNode?(node: Node_2): void;
-    onNodeChanged?(node: Node_2, opts: IChangeNodeOptions): void;
-    onBeforeNodeAdded?(node: Node_2): void;
-    onAddNode?(node: Node_2): void;
-    onRemoveNode?(node: Node_2): void;
-    onNodeAdded?(node: Node_2): void;
-    onNodeRemoved?(node: Node_2): void;
-    onAddComponent?(comp: Component): void;
-    onRemoveComponent?(comp: Component): void;
-    onSetPropertyComponent?(comp: Component): void;
-    onComponentAdded?(comp: Component): void;
-    onComponentRemoved?(comp: Component): void;
-    onBeforeChangeComponent?(node: Node_2): void;
-    onBeforeAddComponent?(name: string, node: Node_2): void;
-    onBeforeRemoveComponent?(comp: Component): void;
-    onAssetDeleted?(uuid: string): void;
-    onAssetChanged?(uuid: string): void;
-    onAssetRefreshed?(uuid: string): void;
-    onScriptExecutionFinished?(): void;
-    onSelectionSelect?(path: string, paths: string[]): void;
-    onSelectionUnselect?(path: string, paths: string[]): void;
-    onSelectionClear?(): void;
-}
-export declare interface IServiceManager {
-    Editor: IEditorService;
-    Node: INodeService;
-    Component: IComponentService;
-    Script: IScriptService;
-    Asset: IAssetService;
-    Engine: IEngineService;
-    Prefab: IPrefabService;
-    Selection: ISelectionService;
-    Operation: IOperationService;
-    Undo: IUndoService;
-    Camera: ICameraService;
-    Gizmo: IGizmoService;
-    SceneView: ISceneViewService;
-    Preview: IPreviewService;
-    UI: IUIService;
-}
-export declare interface ISetPropertyOptions {
-    nodePath: string;
-    path: string;
-    dump: IProperty;
-    record?: boolean;
 }
 export declare interface ISocketConfig {
     connection: (socket: any) => void;
@@ -8005,31 +7924,24 @@ export declare interface IStaticFileConfig {
     path: string;
 }
 export declare type ISupportCreateCCType =
-| 'cc.AnimationClip'        
-| 'cc.Script'               
-| 'cc.SpriteAtlas'          
-| 'cc.EffectAsset'          
-| 'cc.SceneAsset'           
-| 'cc.Prefab'               
-| 'cc.Material'             
-| 'cc.TextureCube'          
-| 'cc.TerrainAsset'         
-| 'cc.PhysicsMaterial'      
-| 'cc.LabelAtlas'           
-| 'cc.RenderTexture'        
-| 'cc.AnimationGraph'       
-| 'cc.AnimationMask'        
+| 'cc.AnimationClip'
+| 'cc.Script'
+| 'cc.SpriteAtlas'
+| 'cc.EffectAsset'
+| 'cc.SceneAsset'
+| 'cc.Prefab'
+| 'cc.Material'
+| 'cc.TextureCube'
+| 'cc.TerrainAsset'
+| 'cc.PhysicsMaterial'
+| 'cc.LabelAtlas'
+| 'cc.RenderTexture'
+| 'cc.AnimationGraph'
+| 'cc.AnimationMask'
 | 'cc.AnimationGraphVariant';
 export declare type ISupportCreateType = typeof SUPPORT_CREATE_TYPES[number];
-export declare interface ITargetOverrideInfo {
-    source: string;
-    sourceInfo?: string[];
-    propertyPath: string[];
-    target: string;
-    targetInfo?: string[];
-}
 export declare interface IUerDataConfigItem {
-    key?: string; 
+    key?: string;
     label?: string;
     description?: string;
     default?: any;
@@ -8043,29 +7955,6 @@ export declare interface IUerDataConfigItem {
             value: string;
         }>;
     };
-}
-export declare interface IUIService {
-    alignSelection(type: UIAlignType): void;
-    distributeSelection(type: UIAlignType): void;
-}
-export declare interface IUndoService {
-    beginRecording(uuids: string[], options?: any): string;
-    endRecording(commandId: string): void;
-    cancelRecording(commandId: string): void;
-    undo(): Promise<void>;
-    redo(): Promise<void>;
-    snapshot(): void;
-    reset(): void;
-    isDirty(): boolean;
-}
-export declare interface IUnpackPrefabInstanceParams {
-    nodePath: string;
-    recursive?: boolean;
-}
-export declare interface IVec3 {
-    x: number;
-    y: number;
-    z: number;
 }
 export declare interface IVec3Like {
     x: number;
@@ -8180,64 +8069,6 @@ export declare interface ModuleRenderConfig {
     migrationScript?: string;
 }
 export declare function moveAsset(source: string, target: string, options?: AssetOperationOption): Promise<any>;
-export declare enum NodeEventType {
-    TRANSFORM_CHANGED = "transform-changed",
-    SIZE_CHANGED = "size-changed",
-    ANCHOR_CHANGED = "anchor-changed",
-    CHILD_ADDED = "child-added",
-    CHILD_REMOVED = "child-removed",
-    PARENT_CHANGED = "parent-changed",
-    CHILD_CHANGED = "child-changed",
-    COMPONENT_CHANGED = "component-changed",
-    ACTIVE_IN_HIERARCHY_CHANGE = "active-in-hierarchy-changed",
-    NOTIFY_NODE_CHANGED = "notify-node-changed",
-    PREFAB_INFO_CHANGED = "prefab-info-changed",
-    LIGHT_PROBE_CHANGED = "light-probe-changed",
-    SET_PROPERTY = "set-property",
-    MOVE_ARRAY_ELEMENT = "move-array-element",
-    REMOVE_ARRAY_ELEMENT = "remove-array-element",
-    CREATE_COMPONENT = "create-component",
-    RESET_COMPONENT = "reset-component"
-}
-export declare enum NodeType {
-    EMPTY = "Empty",
-    TERRAIN = "Terrain",
-    CAMERA = "Camera",
-    SPRITE = "Sprite",
-    SPRITE_SPLASH = "SpriteSplash",
-    GRAPHICS = "Graphics",
-    LABEL = "Label",
-    MASK = "Mask",
-    PARTICLE = "Particle",
-    TILED_MAP = "TiledMap",
-    CAPSULE = "Capsule",
-    CONE = "Cone",
-    CUBE = "Cube",
-    CYLINDER = "Cylinder",
-    PLANE = "Plane",
-    QUAD = "Quad",
-    SPHERE = "Sphere",
-    TORUS = "Torus",
-    BUTTON = "Button",
-    CANVAS = "Canvas",
-    EDIT_BOX = "EditBox",
-    LAYOUT = "Layout",
-    PAGE_VIEW = "PageView",
-    PROGRESS_BAR = "ProgressBar",
-    RICH_TEXT = "RichText",
-    SCROLL_VIEW = "ScrollView",
-    SLIDER = "Slider",
-    TOGGLE = "Toggle",
-    TOGGLE_GROUP = "ToggleGroup",
-    VIDEO_PLAYER = "VideoPlayer",
-    WEB_VIEW = "WebView",
-    WIDGET = "Widget",
-    DIRECTIONAL_LIGHT = "Light-Directional",
-    SPHERE_LIGHT = "Light-Sphere",
-    SPOT_LIGHT = "Light-Spot",
-    PROBE_LIGHT = "Light-Probe-Group",
-    REFLECTION_LIGHT = "Light-Reflection-Probe"
-}
 export declare enum NormalImportSetting {
     optional = 0,
     exclude = 1,
@@ -8265,7 +8096,6 @@ export declare function onPackBuildStart(listener: (e: {
 export declare function onProgress(listener: (current: number, total: number, url: string, state: 'processing' | 'success' | 'failed') => void): () => void;
 export declare function onReady(listener: () => void): () => void;
 export declare function open_2(projectPath: string): Promise<void>;
-export declare type OperationEvent = SceneDragEvent | SceneKeyboardEvent | SceneMouseEvent | 'resize';
 export declare interface ParticleAssetUserData {
     totalParticles: number;
     life: number;
@@ -8326,12 +8156,6 @@ export declare interface PluginScriptUserData {
 export declare interface PrefabAssetUserData {
     persistent?: boolean;
     syncNodeName?: string;
-}
-export declare enum PrefabState {
-    NotAPrefab = 0,
-    PrefabChild = 1,
-    PrefabInstance = 2,
-    PrefabLostAsset = 3
 }
 export declare class ProgrammingFacet {
     private _packerDriverUpdateCount;
@@ -8426,11 +8250,11 @@ export declare function queryAssetInfo(urlOrUUIDOrPath: string, dataKeys?: strin
 export declare function queryAssetInfos(options?: QueryAssetsOption): Promise<IAssetInfo[]>;
 export declare function queryAssetMeta(urlOrUUIDOrPath: string): Promise<IAssetMeta<'unknown'> | null>;
 export declare interface QueryAssetsOption {
-    ccType?: string | string[], 
-    isBundle?: boolean, 
-    importer?: string | string[], 
-    pattern?: string, 
-    extname?: string | string[], 
+    ccType?: string | string[],
+    isBundle?: boolean,
+    importer?: string | string[],
+    pattern?: string,
+    extname?: string | string[],
     userData?: Record<string, boolean | string | number>;
     type?: string;
 }
@@ -8443,6 +8267,8 @@ export declare function queryLayerBuiltin(): Promise<{
     value: number;
 }[]>;
 export declare function queryPath(urlOrUuid: string): Promise<string>;
+export declare function queryPropertySchema(importer: string): Promise<AssetPropertySchemaMap>;
+export declare function querySerializedData(uuidOrUrlOrPath: string): Promise<SerializedAssetQueryResult>;
 export declare function querySortedPlugins(filterOptions?: FilterPluginOptions): Promise<IPluginScriptInfo[]>;
 export declare function querySortingLayerBuiltin(): Promise<readonly __private._cocos_sorting_sorting_layers__SortingItem[]>;
 export declare function queryThumbnailHandlers(): string[];
@@ -8453,14 +8279,6 @@ export declare function register(): Promise<string>;
 export declare function register_2(name: string, module: IMiddlewareContribution): Promise<void>;
 export declare function reimportAsset(pathOrUrlOrUUID: string): Promise<IAssetInfo>;
 export declare function reload(): Promise<void>;
-export declare enum ReloadResult {
-    SUCCESS = 0,
-    FAILED = 1,
-    QUEUED = 2,
-    NO_EDITOR = 3,
-    ASSET_NOT_FOUND = 4,
-    EDITOR_NOT_FOUND = 5
-}
 export declare function remove(key: string, scope?: ConfigurationScope): Promise<boolean>;
 export declare function renameAsset(source: string, newName: string, options?: AssetOperationOption): Promise<any>;
 export declare interface RenderTextureAssetUserData extends TextureBaseAssetUserData {
@@ -8474,17 +8292,13 @@ export declare interface RtSpriteFrameAssetUserData {
 }
 export declare function save(force?: boolean): Promise<void>;
 export declare function saveAsset(pathOrUrlOrUUID: string, data: string | Buffer): Promise<IAssetInfo>;
-export declare function saveAssetMeta(uuid: string, meta: IAssetMeta): Promise<void>;
+export declare function saveSerializedData(uuidOrUrlOrPath: string, patch: SerializedAssetPatch): Promise<SerializedAssetQueryResult>;
 export declare namespace Scene {
     export {
         init_6 as init,
         startupWorker
     }
 }
-export declare const SCENE_TEMPLATE_TYPE: readonly ["2d", "3d", "quality"];
-export declare type SceneDragEvent = 'onDragLeave' | 'onDragOver' | 'onDrop';
-export declare type SceneKeyboardEvent = 'keydown' | 'keyup';
-export declare type SceneMouseEvent = 'dblclick' | 'mousedown' | 'mousemove' | 'mouseup' | 'mousewheel';
 export declare namespace Scripting {
     export {
         init_7 as init,
@@ -8503,6 +8317,7 @@ export declare namespace Scripting {
 export declare interface ScriptModuleUserData {
     isPlugin: false;
 }
+export declare type SerializedAssetDump = Record<string, IProperty> | IProperty;
 export declare interface SerializedAssetFinder {
     meshes?: Array<string | null>;
     animations?: Array<string | null>;
@@ -8511,6 +8326,18 @@ export declare interface SerializedAssetFinder {
     materials?: Array<string | null>;
     scenes?: Array<string | null>;
 }
+export declare type SerializedAssetPatch = SerializedAssetDump | Partial<Record<string, IProperty | unknown>>;
+export declare interface SerializedAssetQueryResult {
+    uuid: string;
+    url: string;
+    type: string;
+    importer: string;
+    dump: SerializedAssetDump;
+}
+export declare const serializedData: {
+    query: typeof querySerializedData;
+    save: typeof saveSerializedData;
+};
 export declare namespace Server {
     export {
         start_2 as start,
@@ -8595,15 +8422,13 @@ export declare function startCompileScript(assetChanges?: AssetChangeInfo[]): Pr
 export declare function startEngineCompilation(force?: boolean): Promise<void>;
 export declare function startupWorker(projectPath: string): Promise<void>;
 export declare function stop_2(): Promise<void>;
-export declare const SUPPORT_CREATE_TYPES: readonly ["animation-clip", "typescript", "auto-atlas", "effect", "scene", "prefab", "material", "terrain", "physics-material", "label-atlas", "render-texture", "directory", "effect-header"];
+export declare const SUPPORT_CREATE_TYPES: readonly ["animation-clip", "typescript", "auto-atlas", "effect", "scene", "prefab", "material", "texture-cube", "terrain", "physics-material", "label-atlas", "render-texture", "directory", "effect-header"];
 export declare enum TangentImportSetting {
     exclude = 0,
     optional = 1,
     require = 2,
     recalculate = 3
 }
-export declare type TEditorEntity = IScene | INode;
-export declare type TEditorInstance = Scene_2 | Node_2;
 export declare interface Texture2DAssetUserData extends TextureBaseAssetUserData {
     isUuid?: boolean;
     imageUuidOrDatabaseUri?: string;
@@ -8631,13 +8456,12 @@ export declare interface TextureCubeAssetUserData extends TextureBaseAssetUserDa
 }
 export declare interface ThumbnailInfo {
     type: 'icon' | 'image',
-    value: string; 
+    value: string;
 }
 export declare type ThumbnailSize = 'large' | 'small' | 'middle' | 'origin';
-export declare type TSceneTemplateType = typeof SCENE_TEMPLATE_TYPE[number];
-export declare type UIAlignType = 'top' | 'v-center' | 'bottom' | 'left' | 'h-center' | 'right';
 export declare function unregister(): Promise<void>;
-export declare function updateAssetUserData(urlOrUuidOrPath: string, path: string, value: any): Promise<any>;
+export declare function updateAssetUserData(urlOrUuidOrPath: string, userData: Record<string, any>): Promise<any>;
+export declare function updateAssetUserDataByPath(urlOrUuidOrPath: string, path: string, value: any): Promise<any>;
 export declare function updateDefaultUserData(handler: string, path: string, value: any): Promise<void>;
 export declare interface Vec2 {
     x: number;
