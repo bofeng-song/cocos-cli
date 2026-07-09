@@ -103,7 +103,7 @@
         window.WebEnv = { serverURL: '<%= serverURL %>' };
     </script>
     <script type="module">
-        const { default: boot } = await import("/static/web/boot.js");
+        const { default: boot } = await import("/static/web/scene-editor-boot.js");
         await boot();
         const { default: initPreviewApp } = await import("/static/web/preview-app.js");
         initPreviewApp();
