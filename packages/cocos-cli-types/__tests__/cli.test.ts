@@ -78,7 +78,7 @@ describe('cocos-cli-types: cli', () => {
         type UndoKeys = keyof IServiceManager['Undo'];
         const undoMethods: UndoKeys[] = [
             'beginRecording', 'endRecording', 'cancelRecording',
-            'undo', 'redo', 'snapshot', 'reset', 'isDirty',
+            'undo', 'redo', 'canUndo', 'reset', 'isDirty',
         ];
         expect(undoMethods).toHaveLength(8);
     });
