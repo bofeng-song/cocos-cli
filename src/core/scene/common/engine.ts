@@ -10,8 +10,14 @@ export interface IEngineEvents {
     'engine:ticked': [];
 }
 
-
-export interface IPublicEngineService extends Omit<IEngineService, 'initCustomLayer' | 'pause' | 'resume' | keyof IServiceEvents> {}
+export interface IPublicEngineService extends Omit<IEngineService,
+    'initCustomLayer' |
+    'pause' | 
+    'resume' |
+    'enterAnimationMode' |
+    'exitAnimationMode' |
+    keyof IServiceEvents
+> {}
 
 export interface IEngineService extends IServiceEvents {
     /**
@@ -30,4 +36,8 @@ export interface IEngineService extends IServiceEvents {
      * 初始化自定义 Layer 配置
      */
     initCustomLayer(layers?: ICustomLayerConfig[]): Promise<void>;
+
+    enterAnimationMode(): void;
+
+    exitAnimationMode(): void;
 }
