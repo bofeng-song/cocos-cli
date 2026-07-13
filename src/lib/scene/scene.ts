@@ -2,16 +2,10 @@ import { init as sceneInit } from '../../core/scene';
 import { GlobalPaths } from '../../global';
 
 /**
- * Public scene service interface, shared by external IDEs and cli's own browser
- * pages (scene editor / preview). `Services` is the typed service map
- * (Engine / Editor / Camera / Preview / ...); obtain the live instance at
- * runtime via `serviceManager.getServices()`. `GlobalEventManager` is the
- * service event bus, obtained via `serviceManager.getServiceEvents()`.
+ * The service event bus type, obtained at runtime via
+ * `serviceManager.getServiceEvents()`. The service map itself
+ * (`IServiceManager` / `Service`) is exported from `../service`.
  */
-export type {
-    IServiceManager as Services,
-    IPublicServiceManager,
-} from '../../core/scene/scene-process/service/interfaces';
 export type { GlobalEventManager } from '../../core/scene/scene-process/service/core/global-events';
 
 /**

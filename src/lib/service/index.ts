@@ -17,8 +17,5 @@
  * per-service modules above.
  */
 export { Service } from '../../core/scene/scene-process/service/core/decorator';
-export type {
-    IServiceManager as Services,
-    IPublicServiceManager,
-} from '../../core/scene/scene-process/service/interfaces';
+export type { IServiceManager } from '../../core/scene/scene-process/service/interfaces';
 
