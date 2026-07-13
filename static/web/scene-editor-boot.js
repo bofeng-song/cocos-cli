@@ -24,7 +24,7 @@ export default async function boot(addr = {}) {
         console.log('[Scene] loading scene bundle');
         // SystemJS natively awaits the attached import maps above
         const SceneBundle = await System.import('/static/web/scene-bundle.js');
-        const { startup, serviceManager } = SceneBundle;
+        const { startup, Service, serviceManager } = SceneBundle;
 
         globalThis.System = _originalSystem;
         await startup({
@@ -32,11 +32,11 @@ export default async function boot(addr = {}) {
             serverURL,
         });
 
-        const services = serviceManager.getServices();
+
         const events = serviceManager.getServiceEvents();
-        services?.Engine?.resume?.();
+        Service?.Engine?.resume?.();
         console.log('Cocos Engine and Scene Services loaded successfully');
-        return { services, events, serverURL };
+        return { Service, events, serverURL };
     } catch (err) {
         console.error('Failed to load Cocos Engine or Services:', err.stack || err);
         return null;
