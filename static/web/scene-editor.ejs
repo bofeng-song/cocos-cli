@@ -405,17 +405,11 @@
         </div>
     </div>
 
-    <script>
-        window.WebEnv = {
-            serverURL: '<%= serverURL %>'
-        };
-    </script>
     <script type="module">
         const { default: boot } = await import("/static/web/scene-editor-boot.js");
-        await boot();
-        if (window.cli && window.cli.Scene && window.cli.Scene.Engine) {
-            window.cli.Scene.Engine.resume();
-        }
+        // 场景服务上下文（services / events / serverURL），供本页调试脚本使用，
+        // 替代旧的 window.cli / window.WebEnv 全局；服务集来自 serviceManager.getServices()。
+        window.SceneCtx = await boot({ ip: '<%= ip %>', port: '<%= port %>', https: <%= https %> });
     </script>
     <script>
         /* ── Helpers ── */
@@ -430,12 +424,12 @@
 
         function safeCall(svc, method, ...args) {
             try {
-                if (!window.cli.Scene) { log('cli not ready', 'status-warn'); return; }
-                const s = window.cli.Scene[svc];
+                if (!window.SceneCtx.services) { log('services not ready', 'status-warn'); return; }
+                const s = window.SceneCtx.services[svc];
                 if (!s) { log(svc + ' not registered', 'status-warn'); return; }
                 const result = s[method](...args);
                 log(svc + '.' + method + '(' + args.map(a => JSON.stringify(a)).join(',') + ')', 'status-ok');
-                try { window.cli.Scene.Engine.repaintInEditMode(); } catch (_) {}
+                try { window.SceneCtx.services.Engine.repaintInEditMode(); } catch (_) {}
                 return result;
             } catch (e) {
                 log(svc + '.' + method + ' error: ' + e.message, 'status-err');
@@ -455,7 +449,7 @@
         function openBrowserPreview() {
             let scene = '';
             try {
-                const ed = window.cli && window.cli.Scene && window.cli.Scene.Editor;
+                const ed = window.SceneCtx && window.SceneCtx.services && window.SceneCtx.services.Editor;
                 const uuid = ed && ed.getCurrentEditorUuid && ed.getCurrentEditorUuid();
                 if (uuid) scene = uuid;
             } catch (e) { /* ignore */ }
@@ -476,8 +470,8 @@
             status.textContent = 'Loading...';
             status.className = 'info-text status-warn';
             try {
-                await import("/static/web/load-scene.js");
-                await window.loadScene(WebEnv.serverURL, sceneInput || undefined);
+                const { loadScene } = await import("/static/web/load-scene.js");
+                await loadScene(window.SceneCtx, sceneInput || undefined);
                 status.textContent = 'Loaded';
                 status.className = 'info-text status-ok';
                 log('Scene loaded' + (sceneInput ? ': ' + sceneInput : ''), 'status-ok');
@@ -497,7 +491,7 @@
             var status = document.getElementById('scriptStatus');
             status.textContent = 'Creating...';
             try {
-                var url = WebEnv.serverURL + '/create-asset';
+                var url = window.SceneCtx.serverURL + '/create-asset';
                 var body = {
                     dbURL: 'db://assets/' + name + '.ts',
                     content: [
@@ -520,7 +514,7 @@
                 if (res.ok) {
                     status.textContent = 'Reloading...';
                     setTimeout(function() {
-                        cli.Scene.Script.investigatePackerDriver().then(function() {
+                        window.SceneCtx.services.Script.investigatePackerDriver().then(function() {
                             setTimeout(function() { doCheckMenus(); }, 2000);
                         });
                     }, 3000);
@@ -538,7 +532,7 @@
             var status = document.getElementById('scriptStatus');
             status.textContent = 'Deleting...';
             try {
-                var url = WebEnv.serverURL + '/delete-asset';
+                var url = window.SceneCtx.serverURL + '/delete-asset';
                 var body = { dbURL: 'db://assets/' + name + '.ts' };
                 var res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
                 var data = await res.json();
@@ -548,7 +542,7 @@
                 if (res.ok) {
                     status.textContent = 'Reloading...';
                     setTimeout(function() {
-                        cli.Scene.Script.investigatePackerDriver().then(function() {
+                        window.SceneCtx.services.Script.investigatePackerDriver().then(function() {
                             setTimeout(function() { doCheckMenus(); }, 2000);
                         });
                     }, 3000);
@@ -574,8 +568,8 @@
         /* ── Camera ── */
         function set2D(is2D) {
             try {
-                if (window.cli.Scene && window.cli.Scene.Camera) {
-                    window.cli.Scene.Camera.is2D = is2D;
+                if (window.SceneCtx.services && window.SceneCtx.services.Camera) {
+                    window.SceneCtx.services.Camera.is2D = is2D;
                     log('Camera.is2D = ' + is2D, 'status-ok');
                 }
             } catch(e) { log('set2D error: ' + e.message, 'status-err'); }
@@ -600,9 +594,9 @@
 
         function rotateCam(x, y, z, byDist) {
             try {
-                if (!window.cli.Scene || !window.cli.Scene.Camera) { log('Camera not ready', 'status-warn'); return; }
+                if (!window.SceneCtx.services || !window.SceneCtx.services.Camera) { log('Camera not ready', 'status-warn'); return; }
                 const dir = new cc.Vec3(x, y, z);
-                window.cli.Scene.Camera.rotateCameraToDir(dir, byDist);
+                window.SceneCtx.services.Camera.rotateCameraToDir(dir, byDist);
                 log('rotateCameraToDir(' + x + ',' + y + ',' + z + ')', 'status-ok');
             } catch(e) { log('rotateCam error: ' + e.message, 'status-err'); }
         }
@@ -668,8 +662,8 @@
         /* ── Selection ── */
         function getSelectedUuids() {
             try {
-                if (window.cli.Scene && window.cli.Scene.Selection) {
-                    return window.cli.Scene.Selection.query() || [];
+                if (window.SceneCtx.services && window.SceneCtx.services.Selection) {
+                    return window.SceneCtx.services.Selection.query() || [];
                 }
             } catch(e) {}
             return [];
@@ -697,7 +691,7 @@
             const sel = document.getElementById('nodeList');
             sel.innerHTML = '<option value="">loading...</option>';
             try {
-                const root = await window.cli.Scene.Node.query({
+                const root = await window.SceneCtx.services.Node.query({
                     path: '/', queryChildren: true, queryComponent: false
                 });
                 sel.innerHTML = '';
@@ -732,19 +726,19 @@
         /* ── State Refresh ── */
         function refreshState() {
             try {
-                if (!window.cli.Scene) return;
+                if (!window.SceneCtx.services) return;
 
                 // Camera
                 try {
-                    const fov = window.cli.Scene.Camera.getCameraFov();
+                    const fov = window.SceneCtx.services.Camera.getCameraFov();
                     document.getElementById('fovSlider').value = fov;
                     document.getElementById('fovVal').textContent = Math.round(fov);
-                    const grid = window.cli.Scene.Camera.isGridVisible();
+                    const grid = window.SceneCtx.services.Camera.isGridVisible();
                     document.getElementById('chkGrid').checked = grid;
-                    const is2D = window.cli.Scene.Camera.is2D;
+                    const is2D = window.SceneCtx.services.Camera.is2D;
                     document.getElementById('btn2D').classList.toggle('active', is2D);
                     document.getElementById('btn3D').classList.toggle('active', !is2D);
-                    const cam = window.cli.Scene.Camera.camera;
+                    const cam = window.SceneCtx.services.Camera.camera;
                     if (cam && cam.node) {
                         const p = cam.node.worldPosition;
                         document.getElementById('camPos').textContent =
@@ -754,7 +748,7 @@
 
                 // Gizmo
                 try {
-                    const tool = window.cli.Scene.Gizmo.transformToolName;
+                    const tool = window.SceneCtx.services.Gizmo.transformToolName;
                     document.getElementById('toolName').textContent = tool || '?';
                     tools.forEach(t => {
                         const el = document.getElementById('tool-' + t);
@@ -764,7 +758,7 @@
 
                 // Selection
                 try {
-                    const sel = window.cli.Scene.Selection.query();
+                    const sel = window.SceneCtx.services.Selection.query();
                     const info = document.getElementById('selInfo');
                     if (sel && sel.length > 0) {
                         info.textContent = sel.length + ': ' + sel.map(u => u.substring(0, 8)).join(', ');
@@ -775,7 +769,7 @@
 
                 // SceneView
                 try {
-                    const lightOn = window.cli.Scene.SceneView.querySceneLightOn();
+                    const lightOn = window.SceneCtx.services.SceneView.querySceneLightOn();
                     document.getElementById('chkLight').checked = lightOn;
                 } catch(e) {}
 
@@ -791,8 +785,8 @@
             var uuid = sel.value;
             if (!uuid) { log('No node selected in dropdown', 'status-warn'); return; }
             try {
-                if (window.cli.Scene && window.cli.Scene.Selection) {
-                    window.cli.Scene.Selection.select(uuid);
+                if (window.SceneCtx.services && window.SceneCtx.services.Selection) {
+                    window.SceneCtx.services.Selection.select(uuid);
                     log('Added to selection: ' + uuid.substring(0, 8), 'status-ok');
                     setTimeout(function() { refreshState(); refreshRectInfo(); }, 100);
                 }
@@ -802,15 +796,15 @@
 
         function doSelectAll2D() {
             try {
-                if (!window.cli.Scene || !window.cli.Scene.Selection) return;
-                window.cli.Scene.Selection.clear();
+                if (!window.SceneCtx.services || !window.SceneCtx.services.Selection) return;
+                window.SceneCtx.services.Selection.clear();
                 var sel = document.getElementById('nodeList');
                 var uuids = [];
                 for (var i = 0; i < sel.options.length; i++) {
                     if (sel.options[i].value) uuids.push(sel.options[i].value);
                 }
                 for (var j = 0; j < uuids.length; j++) {
-                    window.cli.Scene.Selection.select(uuids[j]);
+                    window.SceneCtx.services.Selection.select(uuids[j]);
                 }
                 log('Selected all nodes: ' + uuids.length, 'status-ok');
                 setTimeout(function() { refreshState(); refreshRectInfo(); }, 100);
@@ -822,12 +816,12 @@
             try {
                 var selInfo = document.getElementById('rectSelInfo');
                 var boundsInfo = document.getElementById('rectBoundsInfo');
-                if (!window.cli.Scene || !window.cli.Scene.Selection) {
+                if (!window.SceneCtx.services || !window.SceneCtx.services.Selection) {
                     selInfo.textContent = '0 nodes';
                     boundsInfo.textContent = '-';
                     return;
                 }
-                var uuids = window.cli.Scene.Selection.query() || [];
+                var uuids = window.SceneCtx.services.Selection.query() || [];
                 selInfo.textContent = uuids.length + ' node' + (uuids.length !== 1 ? 's' : '');
                 if (uuids.length > 1) {
                     selInfo.textContent += ' (multi)';
