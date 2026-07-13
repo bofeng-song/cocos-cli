@@ -18,4 +18,6 @@
  */
 export { Service } from '../../core/scene/scene-process/service/core/decorator';
 export type { IServiceManager } from '../../core/scene/scene-process/service/interfaces';
+// The service event bus, returned at runtime by `serviceManager.getServiceEvents()`.
+export type { GlobalEventManager } from '../../core/scene/scene-process/service/core/global-events';
 

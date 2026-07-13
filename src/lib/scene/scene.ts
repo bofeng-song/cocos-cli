@@ -2,13 +2,6 @@ import { init as sceneInit } from '../../core/scene';
 import { GlobalPaths } from '../../global';
 
 /**
- * The service event bus type, obtained at runtime via
- * `serviceManager.getServiceEvents()`. The service map itself
- * (`IServiceManager` / `Service`) is exported from `../service`.
- */
-export type { GlobalEventManager } from '../../core/scene/scene-process/service/core/global-events';
-
-/**
  * Initialize the scene module.
  * Registers the scene middleware and initializes scene config.
  */

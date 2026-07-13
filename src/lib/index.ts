@@ -9,7 +9,3 @@ export * as Scene from './scene/scene';
 export * as Scripting from './scripting/scripting';
 export * as i18n from '../i18n';
 
-// Scene services. `Service` is the DecoratorService proxy (`Service.Node.xxx()`,
-// typed as `IServiceManager`); import the per-service entry modules you need from
-// `./service/<name>` so only those services are registered (incremental).
-export * from './service';

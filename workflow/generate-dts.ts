@@ -174,6 +174,10 @@ const entries: IDtsEntry[] = [
         name: 'builder',
         source: 'src/lib/builder/builder.ts',
         output: 'builder.d.ts'
+    }, {
+        name: 'service',
+        source: 'src/lib/service/index.ts',
+        output: 'service.d.ts'
     }
 ];
 
