@@ -8,6 +8,7 @@
  */
 export async function loadScene(ctx, urlOrUUID) {
     const { services, events, serverURL } = ctx;
+    const { Editor } = services;
 
     if (!urlOrUUID) {
         const sceneListPromise = await fetch(`${serverURL}/query-asset-infos/cc.SceneAsset`);
@@ -31,5 +32,5 @@ export async function loadScene(ctx, urlOrUUID) {
     events.on('editor:open', () => {
         console.log('editor:open onCalled');
     });
-    await services.Editor.open({ urlOrUUID });
+    await Editor.open({ urlOrUUID });
 }
