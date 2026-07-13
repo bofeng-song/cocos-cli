@@ -2,7 +2,6 @@ import * as EditorExtends from '../../engine/editor-extends';
 import { Rpc } from './rpc';
 import { serviceManager } from './service/service-manager';
 import { Service as DecoratorService } from './service/core/decorator';
-import { messageManager } from './service/message';
 import { initLocalI18n } from './i18n';
 
 import './service';
@@ -30,7 +29,7 @@ export async function startup(options: {
     const features = (await modules.json()) as string[];
     const { serverURL } = options;
 
-    serviceManager.initialize(serverURL);
+    serviceManager.init(serverURL);
 
     const requiredModules = [
         'cc',
@@ -84,9 +83,6 @@ export async function startup(options: {
 
     (globalThis as any).cce = (globalThis as any).cce || {};
     (globalThis as any).cce.Script = DecoratorService.Script;
-    (globalThis as any).cli = {};
-    (globalThis as any).cli.Scene = DecoratorService;
-    (globalThis as any).cli.SceneEvents = messageManager;
 
     if (EditorExtends.init) {
         await EditorExtends.init();
