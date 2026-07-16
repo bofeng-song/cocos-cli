@@ -114,8 +114,10 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
 
             this._detachSceneCameras();
 
-            setTimeout(() => {
+            setTimeout(async () => {
                 try {
+                    // 每次打开场景都重新加载相机视角记忆，避免复用 CameraService 时取到上一个场景的数据
+                    await this.loadCameraInfos();
                     this._controller.updateGrid();
                     this.defaultFocus(this._currentUuid);
                     Service.Engine.repaintInEditMode();
@@ -142,7 +144,13 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
         } catch {
             // 配置不可用时使用默认值
         }
+    }
 
+    /**
+     * 加载相机视角记忆（按 scene UUID 存储）。每次打开场景都要重新加载，
+     * 因为 CameraService 会在多个场景间复用，只在首次创建相机时加载会导致后续场景取到旧数据。
+     */
+    async loadCameraInfos(): Promise<void> {
         try {
             const rpc = Rpc.getInstance();
             const cameraInfos = await rpc.request('sceneConfigInstance', 'get', ['camera-infos']);
@@ -190,15 +198,23 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
         if (config.fov !== undefined) this.setCameraProperty({ fov: config.fov }, false);
         if (config.far !== undefined) {
             this._controller3D.far = config.far;
+            if (this._camera && !this.is2D) this._camera.far = config.far;
         }
         if (config.near !== undefined) {
             this._controller3D.near = config.near;
+            if (this._camera && !this.is2D) this._camera.near = config.near;
         }
         if (config.wheelSpeed !== undefined) this._controller3D.wheelSpeed = config.wheelSpeed;
         if (config.wanderSpeed !== undefined) this._controller3D.wanderSpeed = config.wanderSpeed;
         if (config.enableAcceleration !== undefined) this._controller3D.enableAcceleration = config.enableAcceleration;
-        if (config.far2D !== undefined) this._controller2D.far = config.far2D;
-        if (config.near2D !== undefined) this._controller2D.near = config.near2D;
+        if (config.far2D !== undefined) {
+            this._controller2D.far = config.far2D;
+            if (this._camera && this.is2D) this._camera.far = config.far2D;
+        }
+        if (config.near2D !== undefined) {
+            this._controller2D.near = config.near2D;
+            if (this._camera && this.is2D) this._camera.near = config.near2D;
+        }
         if (config.wheelSpeed2D !== undefined) this._controller2D.wheelSpeed = config.wheelSpeed2D;
         if (config.aperture !== undefined || config.shutter !== undefined || config.iso !== undefined) {
             this.setCameraProperty({

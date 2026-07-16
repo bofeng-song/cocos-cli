@@ -56,25 +56,32 @@ function getBoundaryOfMeshNode(node: Node): geometry.AABB | null {
     return null;
 }
 
+// 引擎的粒子发射器形状枚举未从 cc 公开导出，这里与 Creator（utils/node.ts）一致，
+// 按其稳定的序列化值定义一个本地 ShapeType 枚举，避免使用魔法数字。
+enum ShapeType {
+    Box = 0,
+    Circle = 1,
+    Cone = 2,
+    Sphere = 3,
+    Hemisphere = 4,
+}
+
 function getRangeFromParticleComp(component: any): number {
     let range = 0;
     if (component.shapeModule?.enable) {
         const shapeModule = component.shapeModule;
-        const ShapeType = (cc as any).ShapeType;
-        if (ShapeType) {
-            switch (shapeModule.shapeType) {
-                case ShapeType.Box:
-                    range = Math.max(shapeModule.scale.x, shapeModule.scale.y, shapeModule.scale.z);
-                    break;
-                case ShapeType.Sphere:
-                case ShapeType.Circle:
-                case ShapeType.Hemisphere:
-                    range = shapeModule.radius;
-                    break;
-                case ShapeType.Cone:
-                    range = Math.max(shapeModule.radius, shapeModule.length);
-                    break;
-            }
+        switch (shapeModule.shapeType) {
+            case ShapeType.Box:
+                range = Math.max(shapeModule.scale.x, shapeModule.scale.y, shapeModule.scale.z);
+                break;
+            case ShapeType.Circle:
+            case ShapeType.Sphere:
+            case ShapeType.Hemisphere:
+                range = shapeModule.radius;
+                break;
+            case ShapeType.Cone:
+                range = Math.max(shapeModule.radius, shapeModule.length);
+                break;
         }
     }
     return range;
