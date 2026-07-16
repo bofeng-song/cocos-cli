@@ -116,7 +116,13 @@ function getMaxRangeOfNode(node: Node): number {
                 if (comp.maxPos && comp.minPos) {
                     const probesSize = new Vec3();
                     Vec3.subtract(probesSize, comp.maxPos, comp.minPos);
-                    compRange = Math.max(Math.abs(probesSize.x / 2), Math.abs(probesSize.y / 2), Math.abs(probesSize.z / 2));
+                    // minPos/maxPos 是本地空间，需乘节点世界缩放换算成世界半径（与 mesh 路径一致）
+                    const ws = node.getWorldScale();
+                    compRange = Math.max(
+                        Math.abs((probesSize.x / 2) * ws.x),
+                        Math.abs((probesSize.y / 2) * ws.y),
+                        Math.abs((probesSize.z / 2) * ws.z),
+                    );
                 }
                 break;
             }

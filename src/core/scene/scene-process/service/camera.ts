@@ -171,7 +171,7 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
     }
 
     setGridColor(color: number[]): void {
-        if (!color || color.length < 4) return;
+        if (!color || color.length < 3) return;
         const [r = 166, g = 166, b = 166, a = 255] = color;
         this._controller3D.lineColor = new Color(r, g, b, a);
         this._controller3D.updateGrid();
