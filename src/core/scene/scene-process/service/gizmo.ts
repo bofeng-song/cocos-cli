@@ -38,6 +38,8 @@ import './gizmo/components/mesh-renderer';
 import './gizmo/components/skinned-mesh-renderer';
 import './gizmo/components/video-player';
 import './gizmo/components/web-view';
+import './gizmo/components/light-probe-group';
+import './gizmo/components/reflection-probe';
 
 type TGizmoType = 'icon' | 'persistent' | 'component';
 

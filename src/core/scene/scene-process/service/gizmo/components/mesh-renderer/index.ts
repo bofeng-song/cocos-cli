@@ -3,6 +3,7 @@
 import { geometry, js, MeshRenderer, Quat, Vec3 } from 'cc';
 import GizmoBase from '../../base/gizmo-base';
 import BoxController from '../../controller/box';
+import { LightProbeTetraHelper } from '../../utils/light-probe-tetra';
 import { registerGizmo } from '../../gizmo-defines';
 
 const tempQuat_a = new Quat();
@@ -10,9 +11,11 @@ const tempSize = new Vec3();
 
 class ModelComponentGizmo extends GizmoBase<MeshRenderer> {
     private _controller!: BoxController;
+    private _tetraHelper!: LightProbeTetraHelper;
 
     init() {
         this._controller = new BoxController(this.getGizmoRoot());
+        this._tetraHelper = new LightProbeTetraHelper(this.getGizmoRoot());
         this._isInitialized = true;
     }
 
@@ -23,6 +26,7 @@ class ModelComponentGizmo extends GizmoBase<MeshRenderer> {
 
     onHide() {
         this._controller.hide();
+        this._tetraHelper.hide();
     }
 
     updateControllerData() {
@@ -48,6 +52,9 @@ class ModelComponentGizmo extends GizmoBase<MeshRenderer> {
         } else {
             this._controller.hide();
         }
+
+        // 影响该物体的光照探针四面体连线（仅当开启“使用光照探针”时显示）
+        this._tetraHelper.update(this.target);
     }
 
     private getBoundingBox(component: MeshRenderer): geometry.AABB | null {
@@ -71,6 +78,15 @@ class ModelComponentGizmo extends GizmoBase<MeshRenderer> {
 
     onNodeChanged() {
         this.updateControllerData();
+    }
+
+    onUpdate() {
+        // 逐帧刷新：让影响探针小球的“恒定屏幕大小”在相机缩放/移动时也生效
+        this.updateControllerData();
+    }
+
+    onDestroy() {
+        this._tetraHelper?.destroy();
     }
 }
 
