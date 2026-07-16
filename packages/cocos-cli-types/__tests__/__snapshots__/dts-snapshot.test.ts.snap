@@ -6059,6 +6059,9 @@ export declare interface ICameraConfig {
     aperture: number;
     shutter: number;
     iso: number;
+    far2D?: number;
+    near2D?: number;
+    wheelSpeed2D?: number;
 }
 export declare interface ICameraService {
     init(): void;

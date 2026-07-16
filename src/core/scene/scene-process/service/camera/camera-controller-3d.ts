@@ -1,4 +1,4 @@
-import { Camera, Color, gfx, js, Layers, Mat4, MeshRenderer, Node, Quat, Vec3, ISizeLike } from 'cc';
+import { Camera, Color, geometry, gfx, js, Layers, Mat4, MeshRenderer, Node, Quat, Vec3, ISizeLike } from 'cc';
 import CameraControllerBase, { EditorCameraInfo } from './camera-controller-base';
 import { CameraMoveMode, CameraUtils } from './utils';
 import FiniteStateMachine from '../utils/state-machine/finite-state-machine';
@@ -29,6 +29,57 @@ function getWorldPosition3D(node: Node): Vec3 {
     return node.getWorldPosition();
 }
 
+function getBoundaryOfMeshNode(node: Node): geometry.AABB | null {
+    if (!node) return null;
+    const modelComp = node.getComponent(MeshRenderer);
+    if (!modelComp) return null;
+
+    const SkinnedMeshRenderer = (cc as any).SkinnedMeshRenderer;
+    if (SkinnedMeshRenderer && modelComp instanceof SkinnedMeshRenderer) {
+        modelComp.model?.updateTransform?.(-1);
+        return modelComp.model?.worldBounds ?? null;
+    }
+
+    if (modelComp.mesh && modelComp.model) {
+        let transformAABB = modelComp.model.modelBounds?.clone() ?? null;
+        if (!transformAABB) {
+            const mesh = modelComp.mesh;
+            if (mesh && mesh.minPosition && mesh.maxPosition) {
+                transformAABB = geometry.AABB.fromPoints(geometry.AABB.create(), mesh.minPosition, mesh.maxPosition);
+            }
+        }
+        if (transformAABB) {
+            geometry.AABB.transform(transformAABB, transformAABB, node.worldMatrix);
+        }
+        return transformAABB;
+    }
+    return null;
+}
+
+function getRangeFromParticleComp(component: any): number {
+    let range = 0;
+    if (component.shapeModule?.enable) {
+        const shapeModule = component.shapeModule;
+        const ShapeType = (cc as any).ShapeType;
+        if (ShapeType) {
+            switch (shapeModule.shapeType) {
+                case ShapeType.Box:
+                    range = Math.max(shapeModule.scale.x, shapeModule.scale.y, shapeModule.scale.z);
+                    break;
+                case ShapeType.Sphere:
+                case ShapeType.Circle:
+                case ShapeType.Hemisphere:
+                    range = shapeModule.radius;
+                    break;
+                case ShapeType.Cone:
+                    range = Math.max(shapeModule.radius, shapeModule.length);
+                    break;
+            }
+        }
+    }
+    return range;
+}
+
 function getMaxRangeOfNode(node: Node): number {
     let maxRange = 0.001;
 
@@ -53,6 +104,15 @@ function getMaxRangeOfNode(node: Node): number {
             case 'cc.PointLight':
                 compRange = (component as any).range ?? 3;
                 break;
+            case 'cc.LightProbeGroup': {
+                const comp = component as any;
+                if (comp.maxPos && comp.minPos) {
+                    const probesSize = new Vec3();
+                    Vec3.subtract(probesSize, comp.maxPos, comp.minPos);
+                    compRange = Math.max(Math.abs(probesSize.x / 2), Math.abs(probesSize.y / 2), Math.abs(probesSize.z / 2));
+                }
+                break;
+            }
             case 'cc.RangedDirectionalLight':
             case 'cc.DirectionalLight':
             case 'cc.Camera':
@@ -60,15 +120,30 @@ function getMaxRangeOfNode(node: Node): number {
                 break;
             case 'cc.MeshRenderer':
             case 'cc.SkinnedMeshRenderer':
+            case 'cc.AvatarModelComponent':
             case 'cc.SkinnedMeshBatchRenderer': {
                 const mr = component as MeshRenderer;
                 if (mr.mesh && mr.model) {
-                    const worldBound = mr.model.worldBounds;
-                    if (worldBound) {
-                        const he = worldBound.halfExtents;
-                        if (!Number.isNaN(he.x) && !Number.isNaN(he.y) && !Number.isNaN(he.z)) {
-                            compRange = Math.max(he.x, he.y, he.z);
+                    let worldBound: any = mr.model.worldBounds;
+
+                    if (!worldBound) {
+                        const modelBound = mr.model.modelBounds;
+                        if (modelBound) {
+                            worldBound = geometry.AABB.create();
+                            geometry.AABB.transform(worldBound, modelBound, node.worldMatrix);
                         }
+                    }
+
+                    if (worldBound && (
+                        Number.isNaN(worldBound.halfExtents.x)
+                        || Number.isNaN(worldBound.halfExtents.y)
+                        || Number.isNaN(worldBound.halfExtents.z)
+                    )) {
+                        worldBound = getBoundaryOfMeshNode(node);
+                    }
+
+                    if (worldBound) {
+                        compRange = Math.max(worldBound.halfExtents.x, worldBound.halfExtents.y, worldBound.halfExtents.z);
                     }
                 }
                 break;
@@ -105,6 +180,19 @@ function getMaxRangeOfNode(node: Node): number {
                 if (size) compRange = Math.max(size.x, size.y, size.z) / 2;
                 break;
             }
+            case 'cc.ParticleSystem':
+                compRange = getRangeFromParticleComp(component);
+                break;
+            default: {
+                const Terrain = (cc as any).Terrain;
+                if (Terrain && className === js.getClassName(Terrain)) {
+                    const info = (component as any).info;
+                    if (info?.size) {
+                        compRange = Math.max(info.size.width / 2, info.size.height / 2);
+                    }
+                }
+                break;
+            }
         }
 
         if (compRange > maxRange) {
@@ -129,7 +217,7 @@ function getMaxRangeOfNodes(nodes: Node[]): number {
         if (childRange > maxRange) maxRange = childRange;
     }
 
-    return Math.max(maxRange, 1);
+    return maxRange;
 }
 
 function makeVec3InRange(v: Vec3, min: number, max: number): void {
