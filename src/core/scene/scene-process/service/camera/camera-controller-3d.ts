@@ -193,9 +193,13 @@ function getMaxRangeOfNode(node: Node): number {
                 if (size) compRange = Math.max(size.x, size.y, size.z) / 2;
                 break;
             }
-            case 'cc.ParticleSystem':
-                compRange = getRangeFromParticleComp(component);
+            case 'cc.ParticleSystem': {
+                // getRangeFromParticleComp 返回的是发射器本地空间尺寸，需按节点绝对世界缩放换算成世界半径
+                const localRange = getRangeFromParticleComp(component);
+                const ws = node.getWorldScale();
+                compRange = localRange * Math.max(Math.abs(ws.x), Math.abs(ws.y), Math.abs(ws.z));
                 break;
+            }
             default: {
                 const Terrain = (cc as any).Terrain;
                 if (Terrain && className === js.getClassName(Terrain)) {
