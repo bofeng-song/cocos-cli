@@ -71,6 +71,10 @@ class SkinningModelComponentGizmo extends GizmoBase<SkinnedMeshRenderer> {
         this.updateControllerData();
     }
 
+    onLightProbeChanged() {
+        if (this.target) this._tetraHelper.update(this.target);
+    }
+
     onDestroy() {
         this._tetraHelper?.destroy();
     }

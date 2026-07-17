@@ -80,6 +80,11 @@ class ModelComponentGizmo extends GizmoBase<MeshRenderer> {
         this.updateControllerData();
     }
 
+    // 探针数据变化（探针组重生成等）时刷新影响四面体；本节点未移动也需响应
+    onLightProbeChanged() {
+        if (this.target) this._tetraHelper.update(this.target);
+    }
+
     onDestroy() {
         this._tetraHelper?.destroy();
     }

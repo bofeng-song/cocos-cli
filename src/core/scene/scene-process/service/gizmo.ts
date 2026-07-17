@@ -911,6 +911,11 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
 
     onNodeChanged(node: Node, opts?: IChangeNodeOptions): void {
         if (!node) return;
+        // 光照探针数据变化（如探针组重新生成）时，探针组自身节点会收到该事件，
+        // 但受其影响的 mesh 的四面体高亮挂在别的节点上，需主动通知选中的探针消费者刷新。
+        if (opts?.type === NodeEventType.LIGHT_PROBE_CHANGED) {
+            this._notifyLightProbeChanged();
+        }
         const has = this._selection.includes(node.uuid);
 
         walkNodeComponent(node, (component: Component) => {
@@ -955,13 +960,30 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
             }
         });
 
-        if (opts?.type !== NodeEventType.CHILD_CHANGED) {
+        if (opts?.type !== NodeEventType.CHILD_CHANGED && opts?.type !== NodeEventType.LIGHT_PROBE_CHANGED) {
             node.children.forEach((child) => {
                 this.onNodeChanged(child, opts);
             });
         }
 
         Service.Engine?.repaintInEditMode?.();
+    }
+
+    /**
+     * 光照探针数据变化时，通知当前选中节点上的组件 gizmo（如 mesh/skinned 的影响四面体）刷新。
+     * tetra helper 内部按签名短路，重复调用是廉价的。
+     */
+    private _notifyLightProbeChanged(): void {
+        for (const uuid of this._selection) {
+            const node = getNodeByUuid(uuid);
+            if (!node) continue;
+            walkNodeComponent(node, (component: Component) => {
+                const gizmo = getGizmoProperty('component', component);
+                if (gizmo && (gizmo as any).onLightProbeChanged && gizmo.checkVisible()) {
+                    (gizmo as any).onLightProbeChanged();
+                }
+            });
+        }
     }
 
     onComponentAdded(comp: Component): void {
