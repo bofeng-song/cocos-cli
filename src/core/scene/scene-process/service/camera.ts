@@ -354,11 +354,15 @@ export class CameraService extends BaseService<ICameraEvents> implements ICamera
                 ? [Math.round(clearColor.r), Math.round(clearColor.g), Math.round(clearColor.b), Math.round(clearColor.a)]
                 : [48, 48, 48, 255],
             fov: this._camera?.fov ?? 45,
-            far: this._camera?.far ?? this._controller3D.far,
-            near: this._camera?.near ?? this._controller3D.near,
+            // 3D 的 near/far 取自 3D 控制器，避免受当前激活相机（可能是 2D）影响
+            far: this._controller3D.far,
+            near: this._controller3D.near,
             wheelSpeed: this._controller3D.wheelSpeed,
             wanderSpeed: this._controller3D.wanderSpeed,
             enableAcceleration: this._controller3D.enableAcceleration,
+            far2D: this._controller2D.far,
+            near2D: this._controller2D.near,
+            wheelSpeed2D: this._controller2D.wheelSpeed,
             aperture: typeof camera?.aperture === 'number' ? camera.aperture : 19,
             shutter: typeof camera?.shutter === 'number' ? camera.shutter : 7,
             iso: typeof camera?.iso === 'number' ? camera.iso : 0,

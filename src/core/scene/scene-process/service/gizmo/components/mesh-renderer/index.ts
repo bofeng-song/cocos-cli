@@ -81,8 +81,9 @@ class ModelComponentGizmo extends GizmoBase<MeshRenderer> {
     }
 
     onUpdate() {
-        // 逐帧刷新：让影响探针小球的“恒定屏幕大小”在相机缩放/移动时也生效
-        this.updateControllerData();
+        // 引擎会在渲染循环里更新 model.tetrahedronIndex（不触发节点事件），需逐帧跟踪。
+        // 只刷新影响四面体（内部按签名短路，无变化时不重建 SH/连线），不每帧重建包围盒。
+        if (this.target) this._tetraHelper.update(this.target);
     }
 
     onDestroy() {

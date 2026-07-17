@@ -28,6 +28,7 @@ export class LightProbeTetraHelper {
     private _spheres: Node[] = [];
     private _lineNode: Node | null = null;
     private _shData = new Float32Array(pipeline.UBOSH.COUNT);
+    private _lastSig = ''; // 上次渲染的签名，未变化时跳过 SH/连线重建
 
     constructor(root: Node | null) {
         this._root = root;
@@ -35,6 +36,7 @@ export class LightProbeTetraHelper {
 
     hide(): void {
         if (this._container) this._container.active = false;
+        this._lastSig = '';
     }
 
     destroy(): void {
@@ -88,8 +90,22 @@ export class LightProbeTetraHelper {
         const indices = [tet.vertex0, tet.vertex1, tet.vertex2];
         if (isInner) indices.push(tet.vertex3);
 
+        // 签名：四面体索引 + 体积 + 各顶点位置/SH 首系数。未变化时跳过昂贵的 SH 与连线重建。
+        let sig = `${tetIndex}|${volume}|${isInner ? 1 : 0}`;
+        for (const idx of indices) {
+            const p = vertices[idx].position;
+            sig += `|${p.x},${p.y},${p.z}`;
+            const c = vertices[idx].coefficients;
+            if (c && c.length > 0) {
+                const c0 = c[0];
+                sig += `:${c0.x},${c0.y},${c0.z}`;
+            }
+        }
+
         this._ensureNodes();
         if (!this._container) return;
+        if (sig === this._lastSig && this._container.active) return;
+        this._lastSig = sig;
         this._container.active = true;
 
         // 探针小球（世界固定尺寸 = volume * 0.06 * 半径5）

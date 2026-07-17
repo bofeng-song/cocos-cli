@@ -4,7 +4,7 @@ import { Color, js, LightProbeGroup, Node, Quat, Vec3 } from 'cc';
 import GizmoBase from '../../base/gizmo-base';
 import BoxController from '../../controller/box';
 import ControllerUtils from '../../utils/controller-utils';
-import { create3DNode, getModel } from '../../utils/engine-utils';
+import { addMeshToNode, create3DNode, getModel, setMeshColor } from '../../utils/engine-utils';
 import { registerGizmo } from '../../gizmo-defines';
 
 // 探针数量超过该阈值时只画包围盒/线框、不逐个建球，避免海量节点
@@ -30,7 +30,9 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
     private _dotsRoot: Node | null = null;      // 探针球容器（跟随节点世界变换）
     private _wireframeNode: Node | null = null;  // 四面体线框（世界坐标、单位阵）
     private _probesRef: Vec3[] | null = null;
+    private _dotsVolume = -1;                     // 上次建点用的球体积，用于失效缓存
     private _reuseMesh: any = null;
+    private _lastInfoSig = '';                    // lightProbeInfo 显示设置/数据签名，用于按需刷新
 
     // mouseDown 时捕获
     private _minPos = new Vec3();
@@ -53,6 +55,7 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
         this._controller.hide();
         if (this._dotsRoot) this._dotsRoot.active = false;
         if (this._wireframeNode) this._wireframeNode.active = false;
+        this._lastInfoSig = '';
     }
 
     createController() {
@@ -188,13 +191,15 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
         if (!showProbe) return;
 
         const probes = this.target.probes;
-        if (!force && probes === this._probesRef) return;
+        const volume = info?.lightProbeSphereVolume ?? 1.0;
+        // 缓存失效：probes 数组或球体积变化时才重建（体积影响球大小）
+        if (!force && probes === this._probesRef && volume === this._dotsVolume) return;
         this._probesRef = probes;
+        this._dotsVolume = volume;
 
         this._dotsRoot.removeAllChildren();
         if (!probes || probes.length === 0 || probes.length > MAX_PROBE_DOTS) return;
 
-        const volume = info?.lightProbeSphereVolume ?? 1.0;
         const scale = volume * 0.06;
         for (let i = 0; i < probes.length; i++) {
             let dot: Node;
@@ -202,7 +207,10 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
                 dot = ControllerUtils.sphere(Vec3.ZERO, PROBE_SPHERE_BASE_RADIUS, PROBE_COLOR, { depthTestForTriangles: true });
                 this._reuseMesh = getModel(dot)?.mesh;
             } else {
-                dot = ControllerUtils.sphere(Vec3.ZERO, PROBE_SPHERE_BASE_RADIUS, PROBE_COLOR, { depthTestForTriangles: true }, undefined);
+                // 复用首个球的 mesh，避免每个探针都新建网格
+                dot = create3DNode();
+                addMeshToNode(dot, this._reuseMesh, { depthTestForTriangles: true });
+                setMeshColor(dot, PROBE_COLOR);
             }
             dot.parent = this._dotsRoot;
             dot.setPosition(probes[i]);
@@ -258,6 +266,29 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
 
     onNodeChanged() {
         this.updateControllerData();
+    }
+
+    // lightProbeInfo 的显示设置/探针数据可能在没有节点变化时改变（如烘焙、面板开关、球体积）。
+    // 每帧只做一次廉价签名比较，变化时才刷新，避免每帧重建。
+    onUpdate() {
+        const sig = this._computeInfoSig();
+        if (sig === this._lastInfoSig) return;
+        this._lastInfoSig = sig;
+        this.updateControllerData();
+    }
+
+    private _computeInfoSig(): string {
+        const info = this._getLightProbeInfo();
+        const data = info?.data;
+        const probes = this.target?.probes;
+        return [
+            probes ? probes.length : 0,
+            info ? (info.lightProbeSphereVolume ?? 1) : 1,
+            info ? (info.showProbe ?? true) : true,
+            info ? (info.showWireframe ?? true) : true,
+            data?.tetrahedrons?.length ?? 0,
+            data?.probes?.length ?? 0,
+        ].join('|');
     }
 
     onDestroy() {
