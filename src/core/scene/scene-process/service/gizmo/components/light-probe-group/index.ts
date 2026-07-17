@@ -268,6 +268,15 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
         this.updateControllerData();
     }
 
+    // 探针数据变化（重新生成/烘焙，可能顶点数不变但位置/系数变了）：失效缓存并强制刷新，
+    // 避免 onUpdate 的计数签名相同而漏刷。
+    onLightProbeChanged() {
+        this._probesRef = null;
+        this._dotsVolume = -1;
+        this._lastInfoSig = '';
+        this.updateControllerData();
+    }
+
     // lightProbeInfo 的显示设置/探针数据可能在没有节点变化时改变（如烘焙、面板开关、球体积）。
     // 每帧只做一次廉价签名比较，变化时才刷新，避免每帧重建。
     onUpdate() {

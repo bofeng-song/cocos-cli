@@ -39,6 +39,11 @@ export class LightProbeTetraHelper {
         this._lastSig = '';
     }
 
+    /** 使缓存失效：下次 update 强制重建（用于探针数据/烘焙/设置变化，覆盖所有 SH 系数与法线等输入）。 */
+    invalidate(): void {
+        this._lastSig = '';
+    }
+
     destroy(): void {
         if (this._container) {
             this._container.destroy();
@@ -90,8 +95,9 @@ export class LightProbeTetraHelper {
         const indices = [tet.vertex0, tet.vertex1, tet.vertex2];
         if (isInner) indices.push(tet.vertex3);
 
-        // 签名：四面体索引 + 体积 + 各顶点位置/SH 首系数。未变化时跳过昂贵的 SH 与连线重建。
-        let sig = `${tetIndex}|${volume}|${isInner ? 1 : 0}`;
+        // 签名：四面体索引 + 体积 + reduceRinging + 各顶点位置/SH 首系数。未变化时跳过重建。
+        // 其余 SH 系数、法线等在探针数据/烘焙/设置变化时通过 invalidate() 失效缓存来覆盖。
+        let sig = `${tetIndex}|${volume}|${reduceRinging}|${isInner ? 1 : 0}`;
         for (const idx of indices) {
             const p = vertices[idx].position;
             sig += `|${p.x},${p.y},${p.z}`;

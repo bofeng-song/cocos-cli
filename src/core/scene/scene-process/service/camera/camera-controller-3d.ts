@@ -70,17 +70,20 @@ function getRangeFromParticleComp(component: any): number {
     let range = 0;
     if (component.shapeModule?.enable) {
         const shapeModule = component.shapeModule;
+        const s = shapeModule.scale;
+        // 引擎会把 shapeModule.scale 应用到所有发射器形状，这里对非 Box 形状也乘上最大轴缩放
+        const maxScale = Math.max(Math.abs(s.x), Math.abs(s.y), Math.abs(s.z));
         switch (shapeModule.shapeType) {
             case ShapeType.Box:
-                range = Math.max(shapeModule.scale.x, shapeModule.scale.y, shapeModule.scale.z);
+                range = Math.max(Math.abs(s.x), Math.abs(s.y), Math.abs(s.z));
                 break;
             case ShapeType.Circle:
             case ShapeType.Sphere:
             case ShapeType.Hemisphere:
-                range = shapeModule.radius;
+                range = shapeModule.radius * maxScale;
                 break;
             case ShapeType.Cone:
-                range = Math.max(shapeModule.radius, shapeModule.length);
+                range = Math.max(shapeModule.radius, shapeModule.length) * maxScale;
                 break;
         }
     }

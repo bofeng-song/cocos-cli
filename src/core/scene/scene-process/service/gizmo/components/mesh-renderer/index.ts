@@ -12,6 +12,7 @@ const tempSize = new Vec3();
 class ModelComponentGizmo extends GizmoBase<MeshRenderer> {
     private _controller!: BoxController;
     private _tetraHelper!: LightProbeTetraHelper;
+    private _lastTetIndex = -2; // 上次的所在四面体索引，用于廉价的逐帧变化检测
 
     init() {
         this._controller = new BoxController(this.getGizmoRoot());
@@ -27,6 +28,7 @@ class ModelComponentGizmo extends GizmoBase<MeshRenderer> {
     onHide() {
         this._controller.hide();
         this._tetraHelper.hide();
+        this._lastTetIndex = -2;
     }
 
     updateControllerData() {
@@ -80,8 +82,20 @@ class ModelComponentGizmo extends GizmoBase<MeshRenderer> {
         this.updateControllerData();
     }
 
-    // 探针数据变化（探针组重生成等）时刷新影响四面体；本节点未移动也需响应
+    onUpdate() {
+        // 引擎在渲染循环里更新 model.tetrahedronIndex（不触发节点事件），移动/动画跨四面体时需捕获。
+        // 仅做一次索引整数比较，变化时才刷新，避免每帧重建 SH/连线。
+        const idx = (this.target as any)?.model?.tetrahedronIndex ?? -1;
+        if (idx !== this._lastTetIndex) {
+            this._lastTetIndex = idx;
+            if (this.target) this._tetraHelper.update(this.target);
+        }
+    }
+
+    // 探针数据变化（探针组重生成/烘焙等）时刷新影响四面体；本节点未移动也需响应
     onLightProbeChanged() {
+        this._tetraHelper.invalidate();
+        this._lastTetIndex = -2;
         if (this.target) this._tetraHelper.update(this.target);
     }
 

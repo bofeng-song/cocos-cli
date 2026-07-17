@@ -72,6 +72,7 @@ class SkinningModelComponentGizmo extends GizmoBase<SkinnedMeshRenderer> {
     }
 
     onLightProbeChanged() {
+        this._tetraHelper.invalidate();
         if (this.target) this._tetraHelper.update(this.target);
     }
 
