@@ -13,6 +13,7 @@ import {
     Node,
     renderer,
     director,
+    EffectAsset,
 } from 'cc';
 
 const regions = [new gfx.BufferTextureCopy()];
@@ -77,6 +78,21 @@ function getPrimitiveData(): Record<string, IPrimitiveInfo> {
     return primitiveData;
 }
 
+function createPreviewMaterial(effectName: string): Material | null {
+    const effect = EffectAsset.get(effectName);
+    if (!effect) {
+        console.warn(`[MaterialPreview] Effect is not registered: ${effectName}`);
+        return null;
+    }
+    const material = new Material();
+    material.initialize({ effectName });
+    if (!material.passes.length) {
+        console.warn(`[MaterialPreview] Effect has no usable passes: ${effectName}`);
+        return null;
+    }
+    return material;
+}
+
 const tempVec3A = new Vec3();
 const tempVec3B = new Vec3();
 
@@ -139,11 +155,14 @@ export class MaterialPreview extends InteractivePreview implements IMaterialPrev
         this.lightComp.node.setParent(scene);
 
         this.modelComp = new Node('Material Preview Model').addComponent(MeshRenderer);
-        this.modelComp.mesh = getPrimitiveData().sphere.mesh;
-        const material = new Material();
-        material.initialize({ effectName: 'builtin-standard' });
-        this.modelComp.material = material;
-        this.setMaterial(material);
+        const material = createPreviewMaterial('builtin-standard');
+        if (material) {
+            this.modelComp.mesh = getPrimitiveData().sphere.mesh;
+            this.modelComp.material = material;
+            this.setMaterial(material);
+        } else {
+            this.modelComp.enabled = false;
+        }
 
         this.modelComp.node.setParent(this.scene);
         this._modelNode = this.modelComp.node;
@@ -151,7 +170,15 @@ export class MaterialPreview extends InteractivePreview implements IMaterialPrev
 
     public setMaterial(material: Material | null) {
         if (material && material !== this.material) {
+            if (!material.passes.length) {
+                console.warn(`[MaterialPreview] Material has no usable passes: ${material.name || material.effectName || (material as any)._uuid}`);
+                return;
+            }
             const comp = this.modelComp;
+            if (!comp.mesh) {
+                comp.mesh = getPrimitiveData()[this.currentPrimitive].mesh;
+            }
+            comp.enabled = true;
             const _matInsInfo = {
                 parent: material,
                 owner: comp as any,
@@ -227,6 +254,10 @@ export class MaterialPreview extends InteractivePreview implements IMaterialPrev
     public switchPrimitive(type: string) {
         const data = getPrimitiveData();
         if (!data[type]) return;
+        if (!this.material || !this.material.passes.length) {
+            console.warn('[MaterialPreview] Cannot switch primitive before a valid material is available.');
+            return;
+        }
         this.currentPrimitive = type;
         this.modelComp.mesh = data[type].mesh;
         this.updateDs();

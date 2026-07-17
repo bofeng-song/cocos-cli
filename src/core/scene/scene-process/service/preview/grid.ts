@@ -1,9 +1,28 @@
-import { Camera, Color, Node, Vec3, gfx, MeshRenderer, Layers, utils } from 'cc';
+import { Camera, Color, EffectAsset, Material, Node, Vec3, gfx, MeshRenderer, Layers, utils } from 'cc';
 import { CameraUtils } from '../camera/utils';
 import LinearTicks from '../camera/grid/linear-ticks';
 
 const _lineEnd = 1000000;
 const tempV3 = new Vec3();
+
+function createGridMaterial(): Material | null {
+    const effectName = 'builtin-unlit';
+    if (!EffectAsset.get(effectName)) {
+        console.warn(`[Grid] Effect is not registered: ${effectName}`);
+        return null;
+    }
+    const material = new Material();
+    material.initialize({
+        effectName,
+        states: { primitive: gfx.PrimitiveMode.LINE_LIST },
+    });
+    if (!material.passes.length) {
+        console.warn(`[Grid] Effect has no usable passes: ${effectName}`);
+        return null;
+    }
+    try { material.setProperty('mainColor', new Color(166, 166, 166, 120)); } catch { /* ignore */ }
+    return material;
+}
 
 export class Grid {
     private _gridMeshComp: MeshRenderer;
@@ -33,6 +52,13 @@ export class Grid {
     }
 
     private createFallbackGrid(rootNode: Node) {
+        const material = createGridMaterial();
+        if (!material) {
+            this._gridMeshComp.enabled = false;
+            this._gridMeshComp.node.active = false;
+            return;
+        }
+
         this._gridMeshComp.node.destroy();
 
         const node = new Node('Fallback Grid');
@@ -54,19 +80,12 @@ export class Grid {
             indices.push(idx++, idx++);
         }
 
+        comp.material = material;
         comp.mesh = utils.createMesh({
             positions,
             indices,
             primitiveMode: gfx.PrimitiveMode.LINE_LIST,
         });
-
-        const mtl = new cc.Material();
-        mtl.initialize({
-            effectName: 'builtin-unlit',
-            states: { primitive: gfx.PrimitiveMode.LINE_LIST },
-        });
-        try { mtl.setProperty('mainColor', new Color(166, 166, 166, 120)); } catch { /* ignore */ }
-        comp.material = mtl;
 
         this._gridMeshComp = comp;
     }

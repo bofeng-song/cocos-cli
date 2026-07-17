@@ -149,48 +149,95 @@ export async function startup(options: {
     // Our own edit-mode tick loop (Engine.startTick) takes over later.
     cc.game.pause();
 
-    // Load and register all effect assets so materials (e.g. builtin-standard)
+    function hasUsableEffect(name: string): boolean {
+        const effect = cc.EffectAsset?.get?.(name);
+        return !!effect
+            && Array.isArray(effect.shaders)
+            && effect.shaders.length > 0
+            && Array.isArray(effect.techniques)
+            && effect.techniques.some((tech: any) => Array.isArray(tech?.passes) && tech.passes.length > 0);
+    }
+
+    async function queryAssetInfo(urlOrUuid: string): Promise<any | null> {
+        try {
+            const res = await fetch(`${serverURL}/query-asset-info/${encodeURIComponent(urlOrUuid)}`);
+            if (!res.ok) return null;
+            return await res.json();
+        } catch {
+            return null;
+        }
+    }
+
+    async function loadAndRegisterEffect(info: any, required = false): Promise<boolean> {
+        const uuid: string = info?.uuid;
+        const label = info?.url || info?.name || uuid || '<unknown>';
+        try {
+            if (!uuid) return false;
+            const lib = info.library;
+            if (!lib || (!lib['.json'] && !lib['.bin'])) {
+                if (required) console.warn(`[Effects] Missing library data for required effect: ${label}`);
+                return false;
+            }
+
+            const encodedUuid = encodeURIComponent(uuid);
+            const ext = (lib['.bin'] && !lib['.json']) ? 'bin' : 'json';
+            const r = await fetch(`${serverURL}/import/${encodedUuid}.${ext}?isBrowser=true`);
+            if (!r.ok) {
+                if (required) console.warn(`[Effects] Failed to fetch required effect ${label}: ${r.status}`);
+                return false;
+            }
+
+            const isBinary = ext === 'bin';
+            const decode = isBinary ? await getDecodeCCONBinary() : null;
+            if (isBinary && !decode) {
+                if (required) console.warn(`[Effects] decodeCCONBinary is not available for required effect: ${label}`);
+                return false;
+            }
+            const deserializeData = isBinary
+                ? decode!(new Uint8Array(await r.arrayBuffer()))
+                : await r.json();
+
+            const classFinder = (id: string): any => cc.js?.getClassById?.(id) ?? null;
+            const asset = cc.deserialize(deserializeData, undefined, { classFinder });
+            asset._uuid = uuid;
+            cc.assetManager.assets.add(uuid, asset);
+            try {
+                if (asset.onLoaded) asset.onLoaded();
+            } catch (e) {
+                console.warn(`[Effects] onLoaded failed for ${asset._name || label}:`, e);
+                try { cc.EffectAsset.register(asset); } catch {}
+            }
+            return hasUsableEffect(asset.name);
+        } catch (e) {
+            if (required) console.warn(`[Effects] Failed to load required effect ${label}:`, e);
+            return false;
+        }
+    }
+
+    // Load and register effect assets so materials (e.g. builtin-standard)
     // are available before preview services initialize.
     await (async () => {
         try {
             const res = await fetch(`${serverURL}/query-asset-infos/cc.EffectAsset`);
-            if (!res.ok) return;
-            const effectInfos: any[] = await res.json();
-            if (!effectInfos.length) return;
-            const classFinder = (id: string): any => cc.js?.getClassById?.(id) ?? null;
-            await Promise.all(effectInfos.map(async (info: any) => {
-                try {
-                    const uuid: string = info.uuid;
-                    if (!uuid) return;
-                    const lib = info.library;
-                    if (!lib || (!lib['.json'] && !lib['.bin'])) return;
-
-                    const encodedUuid = encodeURIComponent(uuid);
-                    const ext = (lib['.bin'] && !lib['.json']) ? 'bin' : 'json';
-
-                    const r = await fetch(`${serverURL}/import/${encodedUuid}.${ext}?isBrowser=true`);
-                    if (!r.ok) return;
-
-                    const isBinary = ext === 'bin';
-                    let deserializeData: any;
-                    const decode = isBinary ? await getDecodeCCONBinary() : null;
-                    if (isBinary && decode) {
-                        deserializeData = decode(new Uint8Array(await r.arrayBuffer()));
-                    } else {
-                        deserializeData = await r.json();
+            const effectInfos: any[] = res.ok ? await res.json() : [];
+            if (effectInfos.length) {
+                await Promise.all(effectInfos.map((info: any) => loadAndRegisterEffect(info)));
+            }
+            const requiredEffects = [
+                { name: 'builtin-standard', url: 'db://internal/effects/builtin-standard.effect' },
+                { name: 'builtin-unlit', url: 'db://internal/effects/builtin-unlit.effect' },
+            ];
+            for (const effect of requiredEffects) {
+                if (!hasUsableEffect(effect.name)) {
+                    const info = await queryAssetInfo(effect.url);
+                    if (info) {
+                        await loadAndRegisterEffect(info, true);
                     }
-
-                    const asset = cc.deserialize(deserializeData, undefined, { classFinder });
-                    asset._uuid = uuid;
-                    cc.assetManager.assets.add(uuid, asset);
-                    try {
-                        if (asset.onLoaded) asset.onLoaded();
-                    } catch (e) {
-                        console.warn(`[Effects] onLoaded failed for ${asset._name || uuid}:`, e);
-                        try { cc.EffectAsset.register(asset); } catch {}
-                    }
-                } catch { /* skip individual effect */ }
-            }));
+                }
+                if (!hasUsableEffect(effect.name)) {
+                    console.warn(`[Effects] Required effect is not available: ${effect.name}`);
+                }
+            }
             const count = Object.keys(cc.EffectAsset.getAll()).length;
             console.log(`[Effects] Registered ${count} effects`);
         } catch (e: any) {
