@@ -104,143 +104,20 @@ export class ServiceManager {
     }
 
     /**
-     * Camera/Gizmo 依赖的编辑器内置 effect UUID
-     */
-    private static readonly EDITOR_EFFECT_UUIDS = [
-        'ba35f02e-a81c-464c-bfc5-c788328da667', // internal/editor/grid
-        'cb2c332a-fa5e-4235-a129-f011634bb7ad', // internal/editor/grid-2d
-        '4736e978-c8fa-449f-9cf6-fe0158ded9d7', // internal/editor/grid-stroke
-        '9d6c6bde-2fe2-44ee-883b-909608948b04', // internal/editor/gizmo
-        'e4e4cb19-8dd2-450d-ad20-1a818263b8d3', // internal/editor/light
-        '084eba38-5336-4444-8c8c-aebb75d5c627', // internal/editor/box-height-light
-    ];
-
-    private static readonly BUILTIN_PREVIEW_EFFECTS = [
-        {
-            name: 'builtin-standard',
-            url: 'db://internal/effects/builtin-standard.effect',
-            fallbackUuid: 'c8f66d17-351a-48da-a12c-0212d28575c4',
-        },
-        {
-            name: 'builtin-unlit',
-            url: 'db://internal/effects/builtin-unlit.effect',
-            fallbackUuid: 'a3cd009f-0ab0-420d-9278-b9fdab939bbc',
-        },
-    ];
-
-    /**
      * 遍历所有已注册的 Service，依次调用 init()（跳过 Engine，它需要单独初始化）
      */
     async initAllServices() {
-        await this.loadBuiltinPreviewEffects();
-        await this.loadEditorEffects();
         for (const service of getServiceAll()) {
             const name = service.constructor.name;
             if (name === 'EngineService') continue;
             if (typeof service.init === 'function') {
                 try {
-                    service.init();
+                    await service.init();
                 } catch (e) {
                     console.warn(`[ServiceManager] init failed on ${name}:`, e);
                 }
             }
         }
-    }
-
-    private hasUsableEffect(name: string): boolean {
-        const effect = cc.EffectAsset?.get?.(name);
-        return !!effect
-            && Array.isArray(effect.shaders)
-            && effect.shaders.length > 0
-            && Array.isArray(effect.techniques)
-            && effect.techniques.some((tech: any) => Array.isArray(tech?.passes) && tech.passes.length > 0);
-    }
-
-    private async queryAssetUuid(url: string): Promise<string | null> {
-        if (!this.serverUrl) {
-            return null;
-        }
-
-        try {
-            const res = await fetch(`${this.serverUrl}/query-asset-info/${encodeURIComponent(url)}`);
-            if (!res.ok) {
-                return null;
-            }
-            const info = await res.json();
-            return typeof info?.uuid === 'string' ? info.uuid : null;
-        } catch {
-            return null;
-        }
-    }
-
-    private loadAssetByUuid(uuid: string): Promise<any> {
-        return new Promise((resolve) => {
-            try {
-                cc.assetManager.loadAny(uuid, (err: any, asset: any) => {
-                    if (err) {
-                        console.warn(`[ServiceManager] Failed to load asset ${uuid}:`, err);
-                        resolve(null);
-                    } else {
-                        resolve(asset);
-                    }
-                });
-            } catch (e) {
-                console.warn(`[ServiceManager] loadAny error for ${uuid}:`, e);
-                resolve(null);
-            }
-        });
-    }
-
-    private registerLoadedEffect(asset: any, name: string) {
-        if (!asset || this.hasUsableEffect(name)) {
-            return;
-        }
-
-        try {
-            asset.onLoaded?.();
-        } catch (e) {
-            console.warn(`[ServiceManager] onLoaded failed for ${name}:`, e);
-        }
-
-        if (!this.hasUsableEffect(name)) {
-            try {
-                cc.EffectAsset?.register?.(asset);
-            } catch (e) {
-                console.warn(`[ServiceManager] register failed for ${name}:`, e);
-            }
-        }
-    }
-
-    private async loadBuiltinPreviewEffects(): Promise<void> {
-        for (const effect of ServiceManager.BUILTIN_PREVIEW_EFFECTS) {
-            if (this.hasUsableEffect(effect.name)) {
-                continue;
-            }
-
-            const uuid = await this.queryAssetUuid(effect.url) || effect.fallbackUuid;
-            const asset = await this.loadAssetByUuid(uuid);
-            this.registerLoadedEffect(asset, effect.name);
-
-            if (!this.hasUsableEffect(effect.name)) {
-                console.warn(`[ServiceManager] Builtin preview effect is not available: ${effect.name}`);
-            }
-        }
-    }
-
-    private loadEditorEffects(): Promise<void> {
-        return new Promise((resolve) => {
-            try {
-                cc.assetManager.loadAny(ServiceManager.EDITOR_EFFECT_UUIDS, (err: any) => {
-                    if (err) {
-                        console.warn('[ServiceManager] Failed to load editor effects:', err);
-                    }
-                    resolve();
-                });
-            } catch (e) {
-                console.warn('[ServiceManager] loadEditorEffects error:', e);
-                resolve();
-            }
-        });
     }
 
     private registerAutoForwardEvents() {
