@@ -80,12 +80,6 @@ class ModelComponentGizmo extends GizmoBase<MeshRenderer> {
         this.updateControllerData();
     }
 
-    onUpdate() {
-        // 引擎会在渲染循环里更新 model.tetrahedronIndex（不触发节点事件），需逐帧跟踪。
-        // 只刷新影响四面体（内部按签名短路，无变化时不重建 SH/连线），不每帧重建包围盒。
-        if (this.target) this._tetraHelper.update(this.target);
-    }
-
     onDestroy() {
         this._tetraHelper?.destroy();
     }
