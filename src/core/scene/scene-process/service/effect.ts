@@ -1,16 +1,22 @@
 import { assetManager, EffectAsset } from 'cc';
-import { BaseService, register } from './core';
+import { BaseService, register, ServiceEvents } from './core';
 import { Rpc } from '../rpc';
 import { messageManager } from './message';
 
 interface IEffectAssetInfo {
     uuid: string;
+    importer?: string;
+    type?: string;
+    ccType?: string;
 }
 
-@register('Effect' as any)
+@register('Effect')
 export class EffectService extends BaseService<Record<string, any[]>> {
     private _uuidSet = new Set<string>();
     private _initialized = false;
+    private _onAssetRefreshed = (uuid: string) => {
+        this.onAssetChanged(uuid);
+    };
 
     async init() {
         if (this._initialized) {
@@ -19,16 +25,17 @@ export class EffectService extends BaseService<Record<string, any[]>> {
         this._initialized = true;
 
         const uuids = await this.queryEffectUuids();
-        await Promise.all(uuids.map((uuid) => this.registerEffect(uuid)));
+        await Promise.all(uuids.map((uuid) => this.register(uuid)));
+        ServiceEvents.on('asset-refresh', this._onAssetRefreshed);
     }
 
-    public registerEffects(uuids: string[]) {
+    public registerMany(uuids: string[]) {
         uuids.forEach((uuid) => {
-            void this.registerEffect(uuid);
+            void this.register(uuid);
         });
     }
 
-    public registerEffect(uuid: string) {
+    public register(uuid: string) {
         return new Promise<void>((resolve) => {
             if (!uuid) {
                 resolve();
@@ -48,7 +55,7 @@ export class EffectService extends BaseService<Record<string, any[]>> {
         });
     }
 
-    public removeEffect(uuid: string) {
+    public remove(uuid: string) {
         if (!this._uuidSet.has(uuid)) {
             return false;
         }
@@ -62,15 +69,23 @@ export class EffectService extends BaseService<Record<string, any[]>> {
         return false;
     }
 
-    public removeEffects(uuids: string[]) {
+    public removeMany(uuids: string[]) {
         uuids.forEach((uuid) => {
-            this.removeEffect(uuid);
+            this.remove(uuid);
         });
     }
 
-    public updateEffect(uuid: string) {
-        this.removeEffect(uuid);
-        void this.registerEffect(uuid);
+    public update(uuid: string) {
+        this.remove(uuid);
+        void this.register(uuid);
+    }
+
+    public onAssetChanged(uuid: string) {
+        void this.syncAssetChanged(uuid);
+    }
+
+    public onAssetDeleted(uuid: string) {
+        this.remove(uuid);
     }
 
     private async queryEffectUuids(): Promise<string[]> {
@@ -86,5 +101,29 @@ export class EffectService extends BaseService<Record<string, any[]>> {
             console.warn('[Effect] Failed to query effects:', err);
             return [];
         }
+    }
+
+    private async syncAssetChanged(uuid: string) {
+        const assetInfo = await this.queryAssetInfo(uuid);
+        if (this.isEffectAsset(assetInfo)) {
+            this.update(uuid);
+        } else if (this._uuidSet.has(uuid)) {
+            this.remove(uuid);
+        }
+    }
+
+    private async queryAssetInfo(uuid: string): Promise<IEffectAssetInfo | null> {
+        try {
+            return await Rpc.getInstance().request('assetManager', 'queryAssetInfo', [uuid]) as IEffectAssetInfo | null;
+        } catch (err) {
+            console.warn('[Effect] Failed to query effect:', err);
+            return null;
+        }
+    }
+
+    private isEffectAsset(assetInfo: IEffectAssetInfo | null): boolean {
+        return assetInfo?.importer === 'effect'
+            || assetInfo?.type === 'cc.EffectAsset'
+            || assetInfo?.ccType === 'cc.EffectAsset';
     }
 }
