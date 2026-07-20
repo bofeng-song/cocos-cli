@@ -40,49 +40,44 @@ export async function remove(key: string, scope?: ConfigurationScope): Promise<b
     return await configurationManager.remove(key, scope);
 }
 
-export async function save(force?: boolean): Promise<void> {
+/**
+ * 将配置写入磁盘
+ * @param force 是否强制写入（跳过节流/脏检查）
+ * @param scope 'project'(默认) -> settings/cocos.config.json；'local' -> profiles/cocos.config.json
+ */
+export async function save(force?: boolean, scope: ConfigurationScope = 'project'): Promise<void> {
     const { configurationManager } = await import('../../core/configuration/index');
+    if (scope === 'local') {
+        return await configurationManager.saveLocal(force);
+    }
     return await configurationManager.save(force);
 }
 
-export async function saveLocal(force?: boolean): Promise<void> {
+/**
+ * 获取指定作用域配置文件的绝对路径
+ * @param scope 'project'(默认) -> settings/cocos.config.json；'local' -> profiles/cocos.config.json
+ */
+export async function getConfigPath(scope: ConfigurationScope = 'project'): Promise<string> {
     const { configurationManager } = await import('../../core/configuration/index');
-    return await configurationManager.saveLocal(force);
-}
-
-export async function getConfigPath(): Promise<string> {
-    const { configurationManager } = await import('../../core/configuration/index');
+    if (scope === 'local') {
+        return await configurationManager.getLocalConfigPath();
+    }
     return await configurationManager.getConfigPath();
 }
 
-export async function getLocalConfigPath(): Promise<string> {
-    const { configurationManager } = await import('../../core/configuration/index');
-    return await configurationManager.getLocalConfigPath();
-}
-
 /**
- * 注册 configurationManager 保存事件的监听器
- * 每次 settings/cocos.config.json（project 作用域）被写入磁盘时触发
+ * 注册配置保存事件的监听器
+ * @param callback 对应作用域配置文件被写入磁盘时触发
+ * @param scope 'project'(默认) -> settings/cocos.config.json；'local' -> profiles/cocos.config.json
  * @returns 取消监听的函数
  */
-export function onDidSave(callback: () => void): () => void {
+export function onDidSave(callback: () => void, scope: ConfigurationScope = 'project'): () => void {
     // 同步引入：调用时 configurationManager 必定已初始化
     const { configurationManager } = require('../../core/configuration/index');
+    const event = scope === 'local' ? 'configuration:save-local' : 'configuration:save';
     const handler = () => callback();
-    configurationManager.on('configuration:save', handler);
-    return () => configurationManager.off('configuration:save', handler);
-}
-
-/**
- * 注册 local(个人/本机)配置保存事件的监听器
- * 每次 profiles/cocos.config.json（local 作用域）被写入磁盘时触发
- * @returns 取消监听的函数
- */
-export function onDidSaveLocal(callback: () => void): () => void {
-    const { configurationManager } = require('../../core/configuration/index');
-    const handler = () => callback();
-    configurationManager.on('configuration:save-local', handler);
-    return () => configurationManager.off('configuration:save-local', handler);
+    configurationManager.on(event, handler);
+    return () => configurationManager.off(event, handler);
 }
 
 // ==================== Metadata ====================
