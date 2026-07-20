@@ -49,13 +49,9 @@ export interface IBaseConfiguration extends EventEmitterMethods {
 
     /**
      * 保存配置
+     * @param scope 'project'(默认) 保存项目配置；'local' 保存个人/本机配置
      */
-    save(): Promise<boolean>;
-
-    /**
-     * 保存 local（个人/本机）作用域配置
-     */
-    saveLocal(): Promise<boolean>;
+    save(scope?: ConfigurationScope): Promise<boolean>;
 }
 
 /**
@@ -144,7 +140,7 @@ export class BaseConfiguration extends EventEmitter implements IBaseConfiguratio
             utils.setByDotPath(this.defaultConfigs, key, value);
         } else if (scope === 'local') {
             utils.setByDotPath(this.localConfigs, key, value);
-            await this.saveLocal();
+            await this.save('local');
         } else {
             utils.setByDotPath(this.configs, key, value);
             await this.save();
@@ -163,7 +159,7 @@ export class BaseConfiguration extends EventEmitter implements IBaseConfiguratio
         } else if (scope === 'local') {
             removed = utils.removeByDotPath(this.localConfigs, key);
             if (removed) {
-                await this.saveLocal();
+                await this.save('local');
             }
         } else {
             // 从项目配置中移除
@@ -176,13 +172,8 @@ export class BaseConfiguration extends EventEmitter implements IBaseConfiguratio
         return removed;
     }
 
-    public async save() {
-        this.emit(MessageType.Save, this);
-        return true;
-    }
-
-    public async saveLocal() {
-        this.emit(MessageType.SaveLocal, this);
+    public async save(scope: ConfigurationScope = 'project') {
+        this.emit(scope === 'local' ? MessageType.SaveLocal : MessageType.Save, this);
         return true;
     }
 }

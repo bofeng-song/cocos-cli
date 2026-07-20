@@ -7129,8 +7129,7 @@ export declare interface IBaseConfiguration extends EventEmitterMethods {
     getAll(scope?: ConfigurationScope): Record<string, any> | undefined;
     set<T>(key: string, value: T, scope?: ConfigurationScope): Promise<boolean>;
     remove(key: string, scope?: ConfigurationScope): Promise<boolean>;
-    save(): Promise<boolean>;
-    saveLocal(): Promise<boolean>;
+    save(scope?: ConfigurationScope): Promise<boolean>;
 }
 export declare interface ICocosConfigurationNode {
     id: string;
@@ -8188,8 +8187,7 @@ export declare interface IBaseConfiguration extends EventEmitterMethods {
     getAll(scope?: ConfigurationScope): Record<string, any> | undefined;
     set<T>(key: string, value: T, scope?: ConfigurationScope): Promise<boolean>;
     remove(key: string, scope?: ConfigurationScope): Promise<boolean>;
-    save(): Promise<boolean>;
-    saveLocal(): Promise<boolean>;
+    save(scope?: ConfigurationScope): Promise<boolean>;
 }
 export declare interface IChunkContent {
     skeleton: null | string;
