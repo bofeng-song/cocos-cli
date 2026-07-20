@@ -25,8 +25,10 @@ describe('BaseConfiguration', () => {
     describe('getAll', () => {
         it('should return configs by scope', () => {
             config['configs'] = { projectKey: 'projectValue' };
+            config['localConfigs'] = { localKey: 'localValue' };
             expect(config.getAll()).toEqual({ projectKey: 'projectValue' });
             expect(config.getAll('project')).toEqual({ projectKey: 'projectValue' });
+            expect(config.getAll('local')).toEqual({ localKey: 'localValue' });
             expect(config.getAll('default')).toEqual(defaultConfigs);
         });
     });
@@ -59,6 +61,47 @@ describe('BaseConfiguration', () => {
             });
         });
 
+        it('should merge default, project, and local values in priority order', async () => {
+            config['configs'] = {
+                layer: 'project',
+                nested: {
+                    projectOnly: true,
+                    shared: 'project'
+                }
+            };
+            config['localConfigs'] = {
+                layer: 'local',
+                nested: {
+                    localOnly: true,
+                    shared: 'local'
+                }
+            };
+
+            expect(await config.get()).toEqual({
+                customKey: 'customValue',
+                layer: 'local',
+                nested: {
+                    custom: 'customNestedValue',
+                    projectOnly: true,
+                    localOnly: true,
+                    shared: 'local'
+                }
+            });
+            expect(await config.get('nested')).toEqual({
+                custom: 'customNestedValue',
+                projectOnly: true,
+                localOnly: true,
+                shared: 'local'
+            });
+            expect(await config.get('nested', 'local')).toEqual({
+                custom: 'customNestedValue',
+                localOnly: true,
+                shared: 'local'
+            });
+            expect(await config.get('customKey', 'local')).toBe('customValue');
+            expect(await config.get('missing', 'local')).toBeUndefined();
+        });
+
         it('should throw error for non-existent values', async () => {
             await expect(config.get('nonExistent', 'project')).rejects.toThrow(
                 '[Configuration] 通过 test-module.nonExistent 获取配置失败'
@@ -86,12 +129,18 @@ describe('BaseConfiguration', () => {
             const result2 = await config.set('nested.newKey', 'newValue', 'project');
             expect(result2).toBe(true);
             expect(config['configs']['nested']['newKey']).toBe('newValue');
+
+            // Local scope
+            const resultLocal = await config.set('local.newKey', 'localValue', 'local');
+            expect(resultLocal).toBe(true);
+            expect(config['localConfigs']['local']['newKey']).toBe('localValue');
+            expect(saveSpy).toHaveBeenLastCalledWith('local');
             
             // Default scope (no save)
             const result3 = await config.set('newDefaultKey', 'newDefaultValue', 'default');
             expect(result3).toBe(true);
             expect(config.getDefaultConfig()!['newDefaultKey']).toBe('newDefaultValue');
-            expect(saveSpy).toHaveBeenCalledTimes(2); // Only project scope saves
+            expect(saveSpy).toHaveBeenCalledTimes(3); // Project and local scopes save
         });
     });
 
@@ -100,6 +149,10 @@ describe('BaseConfiguration', () => {
             config['configs'] = {
                 keyToRemove: 'value',
                 nested: { keyToRemove: 'nestedValue', keep: 'keepValue' }
+            };
+            config['localConfigs'] = {
+                keyToRemove: 'localValue',
+                nested: { keyToRemove: 'localNestedValue', keep: 'localKeepValue' }
             };
         });
 
@@ -115,11 +168,16 @@ describe('BaseConfiguration', () => {
             expect(await config.remove('nested.keyToRemove', 'project')).toBe(true);
             expect(config['configs']['nested']['keyToRemove']).toBeUndefined();
             expect(config['configs']['nested']['keep']).toBe('keepValue');
+
+            // Local scope
+            expect(await config.remove('keyToRemove', 'local')).toBe(true);
+            expect(config['localConfigs']['keyToRemove']).toBeUndefined();
+            expect(saveSpy).toHaveBeenLastCalledWith('local');
             
             // Default scope (no save)
             expect(await config.remove('customKey', 'default')).toBe(true);
             expect(config.getDefaultConfig()!['customKey']).toBeUndefined();
-            expect(saveSpy).toHaveBeenCalledTimes(2); // Only project scope saves
+            expect(saveSpy).toHaveBeenCalledTimes(3); // Project and local scopes save
         });
 
         it('should return false for non-existent values', async () => {
@@ -127,6 +185,7 @@ describe('BaseConfiguration', () => {
             
             expect(await config.remove('nonExistent', 'project')).toBe(false);
             expect(await config.remove('nonExistent', 'default')).toBe(false);
+            expect(await config.remove('nonExistent', 'local')).toBe(false);
             expect(saveSpy).not.toHaveBeenCalled();
         });
     });
@@ -137,6 +196,10 @@ describe('BaseConfiguration', () => {
             const result = await config.save();
             expect(result).toBe(true);
             expect(emitSpy).toHaveBeenCalledWith(MessageType.Save, config);
+
+            const localResult = await config.save('local');
+            expect(localResult).toBe(true);
+            expect(emitSpy).toHaveBeenCalledWith(MessageType.SaveLocal, config);
         });
 
         it('should handle event listeners', () => {
