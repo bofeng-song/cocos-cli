@@ -45,14 +45,24 @@ export async function save(force?: boolean): Promise<void> {
     return await configurationManager.save(force);
 }
 
+export async function saveLocal(force?: boolean): Promise<void> {
+    const { configurationManager } = await import('../../core/configuration/index');
+    return await configurationManager.saveLocal(force);
+}
+
 export async function getConfigPath(): Promise<string> {
     const { configurationManager } = await import('../../core/configuration/index');
     return await configurationManager.getConfigPath();
 }
 
+export async function getLocalConfigPath(): Promise<string> {
+    const { configurationManager } = await import('../../core/configuration/index');
+    return await configurationManager.getLocalConfigPath();
+}
+
 /**
  * 注册 configurationManager 保存事件的监听器
- * 每次 cocos.config.json 被写入磁盘时触发
+ * 每次 settings/cocos.config.json（project 作用域）被写入磁盘时触发
  * @returns 取消监听的函数
  */
 export function onDidSave(callback: () => void): () => void {
@@ -61,6 +71,18 @@ export function onDidSave(callback: () => void): () => void {
     const handler = () => callback();
     configurationManager.on('configuration:save', handler);
     return () => configurationManager.off('configuration:save', handler);
+}
+
+/**
+ * 注册 local(个人/本机)配置保存事件的监听器
+ * 每次 profiles/cocos.config.json（local 作用域）被写入磁盘时触发
+ * @returns 取消监听的函数
+ */
+export function onDidSaveLocal(callback: () => void): () => void {
+    const { configurationManager } = require('../../core/configuration/index');
+    const handler = () => callback();
+    configurationManager.on('configuration:save-local', handler);
+    return () => configurationManager.off('configuration:save-local', handler);
 }
 
 // ==================== Metadata ====================

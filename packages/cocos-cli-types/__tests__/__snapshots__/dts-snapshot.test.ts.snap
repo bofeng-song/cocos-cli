@@ -7116,10 +7116,11 @@ export { }
 
 exports[`DTS API compatibility configuration.d.ts should match snapshot 1`] = `
 "import { EventEmitter } from 'events';
-export declare type ConfigurationScope = 'default' | 'project';
+export declare type ConfigurationScope = 'default' | 'project' | 'local';
 export declare type EventEmitterMethods = Pick<EventEmitter, 'on' | 'off' | 'once' | 'emit'>;
 export declare function get<T>(key: string, scope?: ConfigurationScope): Promise<T>;
 export declare function getConfigPath(): Promise<string>;
+export declare function getLocalConfigPath(): Promise<string>;
 export declare function getMetadata(): Promise<ICocosConfigurationNode[]>;
 export declare interface IBaseConfiguration extends EventEmitterMethods {
     moduleName: string;
@@ -7130,6 +7131,7 @@ export declare interface IBaseConfiguration extends EventEmitterMethods {
     set<T>(key: string, value: T, scope?: ConfigurationScope): Promise<boolean>;
     remove(key: string, scope?: ConfigurationScope): Promise<boolean>;
     save(): Promise<boolean>;
+    saveLocal(): Promise<boolean>;
 }
 export declare interface ICocosConfigurationNode {
     id: string;
@@ -7166,9 +7168,11 @@ export declare function init(projectPath: string): Promise<void>;
 export declare function migrate(): Promise<void>;
 export declare function migrateFromProject(): Promise<IConfiguration>;
 export declare function onDidSave(callback: () => void): () => void;
+export declare function onDidSaveLocal(callback: () => void): () => void;
 export declare function reload(): Promise<void>;
 export declare function remove(key: string, scope?: ConfigurationScope): Promise<boolean>;
 export declare function save(force?: boolean): Promise<void>;
+export declare function saveLocal(force?: boolean): Promise<void>;
 export declare function set<T>(key: string, value: T, scope?: ConfigurationScope): Promise<boolean>;
 export { }
 "
@@ -7812,8 +7816,11 @@ export declare namespace Configuration {
         set,
         remove,
         save,
+        saveLocal,
         getConfigPath,
+        getLocalConfigPath,
         onDidSave,
+        onDidSaveLocal,
         getMetadata,
         IConfiguration,
         ConfigurationScope,
@@ -7822,7 +7829,7 @@ export declare namespace Configuration {
         ICocosConfigurationPropertySchema
     }
 }
-export declare type ConfigurationScope = 'default' | 'project';
+export declare type ConfigurationScope = 'default' | 'project' | 'local';
 export declare function createAsset(options: CreateAssetOptions): Promise<IAssetInfo>;
 export declare function createAssetByType(ccType: ISupportCreateType, dirOrUrl: string, baseName: string, options?: CreateAssetByTypeOptions): Promise<IAssetInfo>;
 export declare interface CreateAssetByTypeOptions extends AssetOperationOption {
@@ -7975,6 +7982,7 @@ export declare function getConfig(useDefault?: boolean): Promise<IEngineConfig>;
 export declare function getConfigPath(): Promise<string>;
 export declare function getInfo(): Promise<EngineInfo>;
 export declare function getInfo_2(): Promise<ProjectInfo>;
+export declare function getLocalConfigPath(): Promise<string>;
 export declare function getMetadata(): Promise<ICocosConfigurationNode[]>;
 export declare function getProgrammingFacet(): Promise<ProgrammingFacet>;
 export declare function getRenderConfig(): Promise<ModuleRenderConfig>;
@@ -8188,6 +8196,7 @@ export declare interface IBaseConfiguration extends EventEmitterMethods {
     set<T>(key: string, value: T, scope?: ConfigurationScope): Promise<boolean>;
     remove(key: string, scope?: ConfigurationScope): Promise<boolean>;
     save(): Promise<boolean>;
+    saveLocal(): Promise<boolean>;
 }
 export declare interface IChunkContent {
     skeleton: null | string;
@@ -8743,6 +8752,7 @@ export declare function onCompileStart(listener: (e: {
 }) => void): () => void;
 export declare function onDBReady(listener: (dbInfo: IAssetDBInfo) => void): () => void;
 export declare function onDidSave(callback: () => void): () => void;
+export declare function onDidSaveLocal(callback: () => void): () => void;
 export declare function onPackBuildEnd(listener: (e: {
     targetName: string;
 }) => void): () => void;
@@ -8952,6 +8962,7 @@ export declare interface RtSpriteFrameAssetUserData {
 }
 export declare function save(force?: boolean): Promise<void>;
 export declare function saveAsset(pathOrUrlOrUUID: string, data: string | Buffer): Promise<IAssetInfo>;
+export declare function saveLocal(force?: boolean): Promise<void>;
 export declare function saveMaterial(uuidOrUrlOrPath: string, dump: MaterialDump): Promise<void>;
 export declare function saveSerializedData(uuidOrUrlOrPath: string, patch: SerializedAssetPatch): Promise<SerializedAssetQueryResult>;
 export declare namespace Scene {

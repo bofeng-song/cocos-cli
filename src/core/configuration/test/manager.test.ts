@@ -27,7 +27,7 @@ const mockRegistry = configurationRegistry as jest.Mocked<typeof configurationRe
 describe('ConfigurationManager', () => {
     let manager: ConfigurationManager;
     const projectPath = '/test/project';
-    const configPath = path.join(projectPath, ConfigurationManager.name);
+    const configPath = path.join(projectPath, 'settings', ConfigurationManager.name);
 
     beforeEach(() => {
         manager = new ConfigurationManager();
@@ -320,7 +320,7 @@ describe('ConfigurationManager', () => {
             expect(manager['projectConfig']).toEqual({
                 version: '1.0.0',
                 migratedKey: 'migratedValue',
-                $schema: './temp/cocos.config.schema.json'
+                $schema: '../temp/cocos.config.schema.json'
             });
             expect(manager['version']).toBe('1.0.0');
             // Same version - should not migrate (migrate method checks version)
@@ -350,7 +350,7 @@ describe('ConfigurationManager', () => {
             expect(mockFse.ensureDir).toHaveBeenCalledWith(path.dirname(configPath));
             expect(mockFse.writeJSON).toHaveBeenCalledWith(
                 configPath,
-                { version: '1.0.0', test: 'value', $schema: './temp/cocos.config.schema.json' },
+                { version: '1.0.0', test: 'value', $schema: '../temp/cocos.config.schema.json' },
                 { spaces: 4 }
             );
 
@@ -477,6 +477,7 @@ describe('ConfigurationManager', () => {
             const mockInstance = {
                 moduleName: 'testModule',
                 configs: {}, // 模拟 BaseConfiguration 的 configs 属性
+                localConfigs: {}, // local 作用域桶
                 getAll: jest.fn().mockReturnValue({}), // 初始返回空对象
                 on: jest.fn(),
                 emit: jest.fn(),

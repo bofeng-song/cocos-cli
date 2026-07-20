@@ -2,10 +2,11 @@
 /**
  * 配置范围
  */
-export type ConfigurationScope = 'default' | 'project';
+export type ConfigurationScope = 'default' | 'project' | 'local';
 
 export const MessageType = {
     Save: 'configuration:save',
+    SaveLocal: 'configuration:save-local',
     Registry: 'configuration:registry',
     UnRegistry: 'configuration:unregistry',
     Reload: 'configuration:reload',
