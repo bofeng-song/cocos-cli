@@ -6,6 +6,32 @@ import { GlobalPaths } from '../../global';
 import { scriptingRoutes } from '../preview/scripting-routes';
 import { pathExists } from 'fs-extra';
 
+let sceneRpcSocket: any = null;
+const SCENE_RPC_TIMEOUT = 60000;
+
+function replySceneRpcError(reply: any, message: string) {
+    if (typeof reply === 'function') {
+        reply({ error: message });
+    }
+}
+
+function forwardSceneRpcRequest(msg: any, reply: any) {
+    if (!sceneRpcSocket?.connected) {
+        replySceneRpcError(reply, 'Scene editor is not connected');
+        return;
+    }
+
+    sceneRpcSocket.timeout(SCENE_RPC_TIMEOUT).emit('scene:rpc:request', msg, (err: any, response: any) => {
+        if (err) {
+            replySceneRpcError(reply, err?.message || String(err));
+            return;
+        }
+        if (typeof reply === 'function') {
+            reply(response ?? { result: null });
+        }
+    });
+}
+
 export default {
     get: [
         {
@@ -72,7 +98,18 @@ export default {
     post: [],
     staticFiles: [],
     socket: {
-        connection: (_socket: any) => { },
-        disconnect: (_socket: any) => { }
+        connection: (socket: any) => {
+            socket.on('scene:rpc:register', () => {
+                sceneRpcSocket = socket;
+            });
+            socket.on('scene:rpc:request', (msg: any, reply: any) => {
+                forwardSceneRpcRequest(msg, reply);
+            });
+        },
+        disconnect: (socket: any) => {
+            if (sceneRpcSocket?.id === socket.id) {
+                sceneRpcSocket = null;
+            }
+        }
     },
 } as IMiddlewareContribution;

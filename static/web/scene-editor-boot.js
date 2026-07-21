@@ -16,7 +16,7 @@ export default async function boot() {
         const _originalSystem = System;
         console.log('[Scene] loading scene bundle');
         // SystemJS natively awaits the attached import maps above
-        const SceneBundle = await System.import('/static/web/scene-bundle.js');
+        const SceneBundle = await System.import('/static/web/scene-bundle.js?v=preview-rpc-10');
         const { startup, Service } = SceneBundle;
 
         globalThis.System = _originalSystem;

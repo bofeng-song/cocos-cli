@@ -17,10 +17,17 @@
         #GameDiv, #Cocos3dGameContainer {
             width: 100%;
             height: 100%;
+            position: relative;
         }
-        #GameCanvas {
+        #PreviewCanvas {
+            position: absolute;
+            inset: 0;
             width: 100%;
             height: 100%;
+        }
+        #PreviewCanvas {
+            background: #333;
+            z-index: 1;
         }
 
         /* ── Toolbar ── */
@@ -69,7 +76,7 @@
 <body>
     <div id="GameDiv">
         <div id="Cocos3dGameContainer">
-            <canvas id="GameCanvas" tabindex="-1"></canvas>
+            <canvas id="PreviewCanvas" tabindex="-1"></canvas>
         </div>
     </div>
 
@@ -102,10 +109,9 @@
     <script>
         window.WebEnv = { serverURL: '<%= serverURL %>' };
     </script>
+    <script src="/socket.io/socket.io.js"></script>
     <script type="module">
-        const { default: boot } = await import("/static/web/scene-editor-boot.js");
-        await boot();
-        const { default: initPreviewApp } = await import("/static/web/preview-app.js");
+        const { default: initPreviewApp } = await import("/static/web/preview-app.js?v=preview-rpc-10");
         initPreviewApp();
     </script>
 </body>

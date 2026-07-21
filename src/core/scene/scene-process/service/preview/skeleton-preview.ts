@@ -51,7 +51,7 @@ export class SkeletonPreview extends InteractivePreview {
                 this.jointNodes.push(jointNode);
             }
 
-            this.cameraComp.enabled = true;
+            this.enablePreviewCamera();
             this.resetCameraView();
 
             const geometryRenderer = (Service.Engine as any).getGeometryRenderer?.();

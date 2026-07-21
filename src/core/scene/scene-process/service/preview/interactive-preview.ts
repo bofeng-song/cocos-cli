@@ -77,9 +77,9 @@ class InteractivePreview extends PreviewBase implements IPreviewInstance {
     protected skybox: SkyboxInfo | null = null;
 
     public async queryPreviewData(info: any) {
-        this.ensurePreviewGlobalsActive();
         this.previewBuffer.ensureWindow(info.width, info.height);
         this.ensureCameraAttached();
+        this.syncRenderCameraState();
         if (this.worldAxis && this.previewBuffer?.window) {
             this.worldAxis._sceneGizmoCamera.camera.changeTargetWindow(this.previewBuffer.window);
             if (this.enableAxis) {
@@ -87,15 +87,6 @@ class InteractivePreview extends PreviewBase implements IPreviewInstance {
             }
         }
         return super.queryPreviewData(info);
-    }
-
-    private ensurePreviewGlobalsActive() {
-        if (!this.enableSkybox) return;
-        const psd = (cc.director.root as any)?.pipeline?.pipelineSceneData;
-        if (!psd?.skybox) return;
-        if (!psd.skybox.enabled) {
-            this.scene.globals.activate(this.scene);
-        }
     }
 
     protected readonly _minScalar = 1;
@@ -149,11 +140,13 @@ class InteractivePreview extends PreviewBase implements IPreviewInstance {
         this.switchViewModeState();
         this.initCamera();
         this.initSceneCamera();
+        this.syncRenderCameraState();
         this.initGrid();
         this.initPreviewWorldAxis();
         if (this._modelNode) {
             this.autoPerfectCameraViewOnModel(this._modelNode);
         }
+        this.syncRenderCameraState();
     }
 
     public initScene(registerName: string, queryName: string) {
@@ -177,7 +170,7 @@ class InteractivePreview extends PreviewBase implements IPreviewInstance {
         if (this.is2D) {
             this.cameraComp.node.setPosition(0, 0, 1000);
             this.cameraComp.orthoHeight = 0;
-            this.cameraComp.node.setRotation(0, 0, 0, 0);
+            this.cameraComp.node.setRotationFromEuler(0, 0, 0);
             this.cameraComp.projection = Camera.ProjectionType.ORTHO;
             this.cameraComp.clearFlags = Camera.ClearFlag.SOLID_COLOR;
         } else {
@@ -210,19 +203,57 @@ class InteractivePreview extends PreviewBase implements IPreviewInstance {
     protected ensureCameraAttached() {
         if (!this.camera || !this.previewBuffer?.window) return;
 
-        this.cameraComp.enabled = true;
-        if (!this.camera.scene && this.scene?.renderScene) {
-            this.scene.renderScene.addCamera(this.camera);
+        const root = cc.director.root as any;
+        const prevTempWindow = root.tempWindow;
+        root.tempWindow = this.previewBuffer.window;
+        try {
+            this.cameraComp.enabled = true;
+            if (!this.camera.scene && this.scene?.renderScene) {
+                this.scene.renderScene.addCamera(this.camera);
+            }
+            this.camera.changeTargetWindow(this.previewBuffer.window);
+            this.camera.enabled = true;
+            this.syncRenderCameraState();
+        } finally {
+            root.tempWindow = prevTempWindow;
         }
-        this.camera.changeTargetWindow(this.previewBuffer.window);
-        this.camera.enabled = true;
+    }
+
+    protected enablePreviewCamera() {
+        this.previewBuffer.ensureWindow();
+        this.ensureCameraAttached();
+    }
+
+    protected syncRenderCameraState() {
+        if (!this.camera) return;
+        this.camera.projectionType = this.cameraComp.projection;
+        this.camera.orthoHeight = this.cameraComp.orthoHeight;
+        this.camera.clearFlag = this.cameraComp.clearFlags;
+        this.camera.clearColor = this.cameraComp.clearColor as Color;
+        this.camera.nearClip = this.cameraComp.near;
+        this.camera.farClip = this.cameraComp.far;
+        this.camera.visibility = this.cameraComp.visibility;
+        this.camera.update(true);
     }
 
     public loadScene() {
-        // @ts-ignore
-        this.scene._load();
-        // @ts-ignore
-        this.scene._activate();
+        const root = cc.director.root as any;
+        const prevTempWindow = root.tempWindow;
+        const activeScene = cc.director.getScene?.();
+        if (this.previewBuffer?.window) {
+            root.tempWindow = this.previewBuffer.window;
+        }
+        try {
+            // @ts-ignore
+            this.scene._load();
+            // @ts-ignore
+            this.scene._activate();
+        } finally {
+            root.tempWindow = prevTempWindow;
+            if (activeScene && activeScene !== this.scene && activeScene.globals) {
+                activeScene.globals.activate(activeScene);
+            }
+        }
 
         if (this.enableSkybox) {
             this.ensureSkyboxMaterial();

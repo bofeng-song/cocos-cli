@@ -495,13 +495,41 @@ async function setupBrowserInvokeChannel(serverURL: string) {
                 console.warn('[scene:invoke] failed:', e);
             }
         };
+        const request = async (
+            msg: { module?: string; method?: string; args?: any[] },
+            reply?: (response: { result?: any; error?: string }) => void,
+        ) => {
+            const respond = typeof reply === 'function' ? reply : () => {};
+            try {
+                if (!msg?.module || !msg?.method) {
+                    respond({ error: 'Invalid scene RPC request' });
+                    return;
+                }
+                const svc = (DecoratorService as any)[msg.module];
+                if (!svc || typeof svc[msg.method] !== 'function') {
+                    respond({ error: `Method not found: ${msg.module}.${msg.method}` });
+                    return;
+                }
+                const result = await svc[msg.method](...(msg.args || []));
+                respond({ result });
+            } catch (e: any) {
+                respond({ error: e?.message || String(e) });
+            }
+        };
         socket.on('scene:invoke', (msg: { module?: string; method?: string; args?: any[] }) => {
             if (msg && msg.module && msg.method) {
                 invoke(msg.module, msg.method, msg.args);
             }
         });
+        socket.on('scene:rpc:request', request);
         // 连接建立时同步一次设计分辨率（首次进入 / 断线重连时补齐错过的变更）
-        socket.on('connect', () => invoke('Engine', 'syncDesignResolution', []));
+        socket.on('connect', () => {
+            socket.emit('scene:rpc:register');
+            invoke('Engine', 'syncDesignResolution', []);
+        });
+        if (socket.connected) {
+            socket.emit('scene:rpc:register');
+        }
     } catch (e) {
         console.warn('[engine-bootstrap] setup browser-invoke channel failed:', e);
     }

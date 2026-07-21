@@ -42,7 +42,7 @@ export class MeshPreview extends InteractivePreview {
             for (let i = 0; i < this._modelComp.mesh!.struct.primitives.length; i++) {
                 this._modelComp.setMaterial(this._defaultMat, i);
             }
-            this.cameraComp.enabled = true;
+            this.enablePreviewCamera();
             this.resetCameraView();
         } catch (e) {
             console.warn(e);

@@ -58,7 +58,7 @@ export class SpinePreview extends InteractivePreview implements ISpinePreviewIns
             this.skeletonComponent.node.active = true;
             this.skeletonComponent.skeletonData = skeletonData;
 
-            this.cameraComp.enabled = true;
+            this.enablePreviewCamera();
             this.resetCamera(this.skeletonComponent.node);
             this.perfectCameraView(getBoundaryOfMeshNodes([this.skeletonComponent.node]));
 

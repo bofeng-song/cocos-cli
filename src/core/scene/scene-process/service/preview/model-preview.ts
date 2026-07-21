@@ -41,13 +41,16 @@ export class ModelPreview extends InteractivePreview {
 
         assetManager.assets.remove(prefabUuid);
         const prefabAsset = await new Promise<Prefab>((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error(`Load model prefab timeout: ${prefabUuid}`)), 10000);
             assetManager.loadAny(prefabUuid, { reloadAsset: true }, (err: any, result: any) => {
+                clearTimeout(timeout);
                 if (err) reject(err);
+                else if (!result) reject(new Error(`Load model prefab failed: ${prefabUuid}`));
                 else resolve(result);
             });
         });
 
-        this.cameraComp.enabled = true;
+        this.enablePreviewCamera();
 
         if (this._modelNode) {
             this.scene.removeChild(this._modelNode);
@@ -59,14 +62,20 @@ export class ModelPreview extends InteractivePreview {
         this._modelNode = instantiate(prefabAsset) as Node;
         this._modelNode.parent = this.scene;
 
-        this.resetCamera(this._modelNode);
-
-        Service.Engine.repaintInEditMode();
         return await new Promise((resolve) => {
-            cc.director.once(cc.Director.EVENT_AFTER_DRAW, () => {
+            let done = false;
+            const finish = () => {
+                if (done) return;
+                done = true;
                 this.perfectCameraView(getBoundaryOfMeshNodes([this._modelNode!]));
                 resolve(null);
+            };
+            cc.director.once(cc.Director.EVENT_AFTER_DRAW, () => {
+                finish();
             });
+            this.resetCamera(this._modelNode!);
+            Service.Engine.repaintInEditMode();
+            setTimeout(finish, 1000);
         });
     }
 

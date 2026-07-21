@@ -256,6 +256,7 @@ class PreviewBuffer extends EventEmitter {
         }
 
         this.ensureWindow(width, height);
+        Service.Engine.repaintInEditMode();
 
         const root = this.renderScene.root;
         const currWindow = this.window;
@@ -283,22 +284,23 @@ class PreviewBuffer extends EventEmitter {
 
         for (let i = 0; i < cameras.length; i++) {
             const curWindowCamera = cameras[i];
-            this.switchCameras(curWindowCamera, currWindow);
             if (curWindowCamera.width !== this.width || curWindowCamera.height !== this.height) {
                 curWindowCamera.resize(width, height);
             }
             curWindowCamera.update(true);
         }
 
-        const prevTempWindow = cc.director.root.tempWindow;
-        cc.director.root.tempWindow = currWindow;
-        Service.Engine.repaintInEditMode();
-
         return await new Promise((resolve) => {
-            cc.director.once(cc.Director.EVENT_AFTER_DRAW, () => {
-                cc.director.root.tempWindow = prevTempWindow;
+            let done = false;
+            const finish = () => {
+                if (done) return;
+                done = true;
                 resolve(this.copyFrameBuffer(this.window));
+            };
+            cc.director.once(cc.Director.EVENT_AFTER_DRAW, () => {
+                finish();
             });
+            setTimeout(finish, 1000);
         });
     }
 }

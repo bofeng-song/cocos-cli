@@ -1,4 +1,10 @@
-/* global window, document, cc */
+/* global window, document */
+
+const RPC_TIMEOUT = 60000;
+const SCENE_READY_RETRY_COUNT = 20;
+const SCENE_READY_RETRY_DELAY = 250;
+const MAX_PREVIEW_PIXELS = 3840 * 2160;
+const MAX_PREVIEW_SIDE = 4096;
 
 function log(msg, level) {
     if (level === 'err') console.error('[Preview]', msg);
@@ -6,30 +12,217 @@ function log(msg, level) {
     else console.log('[Preview]', msg);
 }
 
-function getPreviewService() {
-    try {
-        return window.cli && window.cli.Scene && window.cli.Scene.Preview;
-    } catch (e) {
-        return null;
+let socket = null;
+let activePreview = false;
+let lightEnabled = true;
+let renderScheduled = false;
+let renderInProgress = false;
+let renderQueued = false;
+
+function getStatus() {
+    return document.getElementById('pvStatus');
+}
+
+function getPreviewCanvas() {
+    return document.getElementById('PreviewCanvas');
+}
+
+function resizePreviewCanvas(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const targetWidth = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+    const targetHeight = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+    const scale = Math.min(
+        1,
+        MAX_PREVIEW_SIDE / targetWidth,
+        MAX_PREVIEW_SIDE / targetHeight,
+        Math.sqrt(MAX_PREVIEW_PIXELS / (targetWidth * targetHeight)),
+    );
+    const width = Math.max(1, Math.floor(targetWidth * scale));
+    const height = Math.max(1, Math.floor(targetHeight * scale));
+    if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+    }
+    return { width, height };
+}
+
+function toClampedArray(buffer) {
+    if (buffer instanceof Uint8ClampedArray) {
+        return buffer;
+    }
+    if (ArrayBuffer.isView(buffer)) {
+        return new Uint8ClampedArray(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+    }
+    if (buffer instanceof ArrayBuffer) {
+        return new Uint8ClampedArray(buffer);
+    }
+    if (Array.isArray(buffer)) {
+        return new Uint8ClampedArray(buffer);
+    }
+    if (buffer && Array.isArray(buffer.data)) {
+        return new Uint8ClampedArray(buffer.data);
+    }
+    return null;
+}
+
+function getSceneSocket() {
+    return new Promise((resolve, reject) => {
+        if (!window.io) {
+            reject(new Error('socket.io client is unavailable'));
+            return;
+        }
+        if (!socket) {
+            socket = window.io(window.WebEnv.serverURL);
+            socket.on('connect', () => {
+                const status = getStatus();
+                if (status && !activePreview) {
+                    status.textContent = 'Ready';
+                }
+            });
+            socket.on('disconnect', () => {
+                const status = getStatus();
+                if (status) {
+                    status.textContent = 'Disconnected';
+                }
+            });
+        }
+        if (socket.connected) {
+            resolve(socket);
+            return;
+        }
+
+        const timer = window.setTimeout(() => {
+            cleanup();
+            reject(new Error('Timed out connecting to preview socket'));
+        }, RPC_TIMEOUT);
+
+        function cleanup() {
+            window.clearTimeout(timer);
+            socket.off('connect', onConnect);
+            socket.off('connect_error', onError);
+        }
+        function onConnect() {
+            cleanup();
+            resolve(socket);
+        }
+        function onError(err) {
+            cleanup();
+            reject(err || new Error('Preview socket connection failed'));
+        }
+
+        socket.once('connect', onConnect);
+        socket.once('connect_error', onError);
+    });
+}
+
+async function sceneRpcRequest(module, method, args) {
+    const sceneSocket = await getSceneSocket();
+    return await new Promise((resolve, reject) => {
+        sceneSocket.timeout(RPC_TIMEOUT).emit('scene:rpc:request', {
+            module,
+            method,
+            args: args || [],
+        }, (err, response) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            if (response && response.error) {
+                reject(new Error(response.error));
+                return;
+            }
+            resolve(response ? response.result : null);
+        });
+    });
+}
+
+async function waitForSceneRpc() {
+    let lastError = null;
+    for (let i = 0; i < SCENE_READY_RETRY_COUNT; i++) {
+        try {
+            await sceneRpcRequest('Preview', 'queryActivePreviewData', [{ width: 1, height: 1 }]);
+            return;
+        } catch (e) {
+            lastError = e;
+            if (!/Scene editor is not connected|Timed out connecting/.test(e?.message || '')) {
+                return;
+            }
+            await new Promise((resolve) => window.setTimeout(resolve, SCENE_READY_RETRY_DELAY));
+        }
+    }
+    if (lastError) {
+        throw lastError;
     }
 }
 
-function getActive() {
-    var preview = getPreviewService();
-    return preview && preview.activePreview;
+function previewRequest(method, args) {
+    return sceneRpcRequest('Preview', method, args);
 }
 
-// ── Preview execution ──
+function drawPreviewInfo(canvas, info, fallbackSize) {
+    if (!info || !info.buffer) return;
+
+    const width = info.width || fallbackSize.width;
+    const height = info.height || fallbackSize.height;
+    const data = toClampedArray(info.buffer);
+    if (!data || data.length < width * height * 4) {
+        log('Preview frame buffer is invalid', 'warn');
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.putImageData(new ImageData(data, width, height), 0, 0);
+    log('Preview frame: ' + width + 'x' + height + ', bytes=' + data.length);
+}
+
+async function drawPreviewFrame() {
+    const canvas = getPreviewCanvas();
+    if (!canvas || !activePreview) return;
+
+    const size = resizePreviewCanvas(canvas);
+    const info = await previewRequest('queryActivePreviewData', [{ width: size.width, height: size.height }]);
+    drawPreviewInfo(canvas, info, size);
+}
+
+async function flushPreviewFrame() {
+    if (renderInProgress) {
+        renderQueued = true;
+        return;
+    }
+
+    renderInProgress = true;
+    try {
+        do {
+            renderQueued = false;
+            await drawPreviewFrame();
+        } while (renderQueued);
+    } catch (e) {
+        log('Render preview frame failed: ' + e.message, 'warn');
+    } finally {
+        renderInProgress = false;
+    }
+}
+
+function requestPreviewFrame() {
+    if (renderScheduled) return;
+    renderScheduled = true;
+    window.requestAnimationFrame(() => {
+        renderScheduled = false;
+        flushPreviewFrame();
+    });
+}
+
+function requestPreviewFrames(count) {
+    requestPreviewFrame();
+    if (count > 1) {
+        window.setTimeout(() => requestPreviewFrames(count - 1), 50);
+    }
+}
 
 async function doPreview() {
-    var preview = getPreviewService();
-    if (!preview) {
-        log('Preview service not ready', 'err');
-        return null;
-    }
-
-    var uuid = document.getElementById('pvUuid').value.trim();
-    var status = document.getElementById('pvStatus');
+    const uuid = document.getElementById('pvUuid').value.trim();
+    const status = getStatus();
 
     if (!uuid) {
         log('UUID is required', 'warn');
@@ -40,132 +233,149 @@ async function doPreview() {
     log('Preview: uuid=' + uuid);
 
     try {
-        var instance = await preview.open(uuid);
-        if (!instance) {
+        await waitForSceneRpc();
+        const result = await previewRequest('openAsset', [uuid]);
+        log('Open asset result: ' + JSON.stringify(result));
+        activePreview = !!result?.supported;
+        if (!activePreview) {
             status.textContent = 'unsupported type';
             return null;
         }
+        lightEnabled = true;
         status.textContent = 'ok';
-        return instance;
+        requestPreviewFrames(2);
+        return result;
     } catch (e) {
+        activePreview = false;
         log('Preview error: ' + e.message, 'err');
         status.textContent = 'error';
-        console.error('Preview error:', e);
         return null;
     }
 }
 
+function serializeMouseEvent(event) {
+    return {
+        button: event.button,
+        buttons: event.buttons,
+        movementX: event.movementX || 0,
+        movementY: event.movementY || 0,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        offsetX: event.offsetX,
+        offsetY: event.offsetY,
+    };
+}
+
+async function callActivePreviewFunction(funcName, ...args) {
+    if (!activePreview) return false;
+    return await previewRequest('callActivePreviewFunction', [funcName, ...args]);
+}
+
 function switchPrimitive(type) {
-    var active = getActive();
-    if (active && active.switchPrimitive) {
-        active.switchPrimitive(type);
-        window.cli.Scene.Engine.repaintInEditMode();
-        log('Switched primitive: ' + type);
-    }
+    callActivePreviewFunction('switchPrimitive', type)
+        .then(() => {
+            requestPreviewFrame();
+            log('Switched primitive: ' + type);
+        })
+        .catch((e) => log('Switch primitive failed: ' + e.message, 'warn'));
 }
 
 function toggleLight() {
-    var active = getActive();
-    if (!active || !active.setLightEnable) return;
-    var light = active.lightComp;
-    var on = light ? !light.enabled : true;
-    active.setLightEnable(on);
-    window.cli.Scene.Engine.repaintInEditMode();
-    log('Light: ' + (on ? 'ON' : 'OFF'));
+    lightEnabled = !lightEnabled;
+    callActivePreviewFunction('setLightEnable', lightEnabled)
+        .then(() => {
+            requestPreviewFrame();
+            log('Light: ' + (lightEnabled ? 'ON' : 'OFF'));
+        })
+        .catch((e) => log('Toggle light failed: ' + e.message, 'warn'));
 }
 
-function toggle2D3D() {
-    var active = getActive();
-    if (active && active.viewToggle) {
-        active.viewToggle();
-        window.cli.Scene.Engine.repaintInEditMode();
-        log('Toggled 2D/3D view');
+async function toggle2D3D() {
+    const canvas = getPreviewCanvas();
+    const size = canvas ? resizePreviewCanvas(canvas) : null;
+    try {
+        const result = await previewRequest('toggleActivePreviewView', [size]);
+        const nextIs2D = result && typeof result === 'object' ? result.is2D : result;
+        if (nextIs2D == null) {
+            log('No active preview supports 2D/3D toggle', 'warn');
+            return;
+        }
+        if (canvas && result?.frame) {
+            drawPreviewInfo(canvas, result.frame, size);
+        }
+        requestPreviewFrames(2);
+        log('Toggled 2D/3D view: ' + (nextIs2D ? '2D' : '3D'));
+    } catch (e) {
+        log('Toggle 2D/3D failed: ' + e.message, 'warn');
     }
 }
-
-// ── Mouse event forwarding to InteractivePreview ──
 
 function bindPreviewMouseEvents(canvas) {
-    canvas.addEventListener('mousedown', function(e) {
-        var active = getActive();
-        if (active) active.onMouseDown(e);
+    canvas.addEventListener('mousedown', (e) => {
+        callActivePreviewFunction('onMouseDown', serializeMouseEvent(e))
+            .catch((err) => log('Mouse down failed: ' + err.message, 'warn'));
     });
 
-    canvas.addEventListener('mousemove', function(e) {
-        var active = getActive();
-        if (!active) return;
-        active.onMouseMove(e);
-        if (active._isMouseDown) {
-            window.cli.Scene.Engine.repaintInEditMode();
-        }
+    canvas.addEventListener('mousemove', (e) => {
+        callActivePreviewFunction('onMouseMove', serializeMouseEvent(e))
+            .then(() => requestPreviewFrame())
+            .catch((err) => log('Mouse move failed: ' + err.message, 'warn'));
     });
 
-    canvas.addEventListener('mouseup', function(e) {
-        var active = getActive();
-        if (active) active.onMouseUp(e);
+    canvas.addEventListener('mouseup', (e) => {
+        callActivePreviewFunction('onMouseUp', serializeMouseEvent(e))
+            .then(() => requestPreviewFrame())
+            .catch((err) => log('Mouse up failed: ' + err.message, 'warn'));
     });
 
-    canvas.addEventListener('wheel', function(e) {
-        var active = getActive();
-        if (!active) return;
+    canvas.addEventListener('wheel', (e) => {
         e.preventDefault();
-        active.onMouseWheel({
-            wheelDeltaY: -e.deltaY,
-        });
-        window.cli.Scene.Engine.repaintInEditMode();
+        callActivePreviewFunction('onMouseWheel', { wheelDeltaY: -e.deltaY })
+            .then(() => requestPreviewFrame())
+            .catch((err) => log('Mouse wheel failed: ' + err.message, 'warn'));
     }, { passive: false });
 
-    canvas.addEventListener('contextmenu', function(e) {
+    canvas.addEventListener('contextmenu', (e) => {
         e.preventDefault();
     });
 }
 
-// ── Initialization ──
-
 export default function initPreviewApp() {
-    var status = document.getElementById('pvStatus');
-
-    var preview = getPreviewService();
-    if (!preview) {
-        status.textContent = 'Service unavailable';
-        log('Preview service not found after boot', 'err');
-        return;
-    }
-
-    try {
-        window.cli.Scene.Engine.resume();
-    } catch (e) {
-        log('Engine resume failed: ' + e.message, 'warn');
-    }
-
-    var canvas = document.getElementById('GameCanvas');
+    const status = getStatus();
+    const canvas = getPreviewCanvas();
     if (canvas) {
         bindPreviewMouseEvents(canvas);
-        log('Bound preview mouse events to canvas');
     }
+    window.addEventListener('resize', requestPreviewFrame);
 
-    status.textContent = 'Ready';
-    log('Preview service ready');
+    status.textContent = 'Connecting...';
+    getSceneSocket()
+        .then(() => {
+            status.textContent = 'Ready';
+            log('Preview display connected');
+        })
+        .catch((e) => {
+            status.textContent = 'Scene editor unavailable';
+            log(e.message, 'warn');
+        });
 
-    // Parse URL params for auto-preview
-    var params = new URLSearchParams(window.location.search);
-    var uuid = params.get('uuid');
-
+    const params = new URLSearchParams(window.location.search);
+    const uuid = params.get('uuid');
     if (uuid) {
         document.getElementById('pvUuid').value = uuid;
         log('Auto-preview from URL params: uuid=' + uuid);
-        setTimeout(function() { doPreview(); }, 100);
+        window.setTimeout(() => doPreview(), 100);
     }
 
-    // Expose API for external automation
     window.previewAPI = {
-        doPreview: doPreview,
-        open: function(uuid) {
-            document.getElementById('pvUuid').value = uuid || '';
+        doPreview,
+        open(uuidValue) {
+            document.getElementById('pvUuid').value = uuidValue || '';
             return doPreview();
         },
-        switchPrimitive: switchPrimitive,
-        toggleLight: toggleLight,
-        toggle2D3D: toggle2D3D,
+        switchPrimitive,
+        toggleLight,
+        toggle2D3D,
+        render: requestPreviewFrame,
     };
 }

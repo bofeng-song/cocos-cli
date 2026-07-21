@@ -161,7 +161,7 @@ export class MaterialPreview extends InteractivePreview implements IMaterialPrev
             comp.material = instantiated;
             this.material = material;
             this.updateDs();
-            this.cameraComp.enabled = true;
+            this.enablePreviewCamera();
             this.cameraComp.node.getWorldPosition(tempVec3A);
             this.modelComp.node.getWorldPosition(tempVec3B);
             this.viewDist = Vec3.distance(tempVec3A, tempVec3B);
@@ -231,7 +231,7 @@ export class MaterialPreview extends InteractivePreview implements IMaterialPrev
         this.modelComp.mesh = data[type].mesh;
         this.updateDs();
         this.modelComp.node.setScale(data[type].scale);
-        this.cameraComp.enabled = true;
+        this.enablePreviewCamera();
         this.resetCameraView();
     }
 

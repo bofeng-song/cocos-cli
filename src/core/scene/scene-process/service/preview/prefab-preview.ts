@@ -53,7 +53,7 @@ export class PrefabPreview extends InteractivePreview {
             }
 
             this._modelNode.setPosition(0, 0, 0);
-            this.cameraComp.enabled = true;
+            this.enablePreviewCamera();
             this.resetCameraView();
         } catch (e) {
             console.warn(e);

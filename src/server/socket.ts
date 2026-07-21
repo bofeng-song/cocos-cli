@@ -16,6 +16,7 @@ export class SocketService {
         // 与 HTTP 路由的 CORS（server.ts 的 app.use(cors)，Access-Control-Allow-Origin: *）保持一致。
         this.io = new Server(server, {
             cors: { origin: '*', methods: ['GET', 'POST'] },
+            maxHttpBufferSize: 64 * 1024 * 1024,
         });
         this.io.on('connection', (socket: any) => {
             console.log(`socket ${socket.id} connected`);

@@ -7,14 +7,24 @@ import { MeshPreview } from './mesh-preview';
 import { SkeletonPreview } from './skeleton-preview';
 import { PrefabPreview } from './prefab-preview';
 import { SpinePreview } from './spine-preview';
-import { BaseService, register, Service } from '../core';
+import { BaseService, register } from '../core';
 import { Rpc } from '../../rpc';
-import type { InteractivePreview } from './interactive-preview';
 import type { IPreviewService, IPreviewEvents, IPreviewInstance } from '../../../common/preview';
 
 interface PreviewTypeEntry {
     instance: PreviewBase;
     setup: string;
+}
+
+interface ResolvedPreviewEntry extends PreviewTypeEntry {
+    assetType: string;
+}
+
+function withTimeout<T>(promise: Promise<T>, message: string, timeout = 10000): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), timeout)),
+    ]);
 }
 
 @register('Preview')
@@ -71,23 +81,28 @@ export class PreviewService extends BaseService<IPreviewEvents> implements IPrev
     // importer name → preview type 的映射（用于 assetType 为 cc.Asset 等泛型的回退）
     private static readonly IMPORTER_MAP: Record<string, string> = {
         'gltf': 'model',
+        'gltf-scene': 'model',
         'fbx': 'model',
         'spine-data': 'spine',
     };
 
-    private resolvePreview(assetType: string): PreviewTypeEntry | null {
-        return this._typeMap.get(assetType) ?? null;
+    private resolvePreview(assetType: string): ResolvedPreviewEntry | null {
+        const entry = this._typeMap.get(assetType);
+        return entry ? { ...entry, assetType } : null;
     }
 
     private async resolveAssetType(uuid: string): Promise<string | null> {
-        const info = await Rpc.getInstance().request('assetManager', 'queryAssetInfo', [uuid]);
+        const info = await withTimeout(
+            Rpc.getInstance().request('assetManager', 'queryAssetInfo', [uuid]),
+            `Query asset info timeout: ${uuid}`,
+        );
         if (!info) return null;
-        // 优先用 type 匹配；若 type 为泛型（如 cc.Asset），用 importer 回退
-        if (info.type && this._typeMap.has(info.type)) {
-            return info.type;
-        }
+        // Importer is more specific for virtual model sub-assets such as gltf-scene.
         if (info.importer && PreviewService.IMPORTER_MAP[info.importer]) {
             return PreviewService.IMPORTER_MAP[info.importer];
+        }
+        if (info.type && this._typeMap.has(info.type)) {
+            return info.type;
         }
         return info.type ?? null;
     }
@@ -107,7 +122,60 @@ export class PreviewService extends BaseService<IPreviewEvents> implements IPrev
         return false;
     }
 
+    public async queryPreviewData(previewName: string, info: any) {
+        const preview = this._previewMap.get(previewName);
+        if (preview) {
+            return await preview.queryPreviewData(info);
+        }
+        return null;
+    }
+
+    public async callActivePreviewFunction(funcName: string, ...args: any[]) {
+        const preview: any = this._activePreview;
+        if (preview?.[funcName]) {
+            return await preview[funcName](...args);
+        }
+        return false;
+    }
+
+    public async queryActivePreviewData(info: any) {
+        const preview: any = this._activePreview;
+        if (preview?.queryPreviewData) {
+            return await preview.queryPreviewData(info);
+        }
+        return null;
+    }
+
+    public async toggleActivePreviewView(info?: any) {
+        const preview: any = this._activePreview;
+        if (!preview?.viewToggle) {
+            return null;
+        }
+        const state = preview.queryViewToolState?.();
+        if (state?.enableViewToggle === false) {
+            return null;
+        }
+        await preview.viewToggle();
+        const is2D = preview.is2DView?.() ?? null;
+        if (info && preview.queryPreviewData) {
+            return {
+                is2D,
+                frame: await preview.queryPreviewData(info),
+            };
+        }
+        return is2D;
+    }
+
     // --- 上屏预览 ---
+
+    public async openAsset(uuid: string) {
+        const preview = await this.open(uuid);
+        return {
+            supported: !!preview,
+            assetType: (preview as any)?._previewAssetType ?? null,
+            is2D: preview?.is2DView?.() ?? null,
+        };
+    }
 
     async open(uuid: string): Promise<IPreviewInstance | null> {
         const assetType = await this.resolveAssetType(uuid);
@@ -131,39 +199,15 @@ export class PreviewService extends BaseService<IPreviewEvents> implements IPrev
         }
 
         // 设置资源
-        await (entry.instance as any)[entry.setup](uuid);
+        await withTimeout(
+            (entry.instance as any)[entry.setup](uuid),
+            `Preview setup timeout: ${uuid}`,
+            15000,
+        );
+        (entry.instance as any)._previewAssetType = entry.assetType;
         this._activePreview = entry.instance as unknown as IPreviewInstance;
 
-        // 将相机挂到 mainWindow 上屏渲染
-        this.attachToMainWindow(entry.instance as InteractivePreview);
-        Service.Engine.repaintInEditMode();
-
         return this._activePreview;
-    }
-
-    private attachToMainWindow(previewInstance: InteractivePreview) {
-        const inst = previewInstance as any;
-        if (!inst?.cameraComp) return;
-
-        const mainWindow = cc.director.root.mainWindow;
-        const camera = inst.cameraComp.camera || inst.camera;
-        if (!camera || !mainWindow) return;
-
-        camera.changeTargetWindow(mainWindow);
-        camera.isWindowSize = true;
-        camera.enabled = true;
-        inst.cameraComp.enabled = true;
-
-        if (inst.scene?.renderScene && !camera.scene) {
-            inst.scene.renderScene.addCamera(camera);
-        }
-
-        if (inst.worldAxis) {
-            inst.worldAxis._sceneGizmoCamera.camera.changeTargetWindow(mainWindow);
-            if (inst.enableAxis) {
-                inst.worldAxis.show();
-            }
-        }
     }
 
     // --- 缩略图生成 ---
