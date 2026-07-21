@@ -46,6 +46,7 @@ async function doPreview() {
             return null;
         }
         status.textContent = 'ok';
+        refreshViewModeControls();
         return instance;
     } catch (e) {
         log('Preview error: ' + e.message, 'err');
@@ -74,13 +75,44 @@ function toggleLight() {
     log('Light: ' + (on ? 'ON' : 'OFF'));
 }
 
-function toggle2D3D() {
+function refreshViewModeControls() {
     var active = getActive();
-    if (active && active.viewToggle) {
-        active.viewToggle();
-        window.cli.Scene.Engine.repaintInEditMode();
-        log('Toggled 2D/3D view');
+    var is2D = false;
+    if (active && active.is2DView) {
+        try {
+            is2D = !!active.is2DView();
+        } catch (e) {
+            is2D = false;
+        }
     }
+
+    var btn2D = document.getElementById('pvBtn2D');
+    var btn3D = document.getElementById('pvBtn3D');
+    if (btn2D) btn2D.classList.toggle('active', is2D);
+    if (btn3D) btn3D.classList.toggle('active', !is2D);
+}
+
+function switch2D3D(targetIs2D) {
+    var active = getActive();
+    if (!active) {
+        log('No active preview', 'warn');
+        refreshViewModeControls();
+        return;
+    }
+
+    var currentIs2D = !!(active.is2DView && active.is2DView());
+    var nextIs2D = typeof targetIs2D === 'boolean' ? targetIs2D : !currentIs2D;
+    if (active.viewToggle && currentIs2D !== nextIs2D) {
+        active.viewToggle();
+    }
+
+    window.cli.Scene.Engine.repaintInEditMode();
+    refreshViewModeControls();
+    log('View mode: ' + (nextIs2D ? '2D' : '3D'));
+}
+
+function toggle2D3D(targetIs2D) {
+    switch2D3D(targetIs2D);
 }
 
 // ── Mouse event forwarding to InteractivePreview ──
@@ -145,6 +177,7 @@ export default function initPreviewApp() {
     }
 
     status.textContent = 'Ready';
+    refreshViewModeControls();
     log('Preview service ready');
 
     // Parse URL params for auto-preview
