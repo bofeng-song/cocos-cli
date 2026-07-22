@@ -1,5 +1,6 @@
 import { socketService } from '../../server/socket';
 import { invalidatePreviewSettings } from './preview-settings';
+import type { IAsset } from '../assets/@types/protected/asset';
 
 /**
  * 浏览器热重载。
@@ -15,9 +16,11 @@ let registered = false;
 // 保存已注册的监听源与回调，供 unregisterLiveReload 精确解绑，避免预览重启后监听泄漏。
 let scriptingRef: { off?: Function; removeListener?: Function } | null = null;
 let assetDBRef: { off?: Function; removeListener?: Function } | null = null;
+let assetMgrRef: { off?: Function; removeListener?: Function } | null = null;
 let configRef: { off?: Function; removeListener?: Function } | null = null;
 let onCompiled: (() => void) | null = null;
 let onRefreshFinish: (() => void) | null = null;
+let onAssetChanged: ((asset: IAsset) => void) | null = null;
 let onConfigChanged: (() => void) | null = null;
 
 function removeListener(emitter: { off?: Function; removeListener?: Function } | null, event: string, fn: Function | null): void {
@@ -58,23 +61,42 @@ export async function registerLiveReload(): Promise<void> {
     registered = true;
 
     const { default: scripting } = await import('../scripting');
-    const { assetDBManager } = await import('../assets');
+    const { assetDBManager, assetManager } = await import('../assets');
     const { configurationManager } = await import('../configuration');
     const { MessageType } = await import('../configuration/script/interface');
 
     onCompiled = () => scheduleReload();
     onRefreshFinish = () => scheduleReload();
+    // 仅在「场景 / 预制体」资源增删改时重载（= 用户保存场景/预制体）。
+    // 不监听全部 asset-change：预览启动/构建会导入大量贴图、材质等资源并触发 asset-change，
+    // 若都重载，会在引擎初始化 / 场景激活途中整页刷新，概率性报错
+    // （initDefaultMaterial 失败、recompileShaders 读 null、asset destroyed 等）。
+    // 有 200ms 去抖，保存时的连带变更会合并成一次。
+    const shouldReloadForAsset = (asset: IAsset): boolean => {
+        const importer = asset?.meta?.importer;
+        return importer === 'scene' || importer === 'prefab';
+    };
+    onAssetChanged = (asset: IAsset) => {
+        if (shouldReloadForAsset(asset)) {
+            scheduleReload();
+        }
+    };
     // 工程配置变更（如切换物理后端 = 改 engine.includeModules）会影响预览 settings，
     // 需清缓存并重载，否则预览仍用旧模块集（漏掉新后端的内置资源，报 builtinMaterial 加载失败）。
     onConfigChanged = () => scheduleReload();
     scriptingRef = scripting as any;
     assetDBRef = assetDBManager as any;
+    assetMgrRef = assetManager as any;
     configRef = configurationManager as any;
 
     // 脚本重编译成功
     scripting.on('compiled', onCompiled);
     // 资源批量刷新结束
     assetDBManager.on('assets:refresh-finish', onRefreshFinish);
+    // 场景 / 预制体保存（逐资源变更）
+    assetManager.on('asset-change', onAssetChanged);
+    assetManager.on('asset-add', onAssetChanged);
+    assetManager.on('asset-delete', onAssetChanged);
     // 工程配置变更（set / reload）
     configurationManager.on(MessageType.Update, onConfigChanged);
     configurationManager.on(MessageType.Reload, onConfigChanged);
@@ -93,14 +115,19 @@ export function unregisterLiveReload(): void {
     }
     removeListener(scriptingRef, 'compiled', onCompiled);
     removeListener(assetDBRef, 'assets:refresh-finish', onRefreshFinish);
+    removeListener(assetMgrRef, 'asset-change', onAssetChanged);
+    removeListener(assetMgrRef, 'asset-add', onAssetChanged);
+    removeListener(assetMgrRef, 'asset-delete', onAssetChanged);
     // MessageType.Update / MessageType.Reload
     removeListener(configRef, 'configuration:update', onConfigChanged);
     removeListener(configRef, 'configuration:reload', onConfigChanged);
     scriptingRef = null;
     assetDBRef = null;
+    assetMgrRef = null;
     configRef = null;
     onCompiled = null;
     onRefreshFinish = null;
+    onAssetChanged = null;
     onConfigChanged = null;
     registered = false;
 }
