@@ -1,6 +1,5 @@
 import { socketService } from '../../server/socket';
 import { invalidatePreviewSettings } from './preview-settings';
-import type { IAsset } from '../assets/@types/protected/asset';
 
 /**
  * 浏览器热重载。
@@ -20,7 +19,7 @@ let assetMgrRef: { off?: Function; removeListener?: Function } | null = null;
 let configRef: { off?: Function; removeListener?: Function } | null = null;
 let onCompiled: (() => void) | null = null;
 let onRefreshFinish: (() => void) | null = null;
-let onAssetChanged: ((asset: IAsset) => void) | null = null;
+let onAssetChanged: (() => void) | null = null;
 let onConfigChanged: (() => void) | null = null;
 
 function removeListener(emitter: { off?: Function; removeListener?: Function } | null, event: string, fn: Function | null): void {
@@ -67,20 +66,10 @@ export async function registerLiveReload(): Promise<void> {
 
     onCompiled = () => scheduleReload();
     onRefreshFinish = () => scheduleReload();
-    // 仅在「场景 / 预制体」资源增删改时重载（= 用户保存场景/预制体）。
-    // 不监听全部 asset-change：预览启动/构建会导入大量贴图、材质等资源并触发 asset-change，
-    // 若都重载，会在引擎初始化 / 场景激活途中整页刷新，概率性报错
-    // （initDefaultMaterial 失败、recompileShaders 读 null、asset destroyed 等）。
-    // 有 200ms 去抖，保存时的连带变更会合并成一次。
-    const shouldReloadForAsset = (asset: IAsset): boolean => {
-        const importer = asset?.meta?.importer;
-        return importer === 'scene' || importer === 'prefab';
-    };
-    onAssetChanged = (asset: IAsset) => {
-        if (shouldReloadForAsset(asset)) {
-            scheduleReload();
-        }
-    };
+    // 单个资源变更（如保存场景 = .scene asset-change、编辑材质/预制体等）。
+    // assets:refresh-finish 只在整批刷新时触发，保存单个场景走的是逐资源 asset-change，
+    // 不监听就会出现“改完/存完场景，浏览器预览不重载”。有 200ms 去抖，批量导入会合并成一次。
+    onAssetChanged = () => scheduleReload();
     // 工程配置变更（如切换物理后端 = 改 engine.includeModules）会影响预览 settings，
     // 需清缓存并重载，否则预览仍用旧模块集（漏掉新后端的内置资源，报 builtinMaterial 加载失败）。
     onConfigChanged = () => scheduleReload();
@@ -93,7 +82,7 @@ export async function registerLiveReload(): Promise<void> {
     scripting.on('compiled', onCompiled);
     // 资源批量刷新结束
     assetDBManager.on('assets:refresh-finish', onRefreshFinish);
-    // 场景 / 预制体保存（逐资源变更）
+    // 单个资源增删改（含保存场景）
     assetManager.on('asset-change', onAssetChanged);
     assetManager.on('asset-add', onAssetChanged);
     assetManager.on('asset-delete', onAssetChanged);
