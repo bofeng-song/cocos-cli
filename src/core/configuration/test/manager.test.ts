@@ -47,7 +47,6 @@ describe('ConfigurationManager', () => {
             expect(manager['localConfig']).toEqual({});
             expect(manager['version']).toBe('0.0.0');
             expect(manager['configurationMap']).toBeInstanceOf(Map);
-            expect(manager['localConfigurationMap']).toBeInstanceOf(Map);
         });
     });
 
@@ -271,7 +270,7 @@ describe('ConfigurationManager', () => {
         });
 
         it('should return the local config file path after initialization', async () => {
-            await expect(manager.getLocalConfigPath()).resolves.toBe(localConfigPath);
+            await expect(manager.getConfigPath('local')).resolves.toBe(localConfigPath);
         });
 
         it('should throw when called before initialization', async () => {
@@ -279,9 +278,6 @@ describe('ConfigurationManager', () => {
 
             await expect(uninitializedManager.getConfigPath()).rejects.toThrow(
                 'Failed to get configuration file path'
-            );
-            await expect(uninitializedManager.getLocalConfigPath()).rejects.toThrow(
-                'Failed to get local configuration file path'
             );
         });
     });
@@ -357,9 +353,7 @@ describe('ConfigurationManager', () => {
             expect(onRegistryHandler).toBeDefined();
             await onRegistryHandler(mockInstance);
             expect(mockInstance.on).toHaveBeenCalledWith(MessageType.Save, expect.any(Function));
-            expect(mockInstance.on).toHaveBeenCalledWith(MessageType.SaveLocal, expect.any(Function));
             expect(manager['configurationMap'].has('testModule')).toBe(true);
-            expect(manager['localConfigurationMap'].has('testModule')).toBe(true);
 
             // Unregistry event
             const mockUnregistryInstance = {
@@ -374,9 +368,7 @@ describe('ConfigurationManager', () => {
             expect(onUnRegistryHandler).toBeDefined();
             await onUnRegistryHandler(mockUnregistryInstance);
             expect(mockUnregistryInstance.off).toHaveBeenCalledWith(MessageType.Save, expect.any(Function));
-            expect(mockUnregistryInstance.off).toHaveBeenCalledWith(MessageType.SaveLocal, expect.any(Function));
             expect(manager['configurationMap'].has('testModule')).toBe(false);
-            expect(manager['localConfigurationMap'].has('testModule')).toBe(false);
         });
 
         it('should save project and local data through separate registry save events', async () => {
@@ -398,14 +390,11 @@ describe('ConfigurationManager', () => {
             const saveHandler = mockInstance.on.mock.calls.find(
                 call => call[0] === MessageType.Save
             )?.[1] as Function;
-            const saveLocalHandler = mockInstance.on.mock.calls.find(
-                call => call[0] === MessageType.SaveLocal
-            )?.[1] as Function;
 
             mockFse.writeJSON.mockClear();
 
             await saveHandler(mockInstance);
-            await saveLocalHandler(mockInstance);
+            await saveHandler(mockInstance, 'local');
 
             expect(mockInstance.getAll).toHaveBeenCalledWith('project');
             expect(mockInstance.getAll).toHaveBeenCalledWith('local');
@@ -499,7 +488,7 @@ describe('ConfigurationManager', () => {
         it('should save local configuration to profiles directory', async () => {
             manager['localConfig'] = { test: 'localValue' };
 
-            await manager['saveLocal'](true);
+            await manager['save'](true, 'local');
 
             expect(mockFse.ensureDir).toHaveBeenCalledWith(path.dirname(localConfigPath));
             expect(mockFse.writeJSON).toHaveBeenCalledWith(
@@ -560,8 +549,8 @@ describe('ConfigurationManager', () => {
                 activeWrites--;
             });
 
-            const firstSave = manager['saveLocal']();
-            const secondSave = manager['saveLocal']();
+            const firstSave = manager['save']('local');
+            const secondSave = manager['save']('local');
 
             await new Promise((resolve) => setImmediate(resolve));
 

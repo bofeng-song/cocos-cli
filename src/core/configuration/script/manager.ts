@@ -58,19 +58,9 @@ export interface IConfigurationManager {
      * 保存项目配置
      * @param force 是否强制保存，默认为 false
      */
-    save(force?: boolean): Promise<void>;
+    save(forceOrScope?: boolean | ConfigurationScope, scope?: ConfigurationScope): Promise<void>;
 
-    /**
-     * 保存 local(个人/本机)作用域配置到 profiles/cocos.config.json
-     */
-    saveLocal(force?: boolean): Promise<void>;
-
-    getConfigPath(): Promise<string>;
-
-    /**
-     * 获取 local(个人/本机)配置文件路径
-     */
-    getLocalConfigPath(): Promise<string>;
+    getConfigPath(scope?: ConfigurationScope): Promise<string>;
 }
 
 export class ConfigurationManager extends EventEmitter implements IConfigurationManager {
@@ -100,7 +90,6 @@ export class ConfigurationManager extends EventEmitter implements IConfiguration
     }
 
     private configurationMap: Map<string, (...args: any[]) => void> = new Map();
-    private localConfigurationMap: Map<string, (...args: any[]) => void> = new Map();
     private onRegistryConfigurationBind = this.onRegistryConfiguration.bind(this);
     private onUnRegistryConfigurationBind = this.onUnRegistryConfiguration.bind(this);
 
@@ -150,18 +139,17 @@ export class ConfigurationManager extends EventEmitter implements IConfiguration
                 this.initializeConfigFromLocal(instance, existingLocal);
             }
 
-            const bind = async (configInstance: IBaseConfiguration) => {
+            const bind = async (configInstance: IBaseConfiguration, scope: ConfigurationScope = 'project') => {
+                if (scope === 'local') {
+                    this.localConfig[configInstance.moduleName] = configInstance.getAll('local');
+                    await this.save(false, 'local');
+                    return;
+                }
                 this.projectConfig[configInstance.moduleName] = configInstance.getAll('project');
                 await this.save();
             };
-            const bindLocal = async (configInstance: IBaseConfiguration) => {
-                this.localConfig[configInstance.moduleName] = configInstance.getAll('local');
-                await this.saveLocal();
-            };
             instance.on(MessageType.Save, bind);
-            instance.on(MessageType.SaveLocal, bindLocal);
             this.configurationMap.set(instance.moduleName, bind);
-            this.localConfigurationMap.set(instance.moduleName, bindLocal);
         }
     }
 
@@ -170,11 +158,6 @@ export class ConfigurationManager extends EventEmitter implements IConfiguration
         if (bind) {
             instances.off(MessageType.Save, bind);
             this.configurationMap.delete(instances.moduleName);
-        }
-        const bindLocal = this.localConfigurationMap.get(instances.moduleName);
-        if (bindLocal) {
-            instances.off(MessageType.SaveLocal, bindLocal);
-            this.localConfigurationMap.delete(instances.moduleName);
         }
     }
 
@@ -370,7 +353,28 @@ export class ConfigurationManager extends EventEmitter implements IConfiguration
     /**
      * 保存项目配置
      */
-    public async save(force: boolean = false): Promise<void> {
+    public async save(forceOrScope: boolean | ConfigurationScope = false, scope: ConfigurationScope = 'project'): Promise<void> {
+        const { force, resolvedScope } = this.normalizeSaveOptions(forceOrScope, scope);
+        if (resolvedScope === 'local') {
+            return this.saveLocalConfig(force);
+        }
+        return this.saveProjectConfig(force);
+    }
+
+    private normalizeSaveOptions(forceOrScope: boolean | ConfigurationScope, scope: ConfigurationScope): { force: boolean; resolvedScope: ConfigurationScope } {
+        if (typeof forceOrScope === 'string') {
+            return {
+                force: false,
+                resolvedScope: forceOrScope,
+            };
+        }
+        return {
+            force: forceOrScope,
+            resolvedScope: scope,
+        };
+    }
+
+    private async saveProjectConfig(force: boolean = false): Promise<void> {
         if (!force && !Object.keys(this.projectConfig).length) {
             return;
         }
@@ -385,7 +389,7 @@ export class ConfigurationManager extends EventEmitter implements IConfiguration
                     this.projectConfig.$schema = ConfigurationManager.schemaRef;
                     // 保存配置文件
                     await fse.writeJSON(this.configPath, this.projectConfig, { spaces: 4 });
-                    this.emit(MessageType.Save, this.projectConfig);
+                    this.emit(MessageType.Save, this.projectConfig, 'project');
                     newConsole.debug(`[Configuration] 已保存项目配置: ${this.configPath}`);
                 } catch (error) {
                     newConsole.error(`[Configuration] 保存项目配置失败: ${this.configPath} - ${error}`);
@@ -400,7 +404,7 @@ export class ConfigurationManager extends EventEmitter implements IConfiguration
     /**
      * 保存 local(个人/本机)配置到 profiles/cocos.config.json
      */
-    public async saveLocal(force: boolean = false): Promise<void> {
+    private async saveLocalConfig(force: boolean = false): Promise<void> {
         if (!force && !Object.keys(this.localConfig).length) {
             return;
         }
@@ -411,7 +415,7 @@ export class ConfigurationManager extends EventEmitter implements IConfiguration
                     await fse.ensureDir(path.dirname(this.localConfigPath));
                     this.localConfig.version = ConfigurationManager.VERSION;
                     await fse.writeJSON(this.localConfigPath, this.localConfig, { spaces: 4 });
-                    this.emit(MessageType.SaveLocal, this.localConfig);
+                    this.emit(MessageType.Save, this.localConfig, 'local');
                     newConsole.debug(`[Configuration] 已保存 local 配置: ${this.localConfigPath}`);
                 } catch (error) {
                     newConsole.error(`[Configuration] 保存 local 配置失败: ${this.localConfigPath} - ${error}`);
@@ -422,21 +426,12 @@ export class ConfigurationManager extends EventEmitter implements IConfiguration
         return nextSave;
     }
 
-    public async getConfigPath(): Promise<string> {
+    public async getConfigPath(scope: ConfigurationScope = 'project'): Promise<string> {
         try {
             await this.ensureInitialized();
-            return this.configPath;
+            return scope === 'local' ? this.localConfigPath : this.configPath;
         } catch (error) {
             throw new Error(`[Configuration] Failed to get configuration file path: ${error}`);
-        }
-    }
-
-    public async getLocalConfigPath(): Promise<string> {
-        try {
-            await this.ensureInitialized();
-            return this.localConfigPath;
-        } catch (error) {
-            throw new Error(`[Configuration] Failed to get local configuration file path: ${error}`);
         }
     }
 
@@ -449,7 +444,6 @@ export class ConfigurationManager extends EventEmitter implements IConfiguration
         this.localConfig = {};
         this.version = '0.0.0';
         this.configurationMap.clear();
-        this.localConfigurationMap.clear();
     }
 }
 

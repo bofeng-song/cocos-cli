@@ -47,10 +47,7 @@ export async function remove(key: string, scope?: ConfigurationScope): Promise<b
  */
 export async function save(force?: boolean, scope: ConfigurationScope = 'project'): Promise<void> {
     const { configurationManager } = await import('../../core/configuration/index');
-    if (scope === 'local') {
-        return await configurationManager.saveLocal(force);
-    }
-    return await configurationManager.save(force);
+    return await configurationManager.save(force, scope);
 }
 
 /**
@@ -59,10 +56,7 @@ export async function save(force?: boolean, scope: ConfigurationScope = 'project
  */
 export async function getConfigPath(scope: ConfigurationScope = 'project'): Promise<string> {
     const { configurationManager } = await import('../../core/configuration/index');
-    if (scope === 'local') {
-        return await configurationManager.getLocalConfigPath();
-    }
-    return await configurationManager.getConfigPath();
+    return await configurationManager.getConfigPath(scope);
 }
 
 /**
@@ -74,10 +68,13 @@ export async function getConfigPath(scope: ConfigurationScope = 'project'): Prom
 export function onDidSave(callback: () => void, scope: ConfigurationScope = 'project'): () => void {
     // 同步引入：调用时 configurationManager 必定已初始化
     const { configurationManager } = require('../../core/configuration/index');
-    const event = scope === 'local' ? 'configuration:save-local' : 'configuration:save';
-    const handler = () => callback();
-    configurationManager.on(event, handler);
-    return () => configurationManager.off(event, handler);
+    const handler = (_config: unknown, savedScope: ConfigurationScope = 'project') => {
+        if (savedScope === scope) {
+            callback();
+        }
+    };
+    configurationManager.on('configuration:save', handler);
+    return () => configurationManager.off('configuration:save', handler);
 }
 
 // ==================== Metadata ====================

@@ -195,11 +195,11 @@ describe('BaseConfiguration', () => {
             const emitSpy = jest.spyOn(config, 'emit');
             const result = await config.save();
             expect(result).toBe(true);
-            expect(emitSpy).toHaveBeenCalledWith(MessageType.Save, config);
+            expect(emitSpy).toHaveBeenCalledWith(MessageType.Save, config, 'project');
 
             const localResult = await config.save('local');
             expect(localResult).toBe(true);
-            expect(emitSpy).toHaveBeenCalledWith(MessageType.SaveLocal, config);
+            expect(emitSpy).toHaveBeenCalledWith(MessageType.Save, config, 'local');
         });
 
         it('should handle event listeners', () => {

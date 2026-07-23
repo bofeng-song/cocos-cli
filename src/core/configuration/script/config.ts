@@ -173,7 +173,7 @@ export class BaseConfiguration extends EventEmitter implements IBaseConfiguratio
     }
 
     public async save(scope: ConfigurationScope = 'project') {
-        this.emit(scope === 'local' ? MessageType.SaveLocal : MessageType.Save, this);
+        this.emit(MessageType.Save, this, scope);
         return true;
     }
 }
