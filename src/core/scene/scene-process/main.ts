@@ -1,6 +1,6 @@
 import { SceneReadyChannel } from '../common';
 import { Rpc } from './rpc';
-import { parseCommandLineArgs } from './utils';
+import { parseCommandLineArgs, resolveSceneAssetBase } from './utils';
 import { Engine } from '../../engine';
 import { join } from 'path';
 import { serviceManager } from './service/service-manager';
@@ -34,10 +34,11 @@ async function startup() {
 
     await Engine.init(enginePath);
     const libraryPath = join(projectPath, 'library');
+    const assetBase = resolveSceneAssetBase(serverURL, libraryPath);
     await Engine.initEngine({
         serverURL: serverURL,
-        importBase: libraryPath,
-        nativeBase: libraryPath,
+        importBase: assetBase,
+        nativeBase: assetBase,
         writablePath: join(projectPath, 'temp'),
         enableCustomPipeline: false,
     }, async () => {

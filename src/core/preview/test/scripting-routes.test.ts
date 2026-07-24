@@ -79,6 +79,23 @@ describe('preview scripting routes', () => {
         expect(res.json).toHaveBeenCalledWith(['base', 'legacy-pipeline']);
     });
 
+    it('falls back to cached engine modules when disk config cannot be read', async () => {
+        const debugSpy = jest.spyOn(console, 'debug').mockImplementation();
+        mockGetModules.mockReturnValue(['base', 'physics-builtin']);
+        mockReadJSON.mockRejectedValue(new Error('broken config'));
+        const route = scriptingRoutes.find((item) => item.url === '/scripting/engine/modules');
+        const res = {
+            json: jest.fn(),
+        };
+
+        expect(route).toBeDefined();
+
+        await route!.handler({} as any, res as any, jest.fn());
+
+        expect(res.json).toHaveBeenCalledWith(['base', 'physics-builtin']);
+        debugSpy.mockRestore();
+    });
+
     it('normalizes disk graphics settings when serving game config', async () => {
         mockReadJSON.mockResolvedValue({
             engine: {

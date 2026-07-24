@@ -55,8 +55,9 @@ export interface IConfigurationManager {
     migrateFromProject(projectPath: string): Promise<IConfiguration>;
 
     /**
-     * 保存项目配置
-     * @param force 是否强制保存，默认为 false
+     * Save project or local configuration.
+     * @param forceOrScope boolean force flag, or a scope shorthand such as save('local').
+     * @param scope target scope when the first argument is a force flag. Defaults to 'project'.
      */
     save(forceOrScope?: boolean | ConfigurationScope, scope?: ConfigurationScope): Promise<void>;
 
@@ -431,13 +432,13 @@ export class ConfigurationManager extends EventEmitter implements IConfiguration
         this.projectConfig.version && (this.version = this.projectConfig.version);
 
         await this.save(true);
-        await this.save(false, 'local');
+        await this.save(true, 'local');
         await fse.remove(legacyPath);
         newConsole.debug(`[Configuration] 已将根配置拆分到 settings/ 与 profiles/ 并删除根文件: ${legacyPath}`);
     }
 
     /**
-     * 保存项目配置
+     * Save project or local configuration.
      */
     public async save(forceOrScope: boolean | ConfigurationScope = false, scope: ConfigurationScope = 'project'): Promise<void> {
         const { force, resolvedScope } = this.normalizeSaveOptions(forceOrScope, scope);

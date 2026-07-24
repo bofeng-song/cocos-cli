@@ -55,37 +55,42 @@ function decodePathParam(value: string): string {
 }
 
 async function queryFreshEngineModules(fallbackModules: string[]): Promise<string[]> {
-    let modules = fallbackModules;
-    const { configurationManager } = await import('../configuration');
-    const fse = await import('fs-extra');
-    const configPath = await configurationManager.getConfigPath();
-    if (await fse.pathExists(configPath)) {
-        const json = await fse.readJSON(configPath);
-        const engineCfg = json?.engine;
-        if (engineCfg) {
-            // 与 Engine.syncConfig 的解析一致：优先 engine.includeModules；
-            // 否则取选中的模块配置 engine.configs[globalConfigKey].includeModules。
-            let diskModules = Array.isArray(engineCfg.includeModules)
-                ? engineCfg.includeModules
-                : undefined;
-            if (!diskModules && engineCfg.configs) {
-                const key = engineCfg.globalConfigKey || Object.keys(engineCfg.configs)[0];
-                const selectedModules = engineCfg.configs?.[key]?.includeModules;
-                diskModules = Array.isArray(selectedModules) ? selectedModules : undefined;
-            }
-            const baseModules = diskModules ?? modules;
-            if (hasOwnConfigKey(engineCfg, 'graphics')) {
-                const graphics = mergeGraphicsConfigWithModules(baseModules, engineCfg.graphics);
-                modules = normalizeIncludeModulesWithGraphics(baseModules, graphics);
-            } else if (hasOwnConfigKey(engineCfg, 'customPipeline')) {
-                const graphics = deriveGraphicsConfigFromCustomPipeline(engineCfg.customPipeline, baseModules);
-                modules = normalizeIncludeModulesWithGraphics(baseModules, graphics);
-            } else if (diskModules) {
-                modules = diskModules;
+    try {
+        let modules = fallbackModules;
+        const { configurationManager } = await import('../configuration');
+        const fse = await import('fs-extra');
+        const configPath = await configurationManager.getConfigPath();
+        if (await fse.pathExists(configPath)) {
+            const json = await fse.readJSON(configPath);
+            const engineCfg = json?.engine;
+            if (engineCfg) {
+                // 与 Engine.syncConfig 的解析一致：优先 engine.includeModules；
+                // 否则取选中的模块配置 engine.configs[globalConfigKey].includeModules。
+                let diskModules = Array.isArray(engineCfg.includeModules)
+                    ? engineCfg.includeModules
+                    : undefined;
+                if (!diskModules && engineCfg.configs) {
+                    const key = engineCfg.globalConfigKey || Object.keys(engineCfg.configs)[0];
+                    const selectedModules = engineCfg.configs?.[key]?.includeModules;
+                    diskModules = Array.isArray(selectedModules) ? selectedModules : undefined;
+                }
+                const baseModules = diskModules ?? modules;
+                if (hasOwnConfigKey(engineCfg, 'graphics')) {
+                    const graphics = mergeGraphicsConfigWithModules(baseModules, engineCfg.graphics);
+                    modules = normalizeIncludeModulesWithGraphics(baseModules, graphics);
+                } else if (hasOwnConfigKey(engineCfg, 'customPipeline')) {
+                    const graphics = deriveGraphicsConfigFromCustomPipeline(engineCfg.customPipeline, baseModules);
+                    modules = normalizeIncludeModulesWithGraphics(baseModules, graphics);
+                } else if (diskModules) {
+                    modules = diskModules;
+                }
             }
         }
+        return modules;
+    } catch (error) {
+        console.debug('[engine/modules] read project config failed, fallback to cached:', error);
+        return fallbackModules;
     }
-    return modules;
 }
 
 function getAssetLibraryBaseUrl(serverBaseUrl: string): string {

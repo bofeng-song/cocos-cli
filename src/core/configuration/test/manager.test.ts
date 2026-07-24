@@ -188,6 +188,41 @@ describe('ConfigurationManager', () => {
             expect(mockFse.remove).toHaveBeenCalledWith(legacyConfigPath);
         });
 
+        it('should create a profiles config file when legacy root config has no local keys', async () => {
+            const legacyConfigPath = path.join(projectPath, ConfigurationManager.name);
+            const legacyConfig = {
+                version: '1.0.0',
+                testModule: { key: 'value' },
+                scene: {
+                    tick: true,
+                },
+            };
+
+            mockFse.pathExists.mockImplementation(async (filePath: string) => {
+                return filePath === legacyConfigPath;
+            });
+            mockFse.readJSON.mockImplementation(async (filePath: string) => {
+                if (filePath === legacyConfigPath) {
+                    return legacyConfig;
+                }
+                return {};
+            });
+            mockFse.ensureDir.mockResolvedValue(undefined);
+            mockFse.writeJSON.mockResolvedValue(undefined);
+            mockFse.remove.mockResolvedValue(undefined);
+
+            await manager.initialize(projectPath);
+
+            expect(mockFse.writeJSON).toHaveBeenCalledWith(
+                localConfigPath,
+                {
+                    version: '1.0.0',
+                },
+                { spaces: 4 }
+            );
+            expect(mockFse.remove).toHaveBeenCalledWith(legacyConfigPath);
+        });
+
         it('should not let legacy root configuration override existing scoped files', async () => {
             const legacyConfigPath = path.join(projectPath, ConfigurationManager.name);
             const projectConfig = {

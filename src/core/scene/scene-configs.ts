@@ -164,12 +164,21 @@ class SceneConfig {
         }
     }
 
+    private resolveSetScope(path: string, scope?: ConfigurationScope): ConfigurationScope | undefined {
+        if (scope) {
+            return scope;
+        }
+        return SceneConfig.PERSONAL_KEYS.some((key) => path === key || path.startsWith(`${key}.`))
+            ? 'local'
+            : undefined;
+    }
+
     public get<T>(path?: string, scope?: ConfigurationScope): Promise<T> {
         return this.configInstance.get(path, scope);
     }
 
     public set(path: string, value: any, scope?: ConfigurationScope) {
-        return this.configInstance.set(path, value, scope);
+        return this.configInstance.set(path, value, this.resolveSetScope(path, scope));
     }
 }
 
