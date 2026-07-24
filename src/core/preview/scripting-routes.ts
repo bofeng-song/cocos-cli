@@ -4,6 +4,7 @@ import { pathExists, stat, readFile } from 'fs-extra';
 import { GlobalPaths } from '../../global';
 import { readFileSync } from 'fs';
 import {
+    CUSTOM_PIPELINE_MODULE,
     deriveGraphicsConfigFromCustomPipeline,
     hasOwnConfigKey,
     mergeGraphicsConfigWithModules,
@@ -22,6 +23,40 @@ function decodePathParam(value: string): string {
     } catch {
         return value;
     }
+}
+
+async function queryFreshEngineModules(fallbackModules: string[]): Promise<string[]> {
+    let modules = fallbackModules;
+    const { configurationManager } = await import('../configuration');
+    const fse = await import('fs-extra');
+    const configPath = await configurationManager.getConfigPath();
+    if (await fse.pathExists(configPath)) {
+        const json = await fse.readJSON(configPath);
+        const engineCfg = json?.engine;
+        if (engineCfg) {
+            // 与 Engine.syncConfig 的解析一致：优先 engine.includeModules；
+            // 否则取选中的模块配置 engine.configs[globalConfigKey].includeModules。
+            let diskModules = Array.isArray(engineCfg.includeModules)
+                ? engineCfg.includeModules
+                : undefined;
+            if (!diskModules && engineCfg.configs) {
+                const key = engineCfg.globalConfigKey || Object.keys(engineCfg.configs)[0];
+                const selectedModules = engineCfg.configs?.[key]?.includeModules;
+                diskModules = Array.isArray(selectedModules) ? selectedModules : undefined;
+            }
+            const baseModules = diskModules ?? modules;
+            if (hasOwnConfigKey(engineCfg, 'graphics')) {
+                const graphics = mergeGraphicsConfigWithModules(baseModules, engineCfg.graphics);
+                modules = normalizeIncludeModulesWithGraphics(baseModules, graphics);
+            } else if (hasOwnConfigKey(engineCfg, 'customPipeline')) {
+                const graphics = deriveGraphicsConfigFromCustomPipeline(engineCfg.customPipeline, baseModules);
+                modules = normalizeIncludeModulesWithGraphics(baseModules, graphics);
+            } else if (diskModules) {
+                modules = diskModules;
+            }
+        }
+    }
+    return modules;
 }
 
 /**
@@ -249,19 +284,26 @@ export const scriptingRoutes = [
             const { Engine } = await import('../engine');
             const serverBaseUrl = `${req.protocol}://${req.get('host')}`;
             const config = await Engine.getGameConfig(serverBaseUrl, serverBaseUrl, serverBaseUrl);
+            const cfg = config as any;
+            cfg.overrideSettings = cfg.overrideSettings || {};
+            cfg.overrideSettings.rendering = cfg.overrideSettings.rendering || {};
             // 直接读磁盘上的 cocos.config.json（配置真相源），以最新物理碰撞分组覆盖缓存值。
             // 原因同 design-resolution / modules 路由：Engine._config 只在 configuration:save 时刷新，
             // 改分组后不读盘兜底，预览重载仍会按旧枚举构建 cc.PhysicsGroup，导致新分组在预览里不生效。
             try {
                 const { configurationManager } = await import('../configuration');
                 const fse = await import('fs-extra');
+                const modules = await queryFreshEngineModules(Engine.getModules());
+                const customPipeline = modules.includes(CUSTOM_PIPELINE_MODULE);
+                cfg.overrideSettings.rendering.customPipeline = customPipeline;
+                if (customPipeline) {
+                    cfg.overrideSettings.rendering.effectSettingsPath = `${serverBaseUrl}/scripting/engine/effect-settings`;
+                }
                 const configPath = await configurationManager.getConfigPath();
                 if (await fse.pathExists(configPath)) {
                     const json = await fse.readJSON(configPath);
                     const diskGroups = json?.engine?.physicsConfig?.collisionGroups;
                     if (Array.isArray(diskGroups)) {
-                        const cfg = config as any;
-                        cfg.overrideSettings = cfg.overrideSettings || {};
                         cfg.overrideSettings.physics = cfg.overrideSettings.physics || {};
                         cfg.overrideSettings.physics.collisionGroups = diskGroups;
                     }
