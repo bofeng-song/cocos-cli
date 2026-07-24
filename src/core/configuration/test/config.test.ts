@@ -93,12 +93,36 @@ describe('BaseConfiguration', () => {
                 localOnly: true,
                 shared: 'local'
             });
+        });
+
+        it('should read local scope strictly without default fallback', async () => {
+            config['configs'] = {
+                layer: 'project',
+                nested: {
+                    projectOnly: true,
+                    shared: 'project'
+                }
+            };
+            config['localConfigs'] = {
+                layer: 'local',
+                nested: {
+                    localOnly: true,
+                    shared: 'local'
+                }
+            };
+
+            expect(await config.get(undefined, 'local')).toEqual({
+                layer: 'local',
+                nested: {
+                    localOnly: true,
+                    shared: 'local'
+                }
+            });
             expect(await config.get('nested', 'local')).toEqual({
-                custom: 'customNestedValue',
                 localOnly: true,
                 shared: 'local'
             });
-            expect(await config.get('customKey', 'local')).toBe('customValue');
+            expect(await config.get('customKey', 'local')).toBeUndefined();
             expect(await config.get('missing', 'local')).toBeUndefined();
         });
 

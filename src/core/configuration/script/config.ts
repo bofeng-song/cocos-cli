@@ -95,6 +95,15 @@ export class BaseConfiguration extends EventEmitter implements IBaseConfiguratio
     public async get<T>(key?: string, scope?: ConfigurationScope): Promise<T> {
         if (key === undefined) {
             // 不带 key 的合并读：default ← project ← local（后者覆盖前者）
+            if (scope === 'default') {
+                return (this.getDefaultConfig() as T);
+            }
+            if (scope === 'project') {
+                return (this.configs as T);
+            }
+            if (scope === 'local') {
+                return (this.localConfigs as T);
+            }
             return utils.deepMerge(
                 utils.deepMerge(this.getDefaultConfig(), this.configs),
                 this.localConfigs,
@@ -116,8 +125,8 @@ export class BaseConfiguration extends EventEmitter implements IBaseConfiguratio
         }
 
         if (scope === 'local') {
-            // local 覆盖 default，缺失回退 default；都没有则返回 undefined（不抛错，避免噪音）
-            return (utils.deepMerge(defaultConfig, localConfig) as T);
+            // 显式 local 读取只返回本地配置，缺失时返回 undefined，避免和 default 值混淆。
+            return (localConfig as T);
         }
 
         if (scope === 'default') {
