@@ -420,6 +420,7 @@ class EngineManager implements IEngine {
 
         const modules = this.getConfig().includeModules || [];
         const { physicsConfig, macroConfig, customLayers, sortingLayers, highQuality, renderPipeline, customPipeline, customJointTextureLayouts } = this.getConfig();
+        const enableCustomPipeline = info.enableCustomPipeline ?? customPipeline;
         const bundles = assetManager.queryAssets({ isBundle: true }).map((item: any) => item.meta?.userData?.bundleName ?? item.name);
         const builtinAssets = info.serverURL && await this.queryInternalAssetList(this.getInfo().typescript.path);
         const resolvedCustomJointTextureLayouts = await resolveCustomJointTextureLayouts(customJointTextureLayouts);
@@ -448,8 +449,9 @@ class EngineManager implements IEngine {
                 rendering: {
                     renderMode: 3,
                     renderPipeline,
-                    customPipeline,
+                    customPipeline: enableCustomPipeline,
                     highQualityMode: highQuality,
+                    ...(enableCustomPipeline && info.serverURL ? { effectSettingsPath: `${info.serverURL}/scripting/engine/effect-settings` } : {}),
                 },
                 animation: {
                     customJointTextureLayouts: resolvedCustomJointTextureLayouts,

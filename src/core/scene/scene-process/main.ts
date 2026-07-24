@@ -33,12 +33,13 @@ async function startup() {
     serviceManager.initialize(serverURL ?? '');
 
     await Engine.init(enginePath);
-    // 这里 importBase 与 nativeBase 用服务器是为了让服务器转换资源真实存放的路径
+    const libraryPath = join(projectPath, 'library');
     await Engine.initEngine({
         serverURL: serverURL,
-        importBase: serverURL ?? join(projectPath, 'library'),
-        nativeBase: serverURL ?? join(projectPath, 'library'),
+        importBase: libraryPath,
+        nativeBase: libraryPath,
         writablePath: join(projectPath, 'temp'),
+        enableCustomPipeline: false,
     }, async () => {
         // 导入 service，处理装饰器，捕获开发的 api
         await import('./service');
