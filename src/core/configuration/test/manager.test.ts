@@ -151,7 +151,7 @@ describe('ConfigurationManager', () => {
             await manager.initialize(projectPath);
 
             expect(mockFse.writeJSON).toHaveBeenCalledWith(
-                configPath,
+                `${configPath}.${process.pid}.tmp`,
                 {
                     version: '1.0.0',
                     testModule: { key: 'value' },
@@ -237,7 +237,7 @@ describe('ConfigurationManager', () => {
             await manager.initialize(projectPath);
 
             expect(mockFse.writeJSON).toHaveBeenCalledWith(
-                configPath,
+                `${configPath}.${process.pid}.tmp`,
                 {
                     version: '1.0.0',
                     builder: {
@@ -523,7 +523,7 @@ describe('ConfigurationManager', () => {
             expect(mockInstance.getAll).toHaveBeenCalledWith('project');
             expect(mockInstance.getAll).toHaveBeenCalledWith('local');
             expect(mockFse.writeJSON).toHaveBeenCalledWith(
-                configPath,
+                `${configPath}.${process.pid}.tmp`,
                 {
                     testModule: { projectKey: 'projectValue' },
                     version: '1.0.0',
@@ -624,7 +624,7 @@ describe('ConfigurationManager', () => {
             const tmpPath = `${configPath}.${process.pid}.tmp`;
             expect(mockFse.writeJSON).toHaveBeenCalledWith(
                 tmpPath,
-                { version: '1.0.0', test: 'value', $schema: './temp/cocos.config.schema.json' },
+                { version: '1.0.0', test: 'value', $schema: '../temp/cocos.config.schema.json' },
                 { spaces: 4 }
             );
             expect(mockFse.move).toHaveBeenCalledWith(tmpPath, configPath, { overwrite: true });
