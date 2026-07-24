@@ -103,6 +103,11 @@ describe('preview scripting routes', () => {
 
         await route!.handler(req as any, res as any, jest.fn());
 
+        expect(mockGetGameConfig).toHaveBeenCalledWith(
+            'http://localhost:7456',
+            'http://localhost:7456/scripting/asset-library',
+            'http://localhost:7456/scripting/asset-library',
+        );
         expect(res.json).toHaveBeenCalledWith({
             overrideSettings: {
                 rendering: {
@@ -113,16 +118,17 @@ describe('preview scripting routes', () => {
         });
     });
 
-    it('serves root library asset requests by uuid', async () => {
+    it('serves explicit asset-library requests by uuid', async () => {
         const uuid = '45e7c0c8-2699-4912-b45f-d42bb8384189';
         mockQueryAssetInfo.mockReturnValue({
             library: {
                 '.json': 'E:/project/library/45/45e7c0c8-2699-4912-b45f-d42bb8384189.json',
             },
         });
-        const route = scriptingRoutes.find((item) => item.url instanceof RegExp && item.url.test(`/${uuid.slice(0, 2)}/${uuid}.json`));
+        const url = `/scripting/asset-library/${uuid.slice(0, 2)}/${uuid}.json`;
+        const route = scriptingRoutes.find((item) => item.url instanceof RegExp && item.url.test(url));
         const req = {
-            path: `/${uuid.slice(0, 2)}/${uuid}.json`,
+            path: url,
         };
         const res = {
             set: jest.fn(),
@@ -138,5 +144,12 @@ describe('preview scripting routes', () => {
             'E:/project/library/45/45e7c0c8-2699-4912-b45f-d42bb8384189.json',
             { dotfiles: 'allow' },
         );
+    });
+
+    it('does not match implicit root library asset requests', () => {
+        const uuid = '45e7c0c8-2699-4912-b45f-d42bb8384189';
+        const route = scriptingRoutes.find((item) => item.url instanceof RegExp && item.url.test(`/${uuid.slice(0, 2)}/${uuid}.json`));
+
+        expect(route).toBeUndefined();
     });
 });
