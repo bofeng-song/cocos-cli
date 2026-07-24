@@ -7,6 +7,7 @@ import { MeshPreview } from './mesh-preview';
 import { SkeletonPreview } from './skeleton-preview';
 import { PrefabPreview } from './prefab-preview';
 import { SpinePreview } from './spine-preview';
+import { Camera, gfx } from 'cc';
 import { BaseService, register, Service } from '../core';
 import { Rpc } from '../../rpc';
 import type { InteractivePreview } from './interactive-preview';
@@ -149,8 +150,28 @@ export class PreviewService extends BaseService<IPreviewEvents> implements IPrev
         const camera = inst.cameraComp.camera || inst.camera;
         if (!camera || !mainWindow) return;
 
+        const cameraService = Service.Camera as any;
+        const editorCamera = cameraService?.getCamera?.() ?? cameraService?.camera;
+        if (editorCamera) {
+            editorCamera.enabled = false;
+        }
+        const sceneGizmoCamera = (Service.Gizmo as any)?.sceneGizmoCamera;
+        if (sceneGizmoCamera) {
+            sceneGizmoCamera.enabled = false;
+        }
+
+        const skybox = inst.scene?.globals?.skybox;
+        if (skybox?.enabled) {
+            skybox.enabled = false;
+            inst.scene.globals.activate(inst.scene);
+        }
+
         camera.changeTargetWindow(mainWindow);
         camera.isWindowSize = true;
+        camera.priority = -1;
+        inst.cameraComp.clearFlags = Camera.ClearFlag.SOLID_COLOR;
+        camera.clearColor = inst.cameraComp.clearColor;
+        camera.clearFlag = gfx.ClearFlagBit.COLOR | gfx.ClearFlagBit.DEPTH_STENCIL;
         camera.enabled = true;
         inst.cameraComp.enabled = true;
 

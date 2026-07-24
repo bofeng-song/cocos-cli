@@ -1,4 +1,4 @@
-import { Camera, Color, geometry, Node, Quat, renderer, Scene, Layers, Vec3, EventMouse, SkyboxInfo, UITransform } from 'cc';
+import { Camera, Color, geometry, gfx, Node, Quat, renderer, Scene, Layers, Vec3, EventMouse, SkyboxInfo, UITransform } from 'cc';
 import PreviewBuffer from './buffer';
 import { PreviewBase } from './preview-base';
 import { PreviewWorldAxis } from './preview-axis';
@@ -148,12 +148,12 @@ class InteractivePreview extends PreviewBase implements IPreviewInstance {
         this.is2D = !this.is2D;
         this.switchViewModeState();
         this.initCamera();
-        this.initSceneCamera();
         this.initGrid();
-        this.initPreviewWorldAxis();
+        this.updatePreviewWorldAxisVisibility();
         if (this._modelNode) {
             this.autoPerfectCameraViewOnModel(this._modelNode);
         }
+        Service.Engine.repaintInEditMode();
     }
 
     public initScene(registerName: string, queryName: string) {
@@ -176,15 +176,14 @@ class InteractivePreview extends PreviewBase implements IPreviewInstance {
     public initCamera() {
         if (this.is2D) {
             this.cameraComp.node.setPosition(0, 0, 1000);
-            this.cameraComp.orthoHeight = 0;
-            this.cameraComp.node.setRotation(0, 0, 0, 0);
+            this.cameraComp.orthoHeight = 1;
+            this.cameraComp.node.setRotationFromEuler(0, 0, 0);
             this.cameraComp.projection = Camera.ProjectionType.ORTHO;
             this.cameraComp.clearFlags = Camera.ClearFlag.SOLID_COLOR;
         } else {
             this.cameraComp.node.setPosition(0, 1, 2.5);
             this.cameraComp.node.lookAt(Vec3.ZERO);
             this.cameraComp.projection = Camera.ProjectionType.PERSPECTIVE;
-            this.cameraComp.clearFlags = Camera.ClearFlag.SKYBOX;
         }
         this.cameraComp.clearColor = new Color(76, 76, 76, 255);
         this.cameraComp.near = 0.01;
@@ -200,6 +199,9 @@ class InteractivePreview extends PreviewBase implements IPreviewInstance {
             this.camera = this.cameraComp.camera;
         }
         this.camera.isWindowSize = false;
+        if (this.cameraComp.projection === Camera.ProjectionType.PERSPECTIVE) {
+            this.camera.clearFlag = (gfx.ClearFlagBit.STENCIL << 1) | gfx.ClearFlagBit.DEPTH_STENCIL;
+        }
         this.camera.cameraUsage = renderer.scene.CameraUsage.EDITOR;
         // Disable until a preview window is available — scene._activate() already
         // enabled the camera targeting mainWindow, which causes framebuffer errors.
@@ -224,47 +226,6 @@ class InteractivePreview extends PreviewBase implements IPreviewInstance {
         // @ts-ignore
         this.scene._activate();
 
-        if (this.enableSkybox) {
-            this.ensureSkyboxMaterial();
-            this.loadDefaultEnvmap();
-        }
-    }
-
-    private loadDefaultEnvmap() {
-        const skyboxInfo = this.scene.globals.skybox;
-        if (!skyboxInfo) return;
-        const envmapUuid = 'd032ac98-05e1-4090-88bb-eb640dcb5fc1@b47c0';
-        cc.assetManager.loadAny(envmapUuid, (err: any, asset: any) => {
-            if (err || !asset) return;
-            skyboxInfo.envmap = asset;
-        });
-    }
-
-    private ensureSkyboxMaterial() {
-        const skyboxInfo = this.scene.globals.skybox;
-        const resource = (skyboxInfo as any)?._resource;
-        if (!resource) {
-            console.warn(`[InteractivePreview] ensureSkyboxMaterial: no skybox resource`);
-            return;
-        }
-
-        const model = resource.model;
-        const subModels = model?.subModels;
-        const passes = subModels?.[0]?.passes;
-        const passCount = passes?.length ?? 0;
-
-        if (model && subModels?.length > 0 && passCount === 0) {
-            const skyboxEffect = cc.EffectAsset?.get?.('pipeline/skybox');
-            if (skyboxEffect) {
-                const isRGBE = resource._default?.isRGBE ?? false;
-                const mat = new cc.Material();
-                mat.initialize({ effectName: 'pipeline/skybox', defines: { USE_RGBE_CUBEMAP: isRGBE } });
-                if (mat.passes?.length > 0) {
-                    resource._editableMaterial = mat;
-                    resource._updatePipeline();
-                }
-            }
-        }
     }
 
     protected switchViewModeState() {
@@ -302,11 +263,18 @@ class InteractivePreview extends PreviewBase implements IPreviewInstance {
         }
         if (this.previewBuffer?.window) {
             this.worldAxis._sceneGizmoCamera.camera.changeTargetWindow(this.previewBuffer.window);
-            if (this.enableAxis) {
-                this.worldAxis.show();
-            } else {
-                this.worldAxis.hide();
-            }
+            this.updatePreviewWorldAxisVisibility();
+        } else {
+            this.worldAxis.hide();
+        }
+    }
+
+    protected updatePreviewWorldAxisVisibility() {
+        if (!this.worldAxis) {
+            this.worldAxis = new PreviewWorldAxis(this.scene, this.cameraComp);
+        }
+        if (this.enableAxis) {
+            this.worldAxis.show();
         } else {
             this.worldAxis.hide();
         }
@@ -325,12 +293,16 @@ class InteractivePreview extends PreviewBase implements IPreviewInstance {
 
     resetCamera(modelNode: Node) {
         if (this.isOrtho) {
-            tempVec3A.set(0, 0, 0);
+            tempVec3A.set(0, 0, 1000);
         } else {
             tempVec3A.set(0, 1, 2.5);
         }
         this.cameraComp.node.setPosition(tempVec3A);
-        this.cameraComp.node.lookAt(Vec3.ZERO);
+        if (this.isOrtho) {
+            this.cameraComp.node.setRotationFromEuler(0, 0, 0);
+        } else {
+            this.cameraComp.node.lookAt(Vec3.ZERO);
+        }
         modelNode.getWorldPosition(tempVec3B);
         Vec3.set(this.viewCenter, 0, 0, 0);
         this.viewDist = Vec3.distance(tempVec3A, tempVec3B);
@@ -356,20 +328,25 @@ class InteractivePreview extends PreviewBase implements IPreviewInstance {
     private _forward = cc.v3(Vec3.UNIT_Z);
 
     protected perfectCameraView(boundary: geometry.AABB | null | undefined) {
+        let orthoHeight = 1;
         if (boundary) {
             const radius = Math.max(boundary.halfExtents.x, boundary.halfExtents.y, boundary.halfExtents.z);
             const fov = this.cameraComp.fov * Math.PI / 180;
             const requiredDist = radius / Math.tan(fov / 2);
             const dist = Vec3.distance(this.cameraComp.node.worldPosition, boundary.center);
             this.viewDist = Math.max(dist, requiredDist);
+            Vec3.set(this.viewCenter, boundary.center.x, boundary.center.y, boundary.center.z);
+            orthoHeight = Math.max(1, radius * 1.2);
         } else if (this._modelNode) {
             const uiTransform = this._modelNode.getComponent(UITransform);
             if (uiTransform) {
                 const bbox = uiTransform.getBoundingBoxToWorld();
                 Vec3.set(this.viewCenter, bbox.x + bbox.width / 2, bbox.y + bbox.height / 2, 0);
+                orthoHeight = Math.max(1, bbox.height / 2);
             } else {
                 const pos = this._modelNode.worldPosition;
                 Vec3.set(this.viewCenter, pos.x, pos.y, pos.z);
+                orthoHeight = Math.max(1, Math.abs(this.viewCenter.y));
             }
         }
 
@@ -384,7 +361,7 @@ class InteractivePreview extends PreviewBase implements IPreviewInstance {
                 const bbox = uiTransform.getBoundingBoxToWorld();
                 this.cameraComp.orthoHeight = Math.max(1, bbox.height / 2);
             } else {
-                this.cameraComp.orthoHeight = Math.max(1, this.viewCenter.y);
+                this.cameraComp.orthoHeight = orthoHeight;
             }
         } else {
             this.cameraComp.node.getWorldRotation(this._curRot);
