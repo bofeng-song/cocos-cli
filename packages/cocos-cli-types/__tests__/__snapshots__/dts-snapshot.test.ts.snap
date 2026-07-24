@@ -7323,6 +7323,7 @@ export declare interface IInitEngineInfo {
     nativeBase: string;
     writablePath: string;
     serverURL?: string;
+    enableCustomPipeline?: boolean;
 }
 export declare interface IJointTextureLayoutDeviceTip {
     level: JointTextureLayoutDeviceTipLevel;
@@ -8345,6 +8346,7 @@ export declare interface IInitEngineInfo {
     nativeBase: string;
     writablePath: string;
     serverURL?: string;
+    enableCustomPipeline?: boolean;
 }
 export declare interface IJointTextureLayoutDeviceTip {
     level: JointTextureLayoutDeviceTipLevel;
