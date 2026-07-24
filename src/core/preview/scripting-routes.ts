@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import path, { join } from 'path';
+import path, { isAbsolute, join, relative } from 'path';
 import { pathExists, stat, readFile } from 'fs-extra';
 import { GlobalPaths } from '../../global';
 import { readFileSync } from 'fs';
@@ -15,6 +15,35 @@ function sendQuickPackChunk(res: Response, filePath: string): void {
     // QuickPack may emit chunks under project temp paths used by smoke workspaces.
     // The path is resolved by the loader, not by raw URL-to-file joining.
     res.sendFile(filePath, { dotfiles: 'allow' });
+}
+
+let libraryDirsCache: string[] | null = null;
+
+async function getLibraryDirs(): Promise<string[]> {
+    if (libraryDirsCache) {
+        return libraryDirsCache;
+    }
+    const { assetDBManager } = await import('../assets');
+    const dirs = Object.values(assetDBManager.assetDBInfo)
+        .map((info: any) => info.library)
+        .filter((v): v is string => !!v);
+    libraryDirsCache = Array.from(new Set(dirs));
+    return libraryDirsCache;
+}
+
+async function findLibraryFileByRelativePath(relPath: string): Promise<string | undefined> {
+    const dirs = await getLibraryDirs();
+    for (const dir of dirs) {
+        const full = join(dir, relPath);
+        const rel = relative(dir, full);
+        if (rel.startsWith('..') || isAbsolute(rel)) {
+            continue;
+        }
+        if (await pathExists(full) && (await stat(full)).isFile()) {
+            return full;
+        }
+    }
+    return undefined;
 }
 
 function decodePathParam(value: string): string {
@@ -209,6 +238,34 @@ export const scriptingRoutes = [
                 } else {
                     res.status(404).json({ error: 'Asset not found', ccType });
                 }
+            } catch (err) {
+                next(err);
+            }
+        },
+    },
+    {
+        // Imported asset JSON may be requested as the raw library path
+        // `/<uuid-prefix>/<uuid>.<ext>` when a bundle/import base resolves to
+        // the preview server root. Serve it from asset-db's library so scene
+        // editor and preview share the same fallback.
+        url: /^\/([\da-f]{2})\/([\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}(?:@[^.\/]+)?)\.([^/?]+)$/i,
+        async handler(req: Request, res: Response, next: NextFunction) {
+            try {
+                const match = req.path.match(/^\/([\da-f]{2})\/([\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}(?:@[^.\/]+)?)\.([^/?]+)$/i);
+                if (!match) {
+                    return next();
+                }
+                const [, dir, uuid, ext] = match;
+
+                const { assetManager } = await import('../assets');
+                const file = assetManager.queryAssetInfo(uuid)?.library?.[`.${ext}`]
+                    ?? await findLibraryFileByRelativePath(`${dir}/${uuid}.${ext}`);
+                if (!file) {
+                    return next();
+                }
+
+                res.set('Cache-Control', 'no-store');
+                res.sendFile(file, { dotfiles: 'allow' });
             } catch (err) {
                 next(err);
             }
