@@ -28,7 +28,7 @@ describe('preview scripting routes', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         mockGetModules.mockReturnValue(['base', 'custom-pipeline']);
-        mockGetConfigPath.mockResolvedValue('E:/project/cocos.config.json');
+        mockGetConfigPath.mockResolvedValue('E:/project/settings/cocos.config.json');
         mockPathExists.mockResolvedValue(true);
     });
 

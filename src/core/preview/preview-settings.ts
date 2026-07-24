@@ -22,7 +22,7 @@ export async function getCachedPreviewSettings(startScene = ''): Promise<IPrevie
     const { assetManager } = await import('../assets');
     const { fillIncludeModulesFromProjectConfig } = await import('../builder/share/common-options-validator');
     const options = await queryDefaultBuildConfigByPlatform('web-desktop');
-    // 与正式构建（builder createBuildTask）保持一致：从 cocos.config.json 补全 includeModules。
+    // 与正式构建（builder createBuildTask）保持一致：从 settings/cocos.config.json 补全 includeModules。
     // 预览路径原本不补全，options.includeModules 为空/默认时，内置资源包会漏掉当前模块（尤其是所选
     // 物理后端 physics-cannon/ammo/physx/builtin）的 dependentAssets，比如内置物理材质
     // default-physics-material (ba21476f)。运行时 PhysicsSystem.initDefaultMaterial() 便会

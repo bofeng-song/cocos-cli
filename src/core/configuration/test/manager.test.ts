@@ -29,6 +29,9 @@ describe('ConfigurationManager', () => {
     const projectPath = '/test/project';
     const configPath = path.join(projectPath, 'settings', ConfigurationManager.name);
     const localConfigPath = path.join(projectPath, 'profiles', ConfigurationManager.name);
+    const mockExistingPaths = (...paths: string[]) => {
+        mockFse.pathExists.mockImplementation(async (filePath: string) => paths.includes(filePath));
+    };
 
     beforeEach(() => {
         manager = new ConfigurationManager();
@@ -54,7 +57,6 @@ describe('ConfigurationManager', () => {
         it('should initialize successfully with new project and load existing configuration', async () => {
             const { CocosMigrationManager } = require('../migration');
             CocosMigrationManager.migrate.mockResolvedValue({
-                global: {},
                 local: {},
                 project: {},
             });
@@ -75,7 +77,7 @@ describe('ConfigurationManager', () => {
 
             // Existing configuration
             const existingConfig = { version: '1.0.0', module1: { key: 'value' } };
-            mockFse.pathExists.mockResolvedValue(true);
+            mockExistingPaths(configPath);
             mockFse.readJSON.mockResolvedValue(existingConfig);
 
             const newManager = new ConfigurationManager();
@@ -111,9 +113,27 @@ describe('ConfigurationManager', () => {
             expect(mockFse.readJSON).toHaveBeenCalledWith(localConfigPath);
         });
 
-        it('should relocate legacy root configuration to settings directory', async () => {
+        it('should split legacy root configuration into settings and profiles directories', async () => {
             const legacyConfigPath = path.join(projectPath, ConfigurationManager.name);
-            const legacyConfig = { version: '1.0.0', testModule: { key: 'value' } };
+            const legacyConfig = {
+                version: '1.0.0',
+                testModule: { key: 'value' },
+                builder: {
+                    common: { platform: 'web-desktop' },
+                    platforms: {
+                        'web-desktop': { startScene: 'scene-uuid' },
+                    },
+                    bundleConfig: { foo: true },
+                },
+                scene: {
+                    tick: true,
+                    camera: { fov: 45 },
+                    gizmo: { is2D: true },
+                    sceneView: { sceneLightOn: false },
+                    'camera-infos': { node: { position: [0, 1, 2] } },
+                    'camera-uuids': ['node'],
+                },
+            };
 
             mockFse.pathExists.mockImplementation(async (filePath: string) => {
                 return filePath === legacyConfigPath;
@@ -135,7 +155,112 @@ describe('ConfigurationManager', () => {
                 {
                     version: '1.0.0',
                     testModule: { key: 'value' },
+                    builder: {
+                        bundleConfig: { foo: true },
+                    },
+                    scene: {
+                        tick: true,
+                    },
                     $schema: '../temp/cocos.config.schema.json',
+                },
+                { spaces: 4 }
+            );
+            expect(mockFse.writeJSON).toHaveBeenCalledWith(
+                localConfigPath,
+                {
+                    builder: {
+                        common: { platform: 'web-desktop' },
+                        platforms: {
+                            'web-desktop': { startScene: 'scene-uuid' },
+                        },
+                    },
+                    scene: {
+                        camera: { fov: 45 },
+                        gizmo: { is2D: true },
+                        sceneView: { sceneLightOn: false },
+                        'camera-infos': { node: { position: [0, 1, 2] } },
+                        'camera-uuids': ['node'],
+                    },
+                    version: '1.0.0',
+                },
+                { spaces: 4 }
+            );
+            expect(mockFse.remove).toHaveBeenCalledWith(legacyConfigPath);
+        });
+
+        it('should not let legacy root configuration override existing scoped files', async () => {
+            const legacyConfigPath = path.join(projectPath, ConfigurationManager.name);
+            const projectConfig = {
+                version: '1.0.0',
+                builder: {
+                    bundleConfig: { from: 'settings' },
+                },
+                scene: {
+                    tick: false,
+                },
+            };
+            const localConfig = {
+                builder: {
+                    common: { platform: 'web-mobile' },
+                },
+            };
+            const legacyConfig = {
+                version: '0.9.0',
+                builder: {
+                    common: { platform: 'web-desktop', outputName: 'legacy' },
+                    bundleConfig: { from: 'root' },
+                },
+                scene: {
+                    tick: true,
+                    camera: { fov: 60 },
+                },
+                testModule: { fromRoot: true },
+            };
+
+            mockExistingPaths(configPath, localConfigPath, legacyConfigPath);
+            mockFse.readJSON.mockImplementation(async (filePath: string) => {
+                if (filePath === configPath) {
+                    return projectConfig;
+                }
+                if (filePath === localConfigPath) {
+                    return localConfig;
+                }
+                if (filePath === legacyConfigPath) {
+                    return legacyConfig;
+                }
+                return {};
+            });
+            mockFse.ensureDir.mockResolvedValue(undefined);
+            mockFse.writeJSON.mockResolvedValue(undefined);
+            mockFse.remove.mockResolvedValue(undefined);
+
+            await manager.initialize(projectPath);
+
+            expect(mockFse.writeJSON).toHaveBeenCalledWith(
+                configPath,
+                {
+                    version: '1.0.0',
+                    builder: {
+                        bundleConfig: { from: 'settings' },
+                    },
+                    scene: {
+                        tick: false,
+                    },
+                    testModule: { fromRoot: true },
+                    $schema: '../temp/cocos.config.schema.json',
+                },
+                { spaces: 4 }
+            );
+            expect(mockFse.writeJSON).toHaveBeenCalledWith(
+                localConfigPath,
+                {
+                    builder: {
+                        common: { platform: 'web-mobile', outputName: 'legacy' },
+                    },
+                    scene: {
+                        camera: { fov: 60 },
+                    },
+                    version: '1.0.0',
                 },
                 { spaces: 4 }
             );
@@ -145,7 +270,6 @@ describe('ConfigurationManager', () => {
         it('should handle errors and not initialize twice', async () => {
             const { CocosMigrationManager } = require('../migration');
             CocosMigrationManager.migrate.mockResolvedValue({
-                global: {},
                 local: {},
                 project: {},
             });
@@ -426,13 +550,18 @@ describe('ConfigurationManager', () => {
                 project: {
                     migratedKey: 'migratedValue'
                 },
-                global: {},
-                local: {},
+                local: {
+                    builder: {
+                        common: {
+                            platform: 'web-desktop',
+                        },
+                    },
+                },
             };
             CocosMigrationManager.migrate.mockResolvedValue(migratedConfig);
 
             // Lower version - should migrate
-            mockFse.pathExists.mockResolvedValue(true);
+            mockExistingPaths(configPath);
             mockFse.readJSON.mockResolvedValue({ version: '0.9.0' });
             mockFse.ensureDir.mockResolvedValue(undefined);
             mockFse.writeJSON.mockResolvedValue(undefined);
@@ -444,6 +573,26 @@ describe('ConfigurationManager', () => {
                 migratedKey: 'migratedValue',
                 $schema: '../temp/cocos.config.schema.json'
             });
+            expect(manager['localConfig']).toEqual({
+                builder: {
+                    common: {
+                        platform: 'web-desktop',
+                    },
+                },
+                version: '1.0.0',
+            });
+            expect(mockFse.writeJSON).toHaveBeenCalledWith(
+                localConfigPath,
+                {
+                    builder: {
+                        common: {
+                            platform: 'web-desktop',
+                        },
+                    },
+                    version: '1.0.0',
+                },
+                { spaces: 4 }
+            );
             expect(manager['version']).toBe('1.0.0');
             // Same version - should not migrate (migrate method checks version)
             const newManager = new ConfigurationManager();
@@ -630,7 +779,7 @@ describe('ConfigurationManager', () => {
 
         it('should initialize configs from existing projectConfig when registering configuration', async () => {
             // 模拟配置文件存在并包含配置
-            mockFse.pathExists.mockResolvedValue(true);
+            mockExistingPaths(configPath);
             mockFse.readJSON.mockResolvedValue(existingProjectConfig);
             mockFse.ensureDir.mockResolvedValue(undefined);
             mockFse.writeJSON.mockResolvedValue(undefined);
@@ -701,7 +850,7 @@ describe('ConfigurationManager', () => {
 
         it('should throw error when registering non-BaseConfiguration instances', async () => {
             // 模拟配置文件存在并包含配置
-            mockFse.pathExists.mockResolvedValue(true);
+            mockExistingPaths(configPath);
             mockFse.readJSON.mockResolvedValue(existingProjectConfig);
             mockFse.ensureDir.mockResolvedValue(undefined);
             mockFse.writeJSON.mockResolvedValue(undefined);

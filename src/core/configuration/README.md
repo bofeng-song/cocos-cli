@@ -10,7 +10,7 @@
 - **事件驱动**：基于 EventEmitter 的事件系统，支持配置变更监听
 - **自动迁移**：内置配置迁移系统，支持版本升级时的配置自动迁移
 - **类型安全**：完整的 TypeScript 类型定义
-- **持久化存储**：自动保存配置到 `cocos.config.json` 文件
+- **持久化存储**：自动保存 project 配置到 `settings/cocos.config.json`，local 配置到 `profiles/cocos.config.json`
 
 ## 使用建议
 

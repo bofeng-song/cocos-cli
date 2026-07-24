@@ -71,6 +71,16 @@ export class ConfigurationManager extends EventEmitter implements IConfiguration
     static relativeSchemaPath = `./temp/${path.basename(ConfigurationManager.SchemaPathSource)}`;
     // 配置文件已移到 settings/ 目录，$schema 相对引用需回退一级
     static schemaRef = `../temp/${path.basename(ConfigurationManager.SchemaPathSource)}`;
+    private static readonly legacyLocalConfigPaths = [
+        'builder.common',
+        'builder.platforms.web-desktop',
+        'builder.platforms.web-mobile',
+        'scene.camera',
+        'scene.gizmo',
+        'scene.sceneView',
+        'scene.camera-infos',
+        'scene.camera-uuids',
+    ];
 
     private initialized: boolean = false;
     private projectPath: string = '';
@@ -210,9 +220,66 @@ export class ConfigurationManager extends EventEmitter implements IConfiguration
      */
     public async migrateFromProject(projectPath: string): Promise<IConfiguration> {
         const list = await CocosMigrationManager.migrate(projectPath);
-        this.projectConfig = utils.deepMerge(this.projectConfig, list.project) as IConfiguration;
+        this.projectConfig = utils.deepMerge(this.projectConfig, list.project || {}) as IConfiguration;
+        this.localConfig = utils.deepMerge(this.localConfig, list.local || {}) as IConfiguration;
         await this.save();
+        await this.save(false, 'local');
         return this.projectConfig;
+    }
+
+    private splitLegacyConfigScopes(config: IConfiguration): { project: IConfiguration; local: IConfiguration } {
+        const project = utils.deepMerge({}, config) as IConfiguration;
+        const local: IConfiguration = {};
+
+        for (const dotPath of ConfigurationManager.legacyLocalConfigPaths) {
+            const value = utils.getByDotPath(config, dotPath);
+            if (value === undefined) {
+                continue;
+            }
+            utils.setByDotPath(local, dotPath, value);
+            this.removeByDotPathAndPrune(project, dotPath);
+        }
+
+        return { project, local };
+    }
+
+    private removeByDotPathAndPrune(target: IConfiguration, dotPath: string): boolean {
+        if (!target || !dotPath) {
+            return false;
+        }
+
+        const keys = dotPath.split('.');
+        const lastKey = keys.pop();
+        if (!lastKey) {
+            return false;
+        }
+
+        let current: any = target;
+        const ancestors: { parent: any; key: string }[] = [];
+        for (const key of keys) {
+            if (!current || typeof current !== 'object' || Array.isArray(current)) {
+                return false;
+            }
+            ancestors.push({ parent: current, key });
+            current = current[key];
+        }
+
+        if (!current || typeof current !== 'object' || Array.isArray(current) || !(lastKey in current)) {
+            return false;
+        }
+
+        delete current[lastKey];
+
+        for (let i = ancestors.length - 1; i >= 0; i--) {
+            const { parent, key } = ancestors[i];
+            const value = parent[key];
+            if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length > 0) {
+                break;
+            }
+            delete parent[key];
+        }
+
+        return true;
     }
 
     /**
@@ -316,38 +383,57 @@ export class ConfigurationManager extends EventEmitter implements IConfiguration
      * 加载项目配置（settings/ 提交层）与 local 配置（profiles/ 个人层）
      */
     private async load(): Promise<void> {
-        // project(committed): settings/cocos.config.json；兼容旧的根 cocos.config.json（一次性重定位后删除根文件）
+        // project(committed): settings/cocos.config.json; legacy root config is relocated once and then removed.
+        let localConfigLoaded = false;
         try {
             if (await fse.pathExists(this.configPath)) {
                 this.projectConfig = await fse.readJSON(this.configPath);
                 this.projectConfig.version && (this.version = this.projectConfig.version);
                 newConsole.debug(`[Configuration] 已加载项目配置: ${this.configPath}`);
             } else {
-                const legacyPath = path.join(this.projectPath, ConfigurationManager.name);
-                if (await fse.pathExists(legacyPath)) {
-                    this.projectConfig = await fse.readJSON(legacyPath);
-                    this.projectConfig.version && (this.version = this.projectConfig.version);
-                    await this.save(true); // 写入 settings/cocos.config.json
-                    await fse.remove(legacyPath);
-                    newConsole.debug(`[Configuration] 已将根配置重定位到 settings/ 并删除根文件: ${legacyPath} -> ${this.configPath}`);
-                } else {
-                    newConsole.debug(`[Configuration] 项目配置文件不存在，将创建新文件: ${this.configPath}`);
-                    await this.save();
-                }
+                newConsole.debug(`[Configuration] 项目配置文件不存在，将创建新文件: ${this.configPath}`);
+                await this.save();
+            }
+
+            const legacyPath = path.join(this.projectPath, ConfigurationManager.name);
+            if (await fse.pathExists(legacyPath)) {
+                this.localConfig = await this.readLocalConfig();
+                localConfigLoaded = true;
+                await this.relocateLegacyRootConfig(legacyPath);
             }
         } catch (error) {
             newConsole.error(`[Configuration] 加载项目配置失败: ${this.configPath} - ${error}`);
         }
 
         // local(personal): profiles/cocos.config.json
+        if (localConfigLoaded) {
+            return;
+        }
+        this.localConfig = await this.readLocalConfig();
+    }
+
+    private async readLocalConfig(): Promise<IConfiguration> {
         try {
-            this.localConfig = await fse.pathExists(this.localConfigPath)
+            return await fse.pathExists(this.localConfigPath)
                 ? await fse.readJSON(this.localConfigPath)
                 : {};
         } catch (error) {
             newConsole.error(`[Configuration] 加载 local 配置失败: ${this.localConfigPath} - ${error}`);
-            this.localConfig = {};
+            return {};
         }
+    }
+
+    private async relocateLegacyRootConfig(legacyPath: string): Promise<void> {
+        const legacyConfig = await fse.readJSON(legacyPath);
+        const { project, local } = this.splitLegacyConfigScopes(legacyConfig);
+        this.projectConfig = utils.deepMerge(project, this.projectConfig) as IConfiguration;
+        this.localConfig = utils.deepMerge(local, this.localConfig) as IConfiguration;
+        this.projectConfig.version && (this.version = this.projectConfig.version);
+
+        await this.save(true);
+        await this.save(false, 'local');
+        await fse.remove(legacyPath);
+        newConsole.debug(`[Configuration] 已将根配置拆分到 settings/ 与 profiles/ 并删除根文件: ${legacyPath}`);
     }
 
     /**

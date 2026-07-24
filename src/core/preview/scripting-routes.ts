@@ -254,7 +254,7 @@ export const scriptingRoutes = [
     },
     {
         // 轻量接口：返回当前工程的设计分辨率，供场景进程在每次打开场景前刷新 cc.view。
-        // 直接读磁盘上的 cocos.config.json（配置真相源），绕开主进程配置缓存——
+        // Read the project-scope config file from disk through getConfigPath(), bypassing the main-process cache.
         // configurationManager.reload() 的 load() 不会把新值同步回已注册的配置实例，
         // Engine._config 也只在 configuration:save 时刷新，两者都可能慢一拍（改分辨率后要新建两次才生效的根因）。
         url: '/scripting/engine/design-resolution',
@@ -275,7 +275,7 @@ export const scriptingRoutes = [
                     }
                 }
             } catch (error) {
-                console.debug('[design-resolution] read cocos.config.json failed, fallback to cached:', error);
+                console.debug('[design-resolution] read project config failed, fallback to cached:', error);
             }
             res.json(dr);
         },
@@ -286,7 +286,7 @@ export const scriptingRoutes = [
             const { Engine } = await import('../engine');
             // 兜底：Engine 缓存的 includeModules
             let modules = Engine.getModules();
-            // 直接读磁盘上的 cocos.config.json（配置真相源），绕开主进程配置缓存。
+            // Read the project-scope config file from disk through getConfigPath(), bypassing the main-process cache.
             // 原因同 design-resolution 路由：configurationManager.reload() 不会把新值同步回已注册的配置实例，
             // Engine._config 也只在 configuration:save 时刷新，改物理后端（= 改 engine.includeModules）后
             // 不重启就拿不到新值，导致预览 game-boot 按旧模块列表选物理后端、切不过去。
@@ -322,7 +322,7 @@ export const scriptingRoutes = [
                     }
                 }
             } catch (error) {
-                console.debug('[engine/modules] read cocos.config.json failed, fallback to cached:', error);
+                console.debug('[engine/modules] read project config failed, fallback to cached:', error);
             }
             res.json(modules);
         },
