@@ -51,7 +51,7 @@ function getPrefabNodeByRelativePath(path: string): Node | null {
 
 function findNodeFromPrefabRoot(root: Node, path: string): Node | null {
     const normalized = path.replace(/\\/g, '/').replace(/^\/+/, '');
-    const segments = normalizePrefabPathSegments(normalized.split('/').filter(Boolean), root.name);
+    const segments = normalizePrefabPathSegments(normalized.split('/').filter(Boolean), root.name, getCurrentSceneName());
     if (!segments) {
         return null;
     }
@@ -65,14 +65,18 @@ function findNodeFromPrefabRoot(root: Node, path: string): Node | null {
     return node;
 }
 
-function normalizePrefabPathSegments(segments: string[], rootName: string): string[] | null {
+function getCurrentSceneName(): string {
+    return (cc as any).director?.getScene?.()?.name ?? '';
+}
+
+function normalizePrefabPathSegments(segments: string[], rootName: string, currentSceneName: string): string[] | null {
     if (segments[0] === rootName) {
         return segments.slice(1);
     }
     if (segments[0] === 'should_hide_in_hierarchy' && segments[1] === rootName) {
         return segments.slice(2);
     }
-    if (segments[1] === 'should_hide_in_hierarchy' && segments[2] === rootName) {
+    if (segments[0] === currentSceneName && segments[1] === 'should_hide_in_hierarchy' && segments[2] === rootName) {
         return segments.slice(3);
     }
     return null;

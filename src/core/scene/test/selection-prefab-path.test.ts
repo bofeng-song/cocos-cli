@@ -4,10 +4,15 @@ const mockService = {
         getRootNode: jest.fn(),
     },
 };
+const mockCc = {
+    director: {
+        getScene: jest.fn(),
+    },
+};
 
 jest.mock('cc', () => ({
     __esModule: true,
-    default: {},
+    default: mockCc,
 }));
 
 jest.mock('../scene-process/service/core/decorator', () => ({
@@ -21,6 +26,7 @@ describe('SelectionService prefab path resolution', () => {
         jest.clearAllMocks();
         mockService.Editor.getCurrentEditorType.mockReturnValue('unknown');
         mockService.Editor.getRootNode.mockReturnValue(null);
+        mockCc.director.getScene.mockReturnValue(null);
         delete (globalThis as any).EditorExtends;
     });
 
@@ -82,11 +88,37 @@ describe('SelectionService prefab path resolution', () => {
         const selection = new SelectionService();
         jest.spyOn(selection, 'broadcast').mockImplementation(() => undefined);
 
+        mockCc.director.getScene.mockReturnValue({ name: 'virtual-scene' });
         selection.select('virtual-scene/should_hide_in_hierarchy/Node/Child');
 
         expect((selection as any)._selections).toEqual([{
             path: 'virtual-scene/should_hide_in_hierarchy/Node/Child',
             uuid: 'child-uuid',
+        }]);
+    });
+
+    it('does not resolve stale prefab paths from a previous virtual scene', () => {
+        const child = { name: 'Child', uuid: 'child-uuid', children: [], components: [] };
+        const root = { name: 'Node', uuid: 'root-uuid', children: [child], components: [] };
+        (globalThis as any).EditorExtends = {
+            Node: {
+                getNodeUuidByPath: jest.fn(() => ''),
+                getNodeByPath: jest.fn(() => null),
+            },
+        };
+        mockService.Editor.getCurrentEditorType.mockReturnValue('prefab');
+        mockService.Editor.getRootNode.mockReturnValue(root);
+        mockCc.director.getScene.mockReturnValue({ name: 'new-virtual-scene' });
+
+        const { SelectionService } = require('../scene-process/service/selection');
+        const selection = new SelectionService();
+        jest.spyOn(selection, 'broadcast').mockImplementation(() => undefined);
+
+        selection.select('old-virtual-scene/should_hide_in_hierarchy/Node/Child');
+
+        expect((selection as any)._selections).toEqual([{
+            path: 'old-virtual-scene/should_hide_in_hierarchy/Node/Child',
+            uuid: '',
         }]);
     });
 
