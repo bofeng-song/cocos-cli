@@ -33,6 +33,11 @@ static/web/editor-extends.bundle.js
 
 # 构建文件
 /dist
+dist-npm/
+temp/
+tests/fixtures/npm-web-mobile-demo/dist/
+tests/fixtures/npm-web-mobile-demo/public/assets/
+tests/fixtures/npm-web-mobile-webpack-demo/dist/
 src/core/builder/platforms/*/dist
 
 # jest
