@@ -6,6 +6,9 @@
     <title>Cocos npm web-mobile Webpack demo</title>
 </head>
 <body>
+    <script>
+        globalThis.__cocosAssetBaseUrl = new URL('./', window.location.href).href;
+    </script>
     <div id="GameDiv">
         <div id="Cocos3dGameContainer">
             <canvas id="GameCanvas" tabindex="99"></canvas>

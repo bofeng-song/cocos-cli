@@ -23,11 +23,14 @@
     </style>
 </head>
 <body>
+    <script>
+        globalThis.__cocosAssetBaseUrl = new URL('./', window.location.href).href;
+    </script>
     <div id="GameDiv">
         <div id="Cocos3dGameContainer">
             <canvas id="GameCanvas" tabindex="99"></canvas>
         </div>
     </div>
-    <script type="module" src="./main.js"></script>
+    <script type="module" src="./main.ts"></script>
 </body>
 </html>

@@ -10,6 +10,7 @@
         "cocos": "file:../../../dist-npm/cocos/cocos.tgz"
     },
     "devDependencies": {
+        "typescript": "^5.4.5",
         "vite": "^5.0.0"
     }
 }

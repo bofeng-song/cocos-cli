@@ -6,7 +6,7 @@ const cocosRoot = path.resolve(__dirname, 'node_modules', 'cocos');
 
 module.exports = {
     mode: 'development',
-    entry: './main.js',
+    entry: './main.ts',
     output: {
         filename: 'assets/[name].[contenthash].js',
         chunkFilename: 'assets/[name].[contenthash].js',
@@ -29,10 +29,18 @@ module.exports = {
     module: {
         rules: [
             {
+                test: /\.ts$/i,
+                use: 'ts-loader',
+                exclude: /node_modules/,
+            },
+            {
                 test: /\.css$/i,
                 use: ['style-loader', 'css-loader'],
             },
         ],
+    },
+    resolve: {
+        extensions: ['.ts', '.js'],
     },
     plugins: [
         new HtmlWebpackPlugin({
@@ -43,6 +51,10 @@ module.exports = {
                 {
                     from: path.join(cocosRoot, 'dist', 'engine', 'assets'),
                     to: 'assets',
+                },
+                {
+                    from: path.resolve(__dirname, 'public', 'custom-assets'),
+                    to: 'custom-assets',
                 },
             ],
         }),

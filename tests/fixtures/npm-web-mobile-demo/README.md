@@ -1,6 +1,26 @@
 # npm web-mobile Vite demo
 
-This demo verifies that the generated `cocos` npm package can be installed from the local tarball and used from application JavaScript.
+This demo verifies that the generated `cocos` npm package can be installed from the local tarball and used from application TypeScript.
+
+It also covers the lightweight custom script workflow:
+
+- `scripts/Rotator.ts` defines a user component with `@ccclass('Rotator')`.
+- `main.ts` imports the component explicitly and attaches it with `node.addComponent(Rotator)`.
+- Vite compiles the TypeScript and decorator syntax.
+- Runtime state is exposed through `document.documentElement.dataset`:
+  - `data-cocos-custom-component-registered`
+  - `data-cocos-custom-component-started`
+  - `data-cocos-custom-component-updates`
+
+The demo also verifies custom runtime assets:
+
+- `public/custom-assets/checker.png` is loaded with `assetManager.loadRemote(..., { ext: '.png' })`.
+- The loaded image asset is converted to a `Texture2D` and rendered on a textured quad.
+- Runtime state is exposed through:
+  - `data-cocos-remote-image-loaded`
+  - `data-cocos-remote-image-node-name`
+  - `data-cocos-remote-image-size`
+  - `data-cocos-remote-image-asset-type`
 
 ## Run
 
@@ -18,7 +38,7 @@ npm install
 npm run dev
 ```
 
-Open the URL printed by Vite. The page should render a rotating cube.
+Open the URL printed by Vite. The page should render a rotating cube driven by the custom `Rotator` component and a textured quad created from the remote PNG at runtime.
 
 The Vite config copies `node_modules/cocos/dist/engine/assets` to `public/assets` so wasm files can be served from `/assets`.
 
