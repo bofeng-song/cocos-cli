@@ -38,6 +38,17 @@ jobs:
           npx jest --roots packages/cocos-cli-types --testPathPattern dts-snapshot --no-cache -u
           npx jest packages/cocos-cli-types --roots="<rootDir>/packages/cocos-cli-types"
 
+      - name: Check committed DTS snapshot
+        shell: bash
+        run: |
+          SNAP_FILE="packages/cocos-cli-types/__tests__/__snapshots__/dts-snapshot.test.ts.snap"
+          if ! git diff --quiet HEAD -- "$SNAP_FILE"; then
+            echo "::error::DTS snapshot is out of date. Run npm run generate:dts and commit the updated snapshot."
+            git diff -- "$SNAP_FILE"
+            exit 1
+          fi
+          echo "DTS snapshot is up to date."
+
       - name: Typecheck DTS declarations
         shell: bash
         run: |
