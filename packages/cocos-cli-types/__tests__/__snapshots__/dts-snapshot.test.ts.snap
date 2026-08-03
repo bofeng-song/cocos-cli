@@ -118,27 +118,7 @@ export declare interface AssetOperationOption {
     overwrite?: boolean;
     rename?: boolean;
 }
-export declare interface AssetPropertySchema {
-    label: string;
-    description?: string;
-    type: AssetPropertySchemaType;
-    default?: unknown;
-    options?: AssetPropertySchemaOption[];
-    assetType?: string;
-    min?: number;
-    max?: number;
-    step?: number;
-    readOnly?: boolean;
-    order?: number;
-    properties?: Record<string, AssetPropertySchema>;
-    items?: AssetPropertySchema | AssetPropertySchema[];
-}
-export declare type AssetPropertySchemaMap = Record<string, AssetPropertySchema>;
-export declare interface AssetPropertySchemaOption {
-    label: string;
-    value: string | number | boolean;
-}
-export declare type AssetPropertySchemaType = 'string' | 'number' | 'boolean' | 'enum' | 'asset' | 'array' | 'object';
+export declare type AssetPropertySchemaMap = Record<string, ICocosConfigurationPropertySchema>;
 export declare interface AssetUserDataMap {
     'animation-clip': AnimationClipAssetUserData;
     'auto-atlas': AutoAtlasAssetUserData;
@@ -202,6 +182,7 @@ export declare interface BitmapFontAssetUserData {
     fontSize: number;
     textureUuid: string;
 }
+export declare function copyAsset(source: string, target: string, options?: AssetOperationOption): Promise<IAssetInfo>;
 export declare function createAsset(options: CreateAssetOptions): Promise<IAssetInfo>;
 export declare function createAssetByType(ccType: ISupportCreateType, dirOrUrl: string, baseName: string, options?: CreateAssetByTypeOptions): Promise<IAssetInfo>;
 export declare interface CreateAssetByTypeOptions extends AssetOperationOption {
@@ -458,6 +439,27 @@ export declare type IAssetType =
 export declare interface IAssetWriteFileOptions extends IAssetOperationOptionsBase {
     create?: boolean;
     overwrite?: boolean;
+}
+export declare interface ICocosConfigurationPropertySchema {
+    type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+    default?: unknown;
+    title?: string;
+    description?: string;
+    enum?: Array<string | number | boolean>;
+    enumDescriptions?: string[];
+    minimum?: number;
+    maximum?: number;
+    step?: number;
+    order?: number;
+    properties?: Record<string, ICocosConfigurationPropertySchema>;
+    items?: ICocosConfigurationPropertySchema | ICocosConfigurationPropertySchema[];
+    additionalProperties?: boolean | ICocosConfigurationPropertySchema;
+    required?: string[];
+    ui?: 'asset-picker' | string;
+    assetType?: string;
+    valueField?: string;
+    displayFields?: string[];
+    query?: Record<string, unknown>;
 }
 export declare interface ICreateMenuInfo {
     label: string;
@@ -774,7 +776,7 @@ export declare function queryAssetConfigMap(): Promise<Record<string, IAssetConf
 export declare function queryAssetDBInfos(): Promise<Record<string, IAssetDBInfo>>;
 export declare function queryAssetDependencies(uuidOrUrl: string, type?: QueryAssetType): Promise<string[]>;
 export declare function queryAssetInfo(urlOrUUIDOrPath: string, dataKeys?: string[] | undefined): Promise<IAssetInfo | null>;
-export declare function queryAssetInfos(options?: QueryAssetsOption): Promise<IAssetInfo[]>;
+export declare function queryAssetInfos(options?: QueryAssetsOption, dataKeys?: (keyof IAssetInfo)[]): Promise<IAssetInfo[]>;
 export declare function queryAssetMeta(urlOrUUIDOrPath: string): Promise<IAssetMeta<'unknown'> | null>;
 export declare interface QueryAssetsOption {
     ccType?: string | string[],
@@ -7590,27 +7592,7 @@ export declare interface AssetOperationOption {
     overwrite?: boolean;
     rename?: boolean;
 }
-export declare interface AssetPropertySchema {
-    label: string;
-    description?: string;
-    type: AssetPropertySchemaType;
-    default?: unknown;
-    options?: AssetPropertySchemaOption[];
-    assetType?: string;
-    min?: number;
-    max?: number;
-    step?: number;
-    readOnly?: boolean;
-    order?: number;
-    properties?: Record<string, AssetPropertySchema>;
-    items?: AssetPropertySchema | AssetPropertySchema[];
-}
-export declare type AssetPropertySchemaMap = Record<string, AssetPropertySchema>;
-export declare interface AssetPropertySchemaOption {
-    label: string;
-    value: string | number | boolean;
-}
-export declare type AssetPropertySchemaType = 'string' | 'number' | 'boolean' | 'enum' | 'asset' | 'array' | 'object';
+export declare type AssetPropertySchemaMap = Record<string, ICocosConfigurationPropertySchema>;
 export declare namespace Assets {
     export {
         init,
@@ -7629,6 +7611,7 @@ export declare namespace Assets {
         createAssetByType,
         createAsset,
         importAsset,
+        copyAsset,
         reimportAsset,
         saveAsset,
         querySerializedData,
@@ -7685,9 +7668,6 @@ export declare namespace Assets {
         MaterialPassDump,
         MaterialTechniqueDump,
         MaterialDump,
-        AssetPropertySchemaType,
-        AssetPropertySchemaOption,
-        AssetPropertySchema,
         AssetPropertySchemaMap,
         IAssetInfo,
         AssetOperationOption,
@@ -7827,6 +7807,7 @@ export declare namespace Configuration {
     }
 }
 export declare type ConfigurationScope = 'default' | 'project' | 'local';
+export declare function copyAsset(source: string, target: string, options?: AssetOperationOption): Promise<IAssetInfo>;
 export declare function createAsset(options: CreateAssetOptions): Promise<IAssetInfo>;
 export declare function createAssetByType(ccType: ISupportCreateType, dirOrUrl: string, baseName: string, options?: CreateAssetByTypeOptions): Promise<IAssetInfo>;
 export declare interface CreateAssetByTypeOptions extends AssetOperationOption {
@@ -8908,7 +8889,7 @@ export declare function queryAssetConfigMap(): Promise<Record<string, IAssetConf
 export declare function queryAssetDBInfos(): Promise<Record<string, IAssetDBInfo>>;
 export declare function queryAssetDependencies(uuidOrUrl: string, type?: QueryAssetType): Promise<string[]>;
 export declare function queryAssetInfo(urlOrUUIDOrPath: string, dataKeys?: string[] | undefined): Promise<IAssetInfo | null>;
-export declare function queryAssetInfos(options?: QueryAssetsOption): Promise<IAssetInfo[]>;
+export declare function queryAssetInfos(options?: QueryAssetsOption, dataKeys?: (keyof IAssetInfo)[]): Promise<IAssetInfo[]>;
 export declare function queryAssetMeta(urlOrUUIDOrPath: string): Promise<IAssetMeta<'unknown'> | null>;
 export declare interface QueryAssetsOption {
     ccType?: string | string[],

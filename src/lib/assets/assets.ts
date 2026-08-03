@@ -120,8 +120,8 @@ export async function queryCreateMap(): Promise<ICreateMenuInfo[]> {
 /**
  * Batch Query Asset Info // 批量查询资源信息
  */
-export async function queryAssetInfos(options?: QueryAssetsOption): Promise<IAssetInfo[]> {
-    return await assetManager.queryAssetInfos(options);
+export async function queryAssetInfos(options?: QueryAssetsOption, dataKeys?: (keyof IAssetInfo)[]): Promise<IAssetInfo[]> {
+    return await assetManager.queryAssetInfos(options, dataKeys);
 }
 
 /**
@@ -161,6 +161,17 @@ export async function importAsset(
     options?: AssetOperationOption
 ): Promise<IAssetInfo[]> {
     return await assetManager.importAsset(source, target, options);
+}
+
+/**
+ * Copy Asset // 复制资源及其完整元数据
+ */
+export async function copyAsset(
+    source: string,
+    target: string,
+    options?: AssetOperationOption
+): Promise<IAssetInfo> {
+    return await assetManager.copyAsset(source, target, options);
 }
 
 /**
