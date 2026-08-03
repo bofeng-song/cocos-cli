@@ -173,3 +173,5 @@ describe('CameraService view mode config', () => {
         expect(defaultFocus).toHaveBeenCalledWith('scene-uuid');
     });
 });
+
+export {};
