@@ -953,7 +953,7 @@ describe('ServiceEvents 事件发射集成测试', () => {
 
             prefabService.canModifySibling('parent', 0, 1);
 
-            expect(listener).toHaveBeenCalledWith('/PrefabChild');
+            expect(listener).toHaveBeenCalledWith(expect.objectContaining({ uuid: 'prefab-child' }));
         });
     });
 });
