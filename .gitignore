@@ -43,6 +43,10 @@ src/core/builder/platforms/*/dist
 # jest
 coverage
 bin
+!packages/webgame-mcp/bin/
+!packages/webgame-mcp/bin/cocos-webgame-mcp.js
+packages/webgame-mcp/my-game/
+packages/webgame-mcp/package-lock.json
 
 # test project
 e2e/.workspace/
