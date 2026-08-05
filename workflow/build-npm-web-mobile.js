@@ -632,6 +632,59 @@ function isRuntimeEffect(sourceName) {
     return !sourceName.startsWith('internal/editor/');
 }
 
+function readMetaUuid(file) {
+    const metaFile = `${file}.meta`;
+    if (!fs.existsSync(metaFile)) {
+        return undefined;
+    }
+
+    const meta = fs.readJsonSync(metaFile, { throws: false });
+    return typeof meta?.uuid === 'string' ? meta.uuid : undefined;
+}
+
+function collectBuiltinMaterialFiles() {
+    const materialDir = path.join(engineDir, 'editor', 'assets', 'default_materials');
+    const names = [
+        'default-clear-stencil',
+        'ui-alpha-test-material',
+        'ui-base-material',
+        'ui-graphics-material',
+        'ui-sprite-alpha-sep-material',
+        'ui-sprite-gray-alpha-sep-material',
+        'ui-sprite-gray-material',
+        'ui-sprite-material',
+    ];
+
+    return names.map((name) => ({
+        name,
+        file: path.join(materialDir, `${name}.mtl`),
+    })).filter(({ file }) => fs.existsSync(file));
+}
+
+async function generateBuiltinMaterialData() {
+    const materials = [];
+
+    for (const { name, file } of collectBuiltinMaterialFiles()) {
+        const data = await fs.readJson(file);
+        const effectUuid = data?._effectAsset?.__uuid__;
+        if (!effectUuid) {
+            throw new Error(`Builtin material "${name}" does not reference an effect asset.`);
+        }
+
+        materials.push({
+            name,
+            uuid: readMetaUuid(file),
+            effectUuid,
+            technique: data._techIdx || 0,
+            defines: data._defines || [],
+            states: data._states || [],
+            props: data._props || [],
+        });
+    }
+
+    return materials;
+}
+
 function findFiles(dir, predicate, recursive = true) {
     const files = [];
     if (!fs.existsSync(dir)) {
@@ -721,6 +774,7 @@ function collectEffectFiles() {
             file,
             sourceName,
             outputName,
+            uuid: readMetaUuid(file),
         }));
     });
 }
@@ -759,12 +813,15 @@ async function generateBuiltinEffectData({ webgpu }) {
 
     const effects = [];
     const names = new Set();
-    for (const { file, sourceName, outputName } of collectEffectFiles()) {
+    for (const { file, sourceName, outputName, uuid } of collectEffectFiles()) {
         const content = await fs.readFile(file, 'utf8');
         currentEffectDir.value = path.dirname(file);
         const effect = shdcLib.buildEffect(outputName, content);
         if (!effect) {
             continue;
+        }
+        if (uuid) {
+            effect._uuid = uuid;
         }
         if (names.has(effect.name)) {
             throw new Error(`Duplicate builtin effect name "${effect.name}" from ${sourceName}`);
@@ -782,6 +839,7 @@ async function generateBuiltinEffectData({ webgpu }) {
 
 async function writeBuiltinEffectData(options) {
     const { effects, diagnosticCount } = await generateBuiltinEffectData(options);
+    const materials = await generateBuiltinMaterialData();
 
     await fs.outputFile(
         path.join(packageDist, 'builtin-effects.js'),
@@ -789,9 +847,15 @@ async function writeBuiltinEffectData(options) {
         'utf8',
     );
     await fs.outputFile(
+        path.join(packageDist, 'builtin-materials.js'),
+        `export const materials = ${JSON.stringify(materials)};\n`,
+        'utf8',
+    );
+    await fs.outputFile(
         path.join(packageDist, 'register-builtins.js'),
         [
             "import { effects } from './builtin-effects.js';",
+            "import { materials } from './builtin-materials.js';",
             '',
             'let installed = false;',
             'let registered = false;',
@@ -813,6 +877,33 @@ async function writeBuiltinEffectData(options) {
             '            effect.hideInEditor = true;',
             '            effect.onLoaded();',
             '        });',
+            '',
+            '        materials.forEach((materialData) => {',
+            '            const effectAsset = cc.EffectAsset.get(materialData.effectUuid);',
+            '            if (!effectAsset) {',
+            "                console.warn(`[cocos] Missing builtin effect for material ${materialData.name}: ${materialData.effectUuid}`);",
+            '                return;',
+            '            }',
+            '            const material = new cc.Material(materialData.name);',
+            '            material._uuid = materialData.uuid || materialData.name;',
+            '            material.initialize({',
+            '                effectAsset,',
+            '                technique: materialData.technique,',
+            '                defines: materialData.defines,',
+            '                states: materialData.states,',
+            '            });',
+            '            materialData.props.forEach((props, passIndex) => {',
+            '                Object.entries(props || {}).forEach(([name, value]) => {',
+            '                    material.setProperty(name, value, passIndex);',
+            '                });',
+            '            });',
+            '            cc.builtinResMgr.addAsset(materialData.name, material);',
+            '            if (Array.isArray(cc.builtinResMgr._materialsToBeCompiled)) {',
+            '                cc.builtinResMgr._materialsToBeCompiled.push(material);',
+            '            } else {',
+            '                material.passes.forEach((pass) => pass.tryCompile());',
+            '            }',
+            '        });',
             '    };',
             '',
             '    if (cc.game._engineInited) {',
@@ -828,6 +919,7 @@ async function writeBuiltinEffectData(options) {
 
     return {
         effectCount: effects.length,
+        materialCount: materials.length,
         diagnosticCount,
     };
 }
@@ -890,7 +982,7 @@ async function main() {
         'utf8',
     );
 
-    const { effectCount, diagnosticCount } = await writeBuiltinEffectData({ webgpu });
+    const { effectCount, materialCount, diagnosticCount } = await writeBuiltinEffectData({ webgpu });
     await copyDeclarations();
 
     await fs.writeJson(path.join(packageRoot, 'package.json'), createPackageJson(version), { spaces: 4 });
@@ -907,6 +999,7 @@ async function main() {
     const files = await fs.readdir(engineOut);
     const tarball = await packNpmPackage();
     console.log(`[npm-web-mobile] Engine files: ${files.length}`);
+    console.log(`[npm-web-mobile] Builtin materials: ${materialCount}`);
     if (patchedEngineFiles > 0) {
         console.log(`[npm-web-mobile] Bundler compatibility patches: ${patchedEngineFiles}`);
     }
