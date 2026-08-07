@@ -1,9 +1,11 @@
 export {
   createProject,
   createComponent,
+  listProjectFiles,
   modifyComponent,
   removeComponent,
   modifyGame,
+  readProjectFile,
 } from './project.js';
 
 export { runDev, buildProject } from './process.js';

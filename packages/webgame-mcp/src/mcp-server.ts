@@ -5,16 +5,30 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import {
   createComponent,
   createProject,
+  listProjectFiles,
   modifyComponent,
   modifyGame,
+  readProjectFile,
   removeComponent,
 } from './project.js';
 import { buildProject, runDev } from './process.js';
 
-function withProject(defaultProject: string, args: any) {
+function normalizeProject(project: any) {
+  if (typeof project !== 'string') {
+    return undefined;
+  }
+  const trimmed = project.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function withProject(defaultProject: string | undefined, args: any = {}, requireProject = true) {
+  const project = normalizeProject(args.project) || defaultProject;
+  if (requireProject && !project) {
+    throw new Error('Project path is required. Start the MCP server with --project <path> or pass a project argument to this tool.');
+  }
   return {
     ...args,
-    project: args.project || defaultProject,
+    ...(project ? { project } : {}),
   };
 }
 
@@ -33,12 +47,14 @@ function textResult(result: any) {
 }
 
 const toolSummaries = [
-  ['webgame-create-project', 'Create a Vite Cocos npm web game project.'],
+  ['webgame-create-project', 'Create a Vite Cocos npm web game project and run npm install by default.'],
   ['webgame-create-component', 'Create a TypeScript component file under src/components.'],
   ['webgame-modify-component', 'Replace a TypeScript component file.'],
   ['webgame-remove-component', 'Remove a TypeScript component file.'],
   ['webgame-modify-game', 'Replace src/game.ts.'],
   ['webgame-build-project', 'Run npm run build for the web game project.'],
+  ['webgame-list-files', 'List files in the web game project.'],
+  ['webgame-read-file', 'Read a text file from the web game project.'],
 ].map(([name, description]) => ({ name, description }));
 
 const toolHandlers: Record<string, (args: any) => any> = {
@@ -48,6 +64,8 @@ const toolHandlers: Record<string, (args: any) => any> = {
   'webgame-remove-component': removeComponent,
   'webgame-modify-game': modifyGame,
   'webgame-build-project': buildProject,
+  'webgame-list-files': listProjectFiles,
+  'webgame-read-file': readProjectFile,
 };
 
 const debugExamples: Record<string, any> = {
@@ -71,38 +89,69 @@ const debugExamples: Record<string, any> = {
     content: '',
   },
   'webgame-build-project': {},
+  'webgame-list-files': {
+    path: '.',
+    recursive: true,
+  },
+  'webgame-read-file': {
+    path: 'src/game.ts',
+  },
 };
 
-function registerTool(server: McpServer, defaultProject: string, name: string, description: string, schema: any, handler: (args: any) => any) {
+function debugExamplesFor(project: string | undefined) {
+  if (project) {
+    return debugExamples;
+  }
+  return Object.fromEntries(
+    Object.entries(debugExamples).map(([name, example]) => name === 'webgame-create-project'
+      ? [name, example]
+      : [name, { project: './my-game', ...example }]),
+  );
+}
+
+function projectLabel(project: string | undefined) {
+  return project || 'Not set. Pass project in tool arguments or start with --project <path>.';
+}
+
+function registerTool(
+  server: McpServer,
+  defaultProject: string | undefined,
+  name: string,
+  description: string,
+  schema: any,
+  handler: (args: any) => any,
+  options: { requireProject?: boolean } = {},
+) {
   server.tool(name, description, schema, async (args) => {
-    const result = await handler(withProject(defaultProject, args));
+    const result = await handler(withProject(defaultProject, args, options.requireProject !== false));
     return textResult(result);
   });
 }
 
-async function executeDebugTool(project: string, toolName: string, args: any) {
+async function executeDebugTool(project: string | undefined, toolName: string, args: any) {
   const handler = toolHandlers[toolName];
   if (!handler) {
     throw new Error(`Unknown tool: ${toolName}`);
   }
-  return handler(withProject(project, args || {}));
+  return handler(withProject(project, args || {}, toolName !== 'webgame-create-project'));
 }
 
 export function createMcpServer(options: any = {}) {
-  const defaultProject = options.project || process.cwd();
+  const defaultProject = normalizeProject(options.project);
   const server = new McpServer({
     name: '@cocos/webgame-mcp',
     version: '0.0.1-alpha.0',
   });
 
-  registerTool(server, defaultProject, 'webgame-create-project', 'Create a Vite Cocos npm web game project.', {
+  registerTool(server, defaultProject, 'webgame-create-project', 'Create a Vite Cocos npm web game project and run npm install by default.', {
     target: z.string().describe('Target project directory.'),
     name: z.string().optional(),
     template: z.literal('vite').optional(),
     cocosPackage: z.string().optional().describe('Dependency value for package.json dependencies.cocos.'),
     packageSource: z.string().optional().describe('Alias for cocosPackage.'),
     force: z.boolean().optional(),
-  }, createProject);
+    install: z.boolean().optional().describe('Run npm install after creating files. Defaults to true.'),
+  }, createProject, { requireProject: false });
 
   registerTool(server, defaultProject, 'webgame-create-component', 'Create a TypeScript component file under src/components.', {
     project: z.string().optional(),
@@ -134,13 +183,28 @@ export function createMcpServer(options: any = {}) {
     project: z.string().optional(),
   }, buildProject);
 
+  registerTool(server, defaultProject, 'webgame-list-files', 'List files in the web game project.', {
+    project: z.string().optional(),
+    path: z.string().optional().describe('Project-relative file or directory path. Defaults to the project root.'),
+    recursive: z.boolean().optional().describe('Recursively list nested files. Defaults to true.'),
+    includeDirectories: z.boolean().optional().describe('Include directory entries. Defaults to true.'),
+    includeGenerated: z.boolean().optional().describe('Include generated/cache directories such as node_modules, dist, .git, and public/assets. Defaults to false.'),
+    maxFiles: z.number().optional().describe('Maximum number of entries to return. Defaults to 500.'),
+  }, listProjectFiles);
+
+  registerTool(server, defaultProject, 'webgame-read-file', 'Read a text file from the web game project.', {
+    project: z.string().optional(),
+    path: z.string().describe('Project-relative text file path to read.'),
+    maxBytes: z.number().optional().describe('Maximum file size in bytes. Defaults to 200000.'),
+  }, readProjectFile);
+
   return server;
 }
 
 export async function startMcpServer(options: any = {}) {
   const port = Number(options.port ?? 9527);
   const host = options.host || '127.0.0.1';
-  const project = options.project || process.cwd();
+  const project = normalizeProject(options.project);
   const app = express();
   app.use(express.json({ limit: '10mb' }));
 
@@ -161,7 +225,7 @@ export async function startMcpServer(options: any = {}) {
 <body>
   <h1>@cocos/webgame-mcp</h1>
   <p>Status: running</p>
-  <p>Project: <code>${escapeHtml(project)}</code></p>
+  <p>Project: <code>${escapeHtml(projectLabel(project))}</code></p>
   <p>MCP endpoint: <code>POST /mcp</code></p>
   <p>Browser endpoints: <a href="/debug">/debug</a>, <a href="/health">/health</a>, <a href="/tools">/tools</a></p>
   <table>
@@ -178,7 +242,7 @@ export async function startMcpServer(options: any = {}) {
     res.json({
       name: '@cocos/webgame-mcp',
       status: 'running',
-      project,
+      project: project || null,
       mcpEndpoint: '/mcp',
       debugEndpoint: '/debug',
       toolsEndpoint: '/tools',
@@ -261,8 +325,9 @@ function escapeHtml(value: string) {
     .replace(/"/g, '&quot;');
 }
 
-function debugPage(project: string) {
+function debugPage(project: string | undefined) {
   const firstTool = toolSummaries[0]?.name || '';
+  const examples = debugExamplesFor(project);
   return `<!doctype html>
 <html>
 <head>
@@ -282,7 +347,7 @@ function debugPage(project: string) {
 </head>
 <body>
   <h1>@cocos/webgame-mcp Debug</h1>
-  <div class="row">Project: <code>${escapeHtml(project)}</code></div>
+  <div class="row">Project: <code>${escapeHtml(projectLabel(project))}</code></div>
   <div class="row">MCP endpoint for real clients: <code>POST /mcp</code></div>
   <label for="tool">Tool</label>
   <select id="tool">
@@ -295,7 +360,7 @@ function debugPage(project: string) {
   <label for="result">Result</label>
   <pre id="result">Ready.</pre>
   <script>
-    const examples = ${JSON.stringify(debugExamples, null, 2)};
+    const examples = ${JSON.stringify(examples, null, 2)};
     const tool = document.getElementById('tool');
     const args = document.getElementById('args');
     const result = document.getElementById('result');

@@ -8,8 +8,10 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import {
   createComponent,
   createProject,
+  listProjectFiles,
   modifyComponent,
   modifyGame,
+  readProjectFile,
   removeComponent,
   startMcpServer,
 } from '../dist/index.js';
@@ -27,12 +29,13 @@ function readJson(file) {
   return JSON.parse(readText(file));
 }
 
-test('creates a code-first Cocos npm web game project', () => {
+test('creates a code-first Cocos npm web game project', async () => {
   const project = makeTempProject();
 
-  const created = createProject({
+  const created = await createProject({
     target: project,
     cocosPackage: 'file:../cocos.tgz',
+    install: false,
   });
 
   assert.equal(readJson(path.join(project, 'package.json')).dependencies.cocos, 'file:../cocos.tgz');
@@ -53,9 +56,9 @@ test('creates a code-first Cocos npm web game project', () => {
   assert.match(readText(path.join(project, 'src', 'runtime', 'cocos-ui.ts')), /setTextColor/);
 });
 
-test('creates, modifies, and removes component files', () => {
+test('creates, modifies, and removes component files', async () => {
   const project = makeTempProject();
-  createProject({ target: project, cocosPackage: 'cocos' });
+  await createProject({ target: project, cocosPackage: 'cocos', install: false });
 
   const created = createComponent({
     project,
@@ -88,9 +91,9 @@ export class Counter extends Component {
   assert.equal(fs.existsSync(created.file), false);
 });
 
-test('modifies game.ts while main.ts remains fixed', () => {
+test('modifies game.ts while main.ts remains fixed', async () => {
   const project = makeTempProject();
-  createProject({ target: project, cocosPackage: 'cocos' });
+  await createProject({ target: project, cocosPackage: 'cocos', install: false });
   const mainBefore = readText(path.join(project, 'src', 'main.ts'));
 
   modifyGame({
@@ -109,9 +112,25 @@ export class Game {
   assert.match(readText(path.join(project, 'src', 'game.ts')), /CustomGame/);
 });
 
+test('lists and reads project files safely', async () => {
+  const project = makeTempProject();
+  await createProject({ target: project, cocosPackage: 'cocos', install: false });
+
+  const listed = listProjectFiles({ project, path: 'src', recursive: true });
+  const fileNames = listed.files.map((file) => file.path);
+  assert.ok(fileNames.includes('src/game.ts'));
+  assert.ok(fileNames.includes('src/main.ts'));
+
+  const read = readProjectFile({ project, path: 'src/game.ts' });
+  assert.equal(read.path, 'src/game.ts');
+  assert.match(read.content, /export class Game/);
+
+  assert.throws(() => readProjectFile({ project, path: '../outside.txt' }), /Path must stay inside project/);
+});
+
 test('serves browser debug endpoints with code-first tools only', async () => {
   const project = makeTempProject();
-  createProject({ target: project, cocosPackage: 'cocos' });
+  await createProject({ target: project, cocosPackage: 'cocos', install: false });
 
   const server = await startMcpServer({
     project,
@@ -129,7 +148,7 @@ test('serves browser debug endpoints with code-first tools only', async () => {
     const names = toolsJson.tools.map((tool) => tool.name);
 
     assert.equal(debug.status, 200);
-    assert.equal(healthJson.toolCount, 6);
+    assert.equal(healthJson.toolCount, 8);
     assert.deepEqual(names, [
       'webgame-create-project',
       'webgame-create-component',
@@ -137,15 +156,88 @@ test('serves browser debug endpoints with code-first tools only', async () => {
       'webgame-remove-component',
       'webgame-modify-game',
       'webgame-build-project',
+      'webgame-list-files',
+      'webgame-read-file',
     ]);
   } finally {
     await server.close();
   }
 });
 
+test('starts MCP server without a default project and accepts project per tool call', async () => {
+  const project = makeTempProject();
+  await createProject({ target: project, cocosPackage: 'cocos', install: false });
+
+  const server = await startMcpServer({
+    host: '127.0.0.1',
+    port: 0,
+  });
+
+  const client = new Client({ name: 'webgame-mcp-test', version: '0.0.0' });
+  const transport = new StreamableHTTPClientTransport(new URL(server.url));
+
+  try {
+    const health = await fetch(`${server.baseUrl}/health`);
+    const healthJson = await health.json();
+    assert.equal(healthJson.project, null);
+
+    await client.connect(transport);
+    const result = await client.callTool({
+      name: 'webgame-create-component',
+      arguments: {
+        project,
+        name: 'PerCallProject',
+        content: `import { _decorator, Component } from 'cocos';
+const { ccclass } = _decorator;
+@ccclass('PerCallProject')
+export class PerCallProject extends Component {}
+`,
+      },
+    });
+
+    assert.equal(result.structuredContent.result.name, 'PerCallProject');
+    assert.ok(fs.existsSync(path.join(project, 'src', 'components', 'PerCallProject.ts')));
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});
+
+test('creates a project through MCP and can skip dependency install', async () => {
+  const project = makeTempProject();
+  const server = await startMcpServer({
+    host: '127.0.0.1',
+    port: 0,
+  });
+
+  const client = new Client({ name: 'webgame-mcp-test', version: '0.0.0' });
+  const transport = new StreamableHTTPClientTransport(new URL(server.url));
+
+  try {
+    await client.connect(transport);
+    const result = await client.callTool({
+      name: 'webgame-create-project',
+      arguments: {
+        target: project,
+        cocosPackage: 'cocos',
+        install: false,
+      },
+    });
+
+    assert.equal(result.structuredContent.result.project, project);
+    assert.ok(result.structuredContent.result.files.includes('package.json'));
+    assert.equal(result.structuredContent.result.install, undefined);
+    assert.ok(fs.existsSync(path.join(project, 'package.json')));
+    assert.equal(fs.existsSync(path.join(project, 'node_modules')), false);
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});
+
 test('exposes code-first tools through MCP streamable HTTP', async () => {
   const project = makeTempProject();
-  createProject({ target: project, cocosPackage: 'cocos' });
+  await createProject({ target: project, cocosPackage: 'cocos', install: false });
 
   const server = await startMcpServer({
     project,

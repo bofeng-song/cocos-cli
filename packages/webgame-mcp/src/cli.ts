@@ -43,8 +43,8 @@ function printResult(result: any) {
 
 function help() {
   console.log(`Usage:
-  cocos-webgame-mcp start --project <path> [--port 9527]
-  cocos-webgame-mcp create-project --target <path> [--package <cocos-dep>] [--force]
+  cocos-webgame-mcp start [--project <path>] [--port 9527]
+  cocos-webgame-mcp create-project --target <path> [--package <cocos-dep>] [--force] [--no-install]
   cocos-webgame-mcp create-component --project <path> --name Player
   cocos-webgame-mcp modify-component --project <path> --name Player --content <source>
   cocos-webgame-mcp remove-component --project <path> --name Player
@@ -73,12 +73,13 @@ export async function runCli(argv: string[]) {
   }
 
   if (command === 'create-project') {
-    printResult(createProject({
+    printResult(await createProject({
       target: args.target || args.project,
       name: args.name,
       template: args.template || 'vite',
       cocosPackage: args.package || args.cocosPackage,
       force: !!args.force,
+      install: !args['no-install'],
     }));
     return;
   }

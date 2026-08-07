@@ -67,3 +67,7 @@ export async function runDev(options: any = {}) {
 export async function buildProject(options: any = {}) {
   return runNpm(options.project, ['run', 'build']);
 }
+
+export async function installProject(options: any = {}) {
+  return runNpm(options.project, ['install']);
+}

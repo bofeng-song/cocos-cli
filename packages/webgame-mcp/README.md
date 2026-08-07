@@ -35,6 +35,8 @@ packages/webgame-mcp/dist/
 npx cocos-webgame-mcp create-project --target ./my-game --package cocos
 ```
 
+`create-project` runs `npm install` by default so the project can build immediately. Pass `--no-install` to only write files.
+
 如果要使用本地 `npm pack` 生成的 `cocos` 包：
 
 ```bash
@@ -45,7 +47,6 @@ npx cocos-webgame-mcp create-project --target ./my-game --package file:../../dis
 
 ```bash
 cd my-game
-npm install
 npm run dev
 ```
 
@@ -54,8 +55,11 @@ npm run dev
 ### 4. 启动 MCP Server
 
 ```bash
+npx cocos-webgame-mcp start --port 9527
 npx cocos-webgame-mcp start --project ./my-game --port 9527
 ```
+
+When started without `--project`, project-specific MCP tools must include a `project` argument.
 
 启动后会提供：
 
@@ -70,8 +74,8 @@ npx cocos-webgame-mcp start --project ./my-game --port 9527
 ## CLI 命令
 
 ```bash
-cocos-webgame-mcp start --project <path> [--port 9527]
-cocos-webgame-mcp create-project --target <path> [--package <cocos-dep>] [--force]
+cocos-webgame-mcp start [--project <path>] [--port 9527]
+cocos-webgame-mcp create-project --target <path> [--package <cocos-dep>] [--force] [--no-install]
 cocos-webgame-mcp create-component --project <path> --name Player
 cocos-webgame-mcp modify-component --project <path> --name Player --content <source>
 cocos-webgame-mcp remove-component --project <path> --name Player
@@ -92,6 +96,8 @@ cocos-webgame-mcp build-project --project <path>
 | `webgame-remove-component` | 删除指定组件脚本。 |
 | `webgame-modify-game` | 替换 `src/game.ts`。 |
 | `webgame-build-project` | 在游戏工程目录执行 `npm run build`。 |
+| `webgame-list-files` | 列出游戏工程内的文件和目录。 |
+| `webgame-read-file` | 读取游戏工程内的文本文件内容。 |
 
 示例 MCP 参数：
 
@@ -99,6 +105,7 @@ cocos-webgame-mcp build-project --project <path>
 {
   "name": "webgame-modify-game",
   "arguments": {
+    "project": "./my-game",
     "content": "import { createDefaultUI } from './runtime/cocos-ui';\n\nexport class Game {\n  start() {\n    const ui = createDefaultUI();\n    ui.createLabel({ text: 'Hello Cocos', position: [0, 80] });\n  }\n}\n"
   }
 }

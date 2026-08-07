@@ -28,6 +28,7 @@ import {
   tsConfigTemplate,
   viteConfigTemplate,
 } from './templates.js';
+import { installProject } from './process.js';
 
 function projectNameFromPath(target: string) {
   return path.basename(path.resolve(target)).toLowerCase().replace(/[^a-z0-9-_]/g, '-');
@@ -47,6 +48,70 @@ function componentFilePath(projectRoot: string, componentPathOrName: string) {
 
 function gameFilePath(projectRoot: string) {
   return assertInsideProject(projectRoot, path.join(projectRoot, 'src', 'game.ts'));
+}
+
+const defaultListSkipDirs = new Set(['.git', 'node_modules', 'dist']);
+const defaultListSkipPaths = new Set(['public/assets']);
+
+function projectRelativePath(projectRoot: string, file: string) {
+  return toPosixPath(path.relative(projectRoot, file));
+}
+
+function resolveProjectFilePath(projectRoot: string, input: string) {
+  const value = String(input || '').trim();
+  if (!value) {
+    throw new Error('path is required.');
+  }
+  const target = path.isAbsolute(value) ? value : path.join(projectRoot, value);
+  return assertInsideProject(projectRoot, target);
+}
+
+function shouldSkipListedPath(projectRoot: string, target: string, includeGenerated: boolean) {
+  if (includeGenerated) {
+    return false;
+  }
+  const relative = projectRelativePath(projectRoot, target);
+  const parts = relative.split('/');
+  return parts.some((part) => defaultListSkipDirs.has(part)) || defaultListSkipPaths.has(parts.slice(0, 2).join('/'));
+}
+
+function listProjectEntry(projectRoot: string, file: string, type: 'file' | 'directory') {
+  const stat = fs.statSync(file);
+  return {
+    path: projectRelativePath(projectRoot, file),
+    type,
+    size: stat.size,
+    mtimeMs: stat.mtimeMs,
+  };
+}
+
+function listProjectFilesRecursive(
+  projectRoot: string,
+  dir: string,
+  options: {
+    includeDirectories: boolean;
+    includeGenerated: boolean;
+    maxFiles: number;
+    results: any[];
+  },
+) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (options.results.length >= options.maxFiles) {
+      return;
+    }
+    const file = path.join(dir, entry.name);
+    if (shouldSkipListedPath(projectRoot, file, options.includeGenerated)) {
+      continue;
+    }
+    if (entry.isDirectory()) {
+      if (options.includeDirectories) {
+        options.results.push(listProjectEntry(projectRoot, file, 'directory'));
+      }
+      listProjectFilesRecursive(projectRoot, file, options);
+    } else if (entry.isFile()) {
+      options.results.push(listProjectEntry(projectRoot, file, 'file'));
+    }
+  }
 }
 
 function loadScene(projectRoot: string, scene: string) {
@@ -292,7 +357,7 @@ function scanScenes(projectRoot: string) {
   }));
 }
 
-export function createProject(options: any = {}) {
+export async function createProject(options: any = {}) {
   const target = resolveProjectPath(options.target || options.project);
   const template = options.template || 'vite';
   if (template !== 'vite') {
@@ -320,7 +385,7 @@ export function createProject(options: any = {}) {
   writeText(path.join(target, 'src', 'game.ts'), gameTemplate());
   writeText(path.join(target, 'src', 'components', 'Rotator.ts'), componentScriptTemplate('Rotator'));
 
-  return {
+  const result: any = {
     project: target,
     template,
     files: [
@@ -337,6 +402,10 @@ export function createProject(options: any = {}) {
       'src/components/Rotator.ts',
     ],
   };
+  if (options.install !== false && options.installDependencies !== false) {
+    result.install = await installProject({ project: target });
+  }
+  return result;
 }
 
 export function createComponent(options: any = {}) {
@@ -384,6 +453,88 @@ export function modifyGame(options: any = {}) {
   }
   writeText(file, options.content);
   return { file };
+}
+
+export function listProjectFiles(options: any = {}) {
+  const projectRoot = resolveProjectPath(options.project);
+  const target = options.path ? resolveProjectFilePath(projectRoot, options.path) : projectRoot;
+  if (!pathExists(target)) {
+    throw new Error(`Path does not exist: ${options.path || '.'}`);
+  }
+
+  const stat = fs.statSync(target);
+  const includeDirectories = options.includeDirectories !== false;
+  const includeGenerated = options.includeGenerated === true;
+  const recursive = options.recursive !== false;
+  const maxFiles = Number.isFinite(options.maxFiles) ? Math.max(1, Math.floor(options.maxFiles)) : 500;
+  const files: any[] = [];
+
+  if (stat.isFile()) {
+    files.push(listProjectEntry(projectRoot, target, 'file'));
+  } else if (stat.isDirectory()) {
+    if (recursive) {
+      listProjectFilesRecursive(projectRoot, target, {
+        includeDirectories,
+        includeGenerated,
+        maxFiles,
+        results: files,
+      });
+    } else {
+      for (const entry of fs.readdirSync(target, { withFileTypes: true })) {
+        if (files.length >= maxFiles) {
+          break;
+        }
+        const file = path.join(target, entry.name);
+        if (shouldSkipListedPath(projectRoot, file, includeGenerated)) {
+          continue;
+        }
+        if (entry.isDirectory() && includeDirectories) {
+          files.push(listProjectEntry(projectRoot, file, 'directory'));
+        } else if (entry.isFile()) {
+          files.push(listProjectEntry(projectRoot, file, 'file'));
+        }
+      }
+    }
+  } else {
+    throw new Error(`Unsupported path type: ${options.path || '.'}`);
+  }
+
+  return {
+    project: projectRoot,
+    root: projectRelativePath(projectRoot, target) || '.',
+    count: files.length,
+    truncated: files.length >= maxFiles,
+    files,
+  };
+}
+
+export function readProjectFile(options: any = {}) {
+  const projectRoot = resolveProjectPath(options.project);
+  const file = resolveProjectFilePath(projectRoot, options.path);
+  if (!pathExists(file)) {
+    throw new Error(`File does not exist: ${options.path}`);
+  }
+  const stat = fs.statSync(file);
+  if (!stat.isFile()) {
+    throw new Error(`Path is not a file: ${options.path}`);
+  }
+
+  const maxBytes = Number.isFinite(options.maxBytes) ? Math.max(1, Math.floor(options.maxBytes)) : 200_000;
+  const buffer = fs.readFileSync(file);
+  if (buffer.length > maxBytes) {
+    throw new Error(`File is too large to read (${buffer.length} bytes). Increase maxBytes if this is intentional.`);
+  }
+  if (buffer.includes(0)) {
+    throw new Error(`File appears to be binary: ${projectRelativePath(projectRoot, file)}`);
+  }
+
+  return {
+    project: projectRoot,
+    path: projectRelativePath(projectRoot, file),
+    size: buffer.length,
+    encoding: 'utf8',
+    content: buffer.toString('utf8'),
+  };
 }
 
 export function createScene(options: any = {}) {
