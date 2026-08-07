@@ -35,6 +35,7 @@ class MockNode {
     setParent = jest.fn((parent: MockNode | null) => {
         this.parent = parent;
     });
+    getSiblingIndex = jest.fn(() => this.parent?.children.indexOf(this) ?? 0);
 
     constructor(name = 'Node') {
         this.name = name;

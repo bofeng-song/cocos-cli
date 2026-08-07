@@ -6975,7 +6975,7 @@ export declare interface PrefabAssetUserData {
     persistent?: boolean;
     syncNodeName?: string;
 }
-export declare type PrefabCanvasHandling = 'add-root-ui-transform' | 'create-canvas' | 'cancel';
+export declare type PrefabCanvasHandling = 'add-root-ui-transform' | 'create-canvas';
 export declare enum PrefabState {
     NotAPrefab = 0,
     PrefabChild = 1,

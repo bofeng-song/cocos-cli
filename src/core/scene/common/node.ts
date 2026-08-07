@@ -96,7 +96,7 @@ export enum MobilityMode {
     Movable = 2
 }
 
-export type PrefabCanvasHandling = 'add-root-ui-transform' | 'create-canvas' | 'cancel';
+export type PrefabCanvasHandling = 'add-root-ui-transform' | 'create-canvas';
 
 // generateNodeDump / encode / open 共用的选项
 export interface INodeDumpOptions {

@@ -38,9 +38,21 @@ import nodeMgr from './node/index';
 import NodeConfig from './node/node-type-config';
 import { RemoveNodeCommand } from './undo/commands/remove-node-command';
 import { RemoveComponentCommand } from './undo/commands/remove-component-command';
+import { PrefabPreviewCanvasCommand } from './undo/commands/prefab-preview-canvas-command';
 import { broadcastAnimationPropertyCommitted } from './animation/property-commit-event';
 
 const NodeMgr = EditorExtends.Node;
+
+interface IPrefabCanvasUndoRecord {
+    rootNode: Node;
+    rootParentUuid: string | null;
+    rootParentPath: string;
+    rootSiblingIndex: number;
+    addedUITransform: Component | null;
+    previewCanvasNode: Node | null;
+    previewCanvasCreated: boolean;
+    workMode: string;
+}
 
 /**
  * 子进程节点处理器
@@ -49,6 +61,8 @@ const NodeMgr = EditorExtends.Node;
 @register('Node')
 export class NodeService extends BaseService<INodeEvents> implements INodeService {
     private readonly _undo = new NodeUndoHelper((event, ...args) => this.emit(event as any, ...args));
+    private _prefabCanvasUndoRecords: IPrefabCanvasUndoRecord[] | null = null;
+    private _prefabCanvasUndoBeforeNodeUuids: Set<string> | null = null;
 
     async createByType(params: ICreateByNodeTypeParams): Promise<INode | null> {
         try {
@@ -70,8 +84,14 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
                 assetUuid = paramsArray[1]['assetUuid'] || null;
                 canvasNeeded = explicitCanvasRequired || Boolean(paramsArray[1].canvasRequired);
             }
-            const result = await this._createNode(assetUuid, canvasNeeded, params.nodeType == NodeType.EMPTY, params);
-            this._undo.recordCreateNodeCommand(beforeNodeUuids, [createRootPath, result?.path].filter(Boolean) as string[]);
+            const prefabCanvasUndoRecords = this._beginPrefabCanvasUndoCapture(beforeNodeUuids);
+            let result: INode | null;
+            try {
+                result = await this._createNode(assetUuid, canvasNeeded, params.nodeType == NodeType.EMPTY, params);
+            } finally {
+                this._endPrefabCanvasUndoCapture();
+            }
+            this._recordCreateNodeCommand(beforeNodeUuids, [createRootPath, result?.path].filter(Boolean) as string[], prefabCanvasUndoRecords);
             return result;
         } catch (error) {
             console.error(error);
@@ -100,8 +120,14 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
             }
             const assetInfo = await Rpc.getInstance().request('assetManager', 'queryAssetInfo', [assetUuid]);
             const canvasNeeded = params.canvasRequired || false;
-            const result = await this._createNode(assetUuid, canvasNeeded, false, params, assetInfo?.type);
-            this._undo.recordCreateNodeCommand(beforeNodeUuids, [createRootPath, result?.path].filter(Boolean) as string[]);
+            const prefabCanvasUndoRecords = this._beginPrefabCanvasUndoCapture(beforeNodeUuids);
+            let result: INode | null;
+            try {
+                result = await this._createNode(assetUuid, canvasNeeded, false, params, assetInfo?.type);
+            } finally {
+                this._endPrefabCanvasUndoCapture();
+            }
+            this._recordCreateNodeCommand(beforeNodeUuids, [createRootPath, result?.path].filter(Boolean) as string[], prefabCanvasUndoRecords);
             return result;
         } catch (error) {
             console.error(error);
@@ -444,7 +470,7 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
                         canvasNode = uiTransformParentNode;
                     } else if (prefabCanvasHandling === 'add-root-ui-transform') {
                         canvasNode = await this.ensurePrefabRootUITransform(workMode);
-                    } else if (prefabCanvasHandling === 'cancel' || !prefabCanvasHandling) {
+                    } else if (!prefabCanvasHandling) {
                         canvasNode = new Node();
                     }
                 } else if (canvasNode.parent !== director.getScene()) {
@@ -489,17 +515,46 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
             return null;
         }
 
+        const undoRecord = this._createPrefabCanvasUndoRecord(rootNode, workMode);
         if (!hasOneKindOfComponent(rootNode, UITransform)) {
-            rootNode.addComponent('cc.UITransform');
+            undoRecord.addedUITransform = rootNode.addComponent('cc.UITransform') as Component;
         }
 
         if (rootNode.parent && !hasOneKindOfComponent(rootNode.parent, Canvas)) {
             const canvasNode = await createShouldHideInHierarchyCanvasNode(director.getScene()!, workMode);
+            undoRecord.previewCanvasNode = canvasNode;
+            undoRecord.previewCanvasCreated = !this._prefabCanvasUndoBeforeNodeUuids?.has(canvasNode.uuid);
             rootNode.parent = canvasNode;
+            this._pushPrefabCanvasUndoRecord(undoRecord);
             return canvasNode;
         }
 
+        this._pushPrefabCanvasUndoRecord(undoRecord);
         return rootNode;
+    }
+
+    private _createPrefabCanvasUndoRecord(rootNode: Node, workMode: string): IPrefabCanvasUndoRecord {
+        const rootParent = rootNode.parent as Node | null;
+        return {
+            rootNode,
+            rootParentUuid: rootParent?.uuid ?? null,
+            rootParentPath: rootParent ? (NodeMgr.getNodePath(rootParent) ?? '/') : '/',
+            rootSiblingIndex: rootNode.getSiblingIndex(),
+            addedUITransform: null,
+            previewCanvasNode: null,
+            previewCanvasCreated: false,
+            workMode,
+        };
+    }
+
+    private _pushPrefabCanvasUndoRecord(record: IPrefabCanvasUndoRecord): void {
+        if (!this._prefabCanvasUndoRecords) {
+            return;
+        }
+        if (!record.addedUITransform && !record.previewCanvasNode) {
+            return;
+        }
+        this._prefabCanvasUndoRecords.push(record);
     }
 
     public onEditorOpened() {
@@ -601,6 +656,77 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
             return null;
         }
         return this._undo.getCreateRootPath(path);
+    }
+
+    private _beginPrefabCanvasUndoCapture(beforeNodeUuids: Set<string> | null): IPrefabCanvasUndoRecord[] | null {
+        if (!beforeNodeUuids) {
+            return null;
+        }
+        const records: IPrefabCanvasUndoRecord[] = [];
+        this._prefabCanvasUndoRecords = records;
+        this._prefabCanvasUndoBeforeNodeUuids = beforeNodeUuids;
+        return records;
+    }
+
+    private _endPrefabCanvasUndoCapture(): void {
+        this._prefabCanvasUndoRecords = null;
+        this._prefabCanvasUndoBeforeNodeUuids = null;
+    }
+
+    private _recordCreateNodeCommand(
+        beforeNodeUuids: Set<string> | null,
+        preferredRootPaths: string[],
+        prefabCanvasUndoRecords: IPrefabCanvasUndoRecord[] | null,
+    ): void {
+        if (!prefabCanvasUndoRecords?.length) {
+            this._undo.recordCreateNodeCommand(beforeNodeUuids, preferredRootPaths);
+            return;
+        }
+
+        const ownsGroup = !Service.Undo?.isGroupActive?.();
+        const groupId = ownsGroup ? Service.Undo?.beginGroup?.({ label: 'Create Node' }) : null;
+        try {
+            this._recordPrefabCanvasUndoCommands(prefabCanvasUndoRecords);
+            this._undo.recordCreateNodeCommand(beforeNodeUuids, preferredRootPaths);
+            if (groupId) {
+                Service.Undo?.endGroup?.(groupId);
+            }
+        } catch (error) {
+            if (groupId) {
+                Service.Undo?.cancelGroup?.(groupId);
+            }
+            throw error;
+        }
+    }
+
+    private _recordPrefabCanvasUndoCommands(records: IPrefabCanvasUndoRecord[]): void {
+        for (const record of records) {
+            if (record.addedUITransform?.isValid) {
+                const command = this._captureAddComponentCommand(record.addedUITransform);
+                if (command) {
+                    Service.Undo?.push(command);
+                }
+            }
+
+            if (record.previewCanvasNode?.isValid) {
+                Service.Undo?.push(new PrefabPreviewCanvasCommand({
+                    rootUuid: record.rootNode.uuid,
+                    rootPath: NodeMgr.getNodePath(record.rootNode) ?? '',
+                    rootParentUuid: record.rootParentUuid,
+                    rootParentPath: record.rootParentPath,
+                    rootSiblingIndex: record.rootSiblingIndex,
+                    previewCanvasUuid: record.previewCanvasNode.uuid,
+                    previewCanvasPath: NodeMgr.getNodePath(record.previewCanvasNode) ?? '',
+                    removePreviewCanvasOnUndo: record.previewCanvasCreated,
+                    workMode: record.workMode,
+                }));
+            }
+        }
+    }
+
+    private _captureAddComponentCommand(component: Component) {
+        const { AddComponentCommand } = require('./undo/commands/add-component-command') as typeof import('./undo/commands/add-component-command');
+        return AddComponentCommand.capture(component);
     }
 
     private _captureReparentSnapshotsForUndo(nodes: Node[]) {
