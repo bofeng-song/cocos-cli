@@ -20,15 +20,16 @@ import {
     type IMoveArrayElementParams,
     type IRemoveArrayElementParams,
     type IChangeNodeLockParams,
+    type PrefabCanvasHandling,
     NodeType,
     NodeEventType,
     ISetPropertyOptions,
 } from '../../common';
 import { type IScene } from '../../common/editor/scene';
 import { Rpc } from '../rpc';
-import { CCClass, CCObject, Component, Node, Prefab, Quat, Vec3 } from 'cc';
-import { createNodeByAsset, loadAny } from './node/node-create';
-import { getUICanvasNode, setLayer } from './node/node-utils';
+import { Canvas, CCClass, CCObject, Component, director, Node, Prefab, Quat, UITransform, Vec3 } from 'cc';
+import { createNodeByAsset, createShouldHideInHierarchyCanvasNode, loadAny } from './node/node-create';
+import { getUICanvasNode, getUITransformParentNode, hasOneKindOfComponent, setLayer } from './node/node-utils';
 import { NodeUndoHelper } from './node/node-undo';
 import { isUndoApplying } from './undo/applying-state';
 import { prefabUtils } from './prefab/utils';
@@ -54,19 +55,20 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
             await Service.Editor.lock();
             const beforeNodeUuids = this._collectSceneNodeUuidsForUndo();
             const createRootPath = this._getCreateRootPathForUndo(beforeNodeUuids, params.path);
-            let canvasNeeded = params.canvasRequired || false;
+            const explicitCanvasRequired = Boolean(params.canvasRequired);
+            let canvasNeeded = explicitCanvasRequired;
             const nodeType = params.nodeType as string;
             const paramsArray = NodeConfig[nodeType];
             if (!paramsArray || paramsArray.length < 0) {
                 throw new Error(`Node type '${nodeType}' is not implemented`);
             }
             let assetUuid = paramsArray[0].assetUuid || null;
-            canvasNeeded = Boolean(paramsArray[0].canvasRequired);
+            canvasNeeded = explicitCanvasRequired || Boolean(paramsArray[0].canvasRequired);
             const projectType = paramsArray[0]['project-type'];
             const workMode = params.workMode;
             if (projectType && workMode && projectType !== workMode.toLowerCase() && paramsArray.length > 1) {
                 assetUuid = paramsArray[1]['assetUuid'] || null;
-                canvasNeeded = Boolean(paramsArray[1].canvasRequired);
+                canvasNeeded = explicitCanvasRequired || Boolean(paramsArray[1].canvasRequired);
             }
             const result = await this._createNode(assetUuid, canvasNeeded, params.nodeType == NodeType.EMPTY, params);
             this._undo.recordCreateNodeCommand(beforeNodeUuids, [createRootPath, result?.path].filter(Boolean) as string[]);
@@ -123,15 +125,16 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
         }
 
         let resultNode;
+        let canvasRequired = canvasNeeded;
         if (assetUuid) {
-            const { node, canvasRequired } = await createNodeByAsset({
+            const createResult = await createNodeByAsset({
                 uuid: assetUuid,
                 canvasRequired: canvasNeeded,
                 type: assetType,
                 workMode: workMode,
             });
-            resultNode = node;
-            parent = await this.checkCanvasRequired(workMode.toLowerCase(), Boolean(canvasRequired), parent, params.position as Vec3) as Node;
+            resultNode = createResult.node;
+            canvasRequired = Boolean(canvasNeeded || createResult.canvasRequired);
         }
         if (!resultNode) {
             resultNode = new cc.Node();
@@ -140,6 +143,12 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
         if (!resultNode) {
             return null;
         }
+
+        if (checkUITransform) {
+            nodeMgr.ensureUITransformComponent(resultNode);
+        }
+
+        parent = await this.checkCanvasRequired(workMode.toLowerCase(), Boolean(canvasRequired), parent, params.position as Vec3, params.prefabCanvasHandling) as Node;
 
         /**
          * 默认创建节点是从 prefab 模板，所以初始是 prefab 节点
@@ -186,10 +195,6 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
         if (shouldUnlinkPrefab && Service.Editor.getCurrentEditorType() !== 'prefab') {
             Service.Prefab.removePrefabInfoFromNode(resultNode, true);
         }
-        if (checkUITransform) {
-            nodeMgr.ensureUITransformComponent(resultNode);
-        }
-
         // 发送添加节点事件，添加节点中的根节点
         this.emit('node:add', resultNode);
 
@@ -414,26 +419,51 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
      * @param position
      * @returns
      */
-    async checkCanvasRequired(workMode: string, canvasRequiredParam: boolean | undefined, parent: Node | null, position: Vec3 | undefined): Promise<Node | null> {
+    async checkCanvasRequired(
+        workMode: string,
+        canvasRequiredParam: boolean | undefined,
+        parent: Node | null,
+        position: Vec3 | undefined,
+        prefabCanvasHandling?: PrefabCanvasHandling,
+    ): Promise<Node | null> {
 
         if (canvasRequiredParam && parent?.isValid) {
             let canvasNode: Node | null;
+            const isPrefabMode = Service.Editor.getCurrentEditorType() === 'prefab';
 
-            canvasNode = getUICanvasNode(parent);
-            if (canvasNode) {
-                parent = canvasNode;
+            if (isPrefabMode) {
+                const rootNode = Service.Editor.getRootNode();
+                if (parent === director.getScene() && rootNode) {
+                    parent = rootNode;
+                }
+                canvasNode = getUICanvasNode(parent, false);
+                const uiTransformParentNode = getUITransformParentNode(parent);
+
+                if (!canvasNode) {
+                    if (uiTransformParentNode) {
+                        canvasNode = uiTransformParentNode;
+                    } else if (prefabCanvasHandling === 'add-root-ui-transform') {
+                        canvasNode = await this.ensurePrefabRootUITransform(workMode);
+                    } else if (prefabCanvasHandling === 'cancel' || !prefabCanvasHandling) {
+                        canvasNode = new Node();
+                    }
+                } else if (canvasNode.parent !== director.getScene()) {
+                    parent = canvasNode;
+                }
+            } else {
+                canvasNode = getUICanvasNode(parent);
+                if (canvasNode) {
+                    parent = canvasNode;
+                }
             }
 
             // 自动创建一个 canvas 节点
             if (!canvasNode) {
-                // TODO 这里会导致如果在 3D 场景下创建 2d canvas 摄像机的优先级跟主摄像机一样，
-                //  导致显示不出 UI 来，先都用 ui canvas
-                const canvasAssetUuid = 'f773db21-62b8-4540-956a-29bacf5ddbf5';
+                let canvasAssetUuid = 'f773db21-62b8-4540-956a-29bacf5ddbf5';
 
-                // // 2d 项目创建的 ui 节点，canvas 下的 camera 的 visibility 默认勾上 default
-                // if (workMode === '2d') {
-                //     canvasAssetUuid = '4c33600e-9ca9-483b-b734-946008261697';
-                // }
+                if (workMode === '2d') {
+                    canvasAssetUuid = '4c33600e-9ca9-483b-b734-946008261697';
+                }
 
                 const canvasAsset = await loadAny<Prefab>(canvasAssetUuid);
                 canvasNode = cc.instantiate(canvasAsset) as Node;
@@ -451,6 +481,25 @@ export class NodeService extends BaseService<INodeEvents> implements INodeServic
             }
         }
         return parent;
+    }
+
+    private async ensurePrefabRootUITransform(workMode: string): Promise<Node | null> {
+        const rootNode = Service.Editor.getRootNode();
+        if (!rootNode?.isValid) {
+            return null;
+        }
+
+        if (!hasOneKindOfComponent(rootNode, UITransform)) {
+            rootNode.addComponent('cc.UITransform');
+        }
+
+        if (rootNode.parent && !hasOneKindOfComponent(rootNode.parent, Canvas)) {
+            const canvasNode = await createShouldHideInHierarchyCanvasNode(director.getScene()!, workMode);
+            rootNode.parent = canvasNode;
+            return canvasNode;
+        }
+
+        return rootNode;
     }
 
     public onEditorOpened() {

@@ -6043,6 +6043,7 @@ export declare interface IBaseCreateNodeParams {
     position?: IVec3;
     keepWorldTransform?: boolean;
     canvasRequired?: boolean;
+    prefabCanvasHandling?: PrefabCanvasHandling;
     unlinkPrefab?: boolean;
 }
 export declare interface IBaseIdentifier {
@@ -6974,6 +6975,7 @@ export declare interface PrefabAssetUserData {
     persistent?: boolean;
     syncNodeName?: string;
 }
+export declare type PrefabCanvasHandling = 'add-root-ui-transform' | 'create-canvas' | 'cancel';
 export declare enum PrefabState {
     NotAPrefab = 0,
     PrefabChild = 1,

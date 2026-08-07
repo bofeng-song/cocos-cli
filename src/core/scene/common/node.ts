@@ -96,6 +96,8 @@ export enum MobilityMode {
     Movable = 2
 }
 
+export type PrefabCanvasHandling = 'add-root-ui-transform' | 'create-canvas' | 'cancel';
+
 // generateNodeDump / encode / open 共用的选项
 export interface INodeDumpOptions {
     includeChildren?: boolean; // true: children 以 INodeIdentifier[] 返回，false/undefined: undefined
@@ -226,6 +228,7 @@ interface IBaseCreateNodeParams {
     position?: IVec3;
     keepWorldTransform?: boolean;
     canvasRequired?: boolean;
+    prefabCanvasHandling?: PrefabCanvasHandling;
     unlinkPrefab?: boolean;
 }
 

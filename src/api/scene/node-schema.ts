@@ -84,6 +84,12 @@ const SchemaNodeCreateBase = z.object({
     keepWorldTransform: z.boolean().optional().describe('Keep world transform'), // 保持世界变换
     position: SchemaVec3.optional().describe('Node position'), // 节点位置
     canvasRequired: z.boolean().optional().describe('Whether Canvas is required'), // 是否需要 Canvas
+    prefabCanvasHandling: z.enum(['add-root-ui-transform', 'create-canvas', 'cancel']).optional().describe([
+        'Prefab Canvas handling when canvasRequired is true and the parent has no Canvas or UITransform ancestor.',
+        'add-root-ui-transform adds UITransform to the prefab root and creates a hidden preview Canvas if needed.',
+        'create-canvas creates a Canvas parent for the new node.',
+        'cancel skips Canvas creation.',
+    ].join(' ')), // prefab 模式中 canvasRequired 为 true 时的 Canvas 处理
 }).describe('To configure options for node creation, the Scene must be open first.'); // 创建节点的选项参数, 需先打开场景;
 
 export const SchemaNodeCreateByAsset = SchemaNodeCreateBase.extend({

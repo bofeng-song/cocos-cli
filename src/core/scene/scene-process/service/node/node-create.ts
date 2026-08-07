@@ -317,13 +317,10 @@ export async function createShouldHideInHierarchyCanvasNode(scene: Scene, workMo
     }
 
     const creationPromise = (async () => {
-        const canvasAssetUuid = 'f773db21-62b8-4540-956a-29bacf5ddbf5';
-        // TODO 这里的需要知道当前场景是 2D 还是 3D，如果使用了 2D 的 canvas，
-        //  它的 camera 的优先级是为 0，会导致 3D 场景创建了 canvas 运行显示不出 UI 节点
-        //  目前先改注释掉，后续场景有 2D/3D 才去做判断
-        // if (workMode === '2d') {
-        //     canvasAssetUuid = '4c33600e-9ca9-483b-b734-946008261697';
-        // }
+        let canvasAssetUuid = 'f773db21-62b8-4540-956a-29bacf5ddbf5';
+        if (workMode === '2d') {
+            canvasAssetUuid = '4c33600e-9ca9-483b-b734-946008261697';
+        }
 
         const canvasAsset = await loadAny<Prefab>(canvasAssetUuid);
         // 实例化后是一个 prefab, 需要继续 unlink prefab
