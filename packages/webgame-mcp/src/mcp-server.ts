@@ -71,7 +71,7 @@ const toolHandlers: Record<string, (args: any) => any> = {
 const debugExamples: Record<string, any> = {
   'webgame-create-project': {
     target: './my-game',
-    cocosPackage: 'cocos',
+    cocosPackage: 'file:../../packages/cocos.tgz',
     force: true,
   },
   'webgame-create-component': {
@@ -147,8 +147,7 @@ export function createMcpServer(options: any = {}) {
     target: z.string().describe('Target project directory.'),
     name: z.string().optional(),
     template: z.literal('vite').optional(),
-    cocosPackage: z.string().optional().describe('Dependency value for package.json dependencies.cocos.'),
-    packageSource: z.string().optional().describe('Alias for cocosPackage.'),
+    cocosPackage: z.string().optional().describe('Optional package.json dependency value. Defaults to file:../../packages/cocos.tgz.'),
     force: z.boolean().optional(),
     install: z.boolean().optional().describe('Run npm install after creating files. Defaults to true.'),
   }, createProject, { requireProject: false });

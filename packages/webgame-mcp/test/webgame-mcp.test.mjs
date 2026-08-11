@@ -56,6 +56,27 @@ test('creates a code-first Cocos npm web game project', async () => {
   assert.match(readText(path.join(project, 'src', 'runtime', 'cocos-ui.ts')), /setTextColor/);
 });
 
+test('uses cocosPackage as the cocos dependency source', async () => {
+  const project = makeTempProject();
+
+  await createProject({
+    target: project,
+    cocosPackage: 'file:../../packages/cocos.tgz',
+    install: false,
+  });
+
+  assert.equal(readJson(path.join(project, 'package.json')).dependencies.cocos, 'file:../../packages/cocos.tgz');
+});
+
+test('uses the deploy packages directory as the default dependency source', async () => {
+  const project = makeTempProject();
+  await createProject({ target: project, install: false });
+  assert.equal(
+    readJson(path.join(project, 'package.json')).dependencies.cocos,
+    'file:../../packages/cocos.tgz',
+  );
+});
+
 test('creates, modifies, and removes component files', async () => {
   const project = makeTempProject();
   await createProject({ target: project, cocosPackage: 'cocos', install: false });

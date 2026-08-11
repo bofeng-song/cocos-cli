@@ -34,7 +34,7 @@ packages/webgame-mcp/src/project.ts
 执行：
 
 ```bash
-cocos-webgame-mcp create-project --target ./test001 --package cocos
+cocos-webgame-mcp create-project --target ./webgame-projects/test001
 ```
 
 会生成类似结构：
@@ -102,10 +102,10 @@ test001/
 }
 ```
 
-`cocos` 依赖值由 `create-project --package` 或 `cocosPackage` 参数决定，可指向：
+`cocos` 依赖默认使用部署目录中的 `file:../../packages/cocos.tgz`，也可由 `create-project --package` 或 `cocosPackage` 参数覆盖为：
 
 - npm registry 包名，例如 `cocos`
-- 本地 tgz，例如 `file:../../dist-npm/cocos/cocos.tgz`
+- 本地 tgz，例如 `file:../../packages/cocos.tgz`
 
 ### `viteConfigTemplate()`
 

@@ -1,0 +1,6 @@
+**
+!packages/
+!packages/cocos-webgame-mcp.tgz
+!packages/cocos.tgz
+!packages/webgame-docker/
+!packages/webgame-docker/Dockerfile

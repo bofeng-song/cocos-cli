@@ -373,7 +373,8 @@ export async function createProject(options: any = {}) {
   ensureDir(path.join(target, 'src', 'components'));
   ensureDir(path.join(target, 'public', 'assets'));
 
-  writeJson(path.join(target, 'package.json'), packageJsonTemplate(name, options.cocosPackage || options.packageSource || 'cocos'));
+  const cocosDependency = options.cocosPackage || 'file:../../packages/cocos.tgz';
+  writeJson(path.join(target, 'package.json'), packageJsonTemplate(name, cocosDependency));
   writeText(path.join(target, '.gitignore'), projectGitIgnoreTemplate());
   writeText(path.join(target, 'index.html'), indexHtmlTemplate(name));
   writeJson(path.join(target, 'tsconfig.json'), tsConfigTemplate());

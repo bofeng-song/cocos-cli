@@ -1,0 +1,24 @@
+services:
+  webgame-mcp:
+    image: ${WEBGAME_MCP_IMAGE:-cocos-webgame-mcp:local}
+    build:
+      context: ${WEBGAME_DOCKER_CONTEXT:-../..}
+      dockerfile: ${WEBGAME_DOCKERFILE:-packages/webgame-docker/Dockerfile}
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:22-bookworm-slim}
+        NPM_CONFIG_REGISTRY: ${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org/}
+        WEBGAME_MCP_TGZ: ${WEBGAME_MCP_TGZ:-packages/cocos-webgame-mcp.tgz}
+        COCOS_TGZ: ${COCOS_TGZ:-packages/cocos.tgz}
+        IMAGE_VERSION: ${WEBGAME_IMAGE_VERSION:-local}
+        COCOS_VERSION: ${COCOS_PACKAGE_VERSION:-unknown}
+        WEBGAME_MCP_VERSION: ${WEBGAME_MCP_PACKAGE_VERSION:-unknown}
+        VCS_REF: ${VCS_REF:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    environment:
+      NPM_CONFIG_REGISTRY: ${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org/}
+    ports:
+      - "${WEBGAME_MCP_PORT:-9527}:9527"
+      - "${WEBGAME_DEV_PORT:-5173}:5173"
+      - "${WEBGAME_PREVIEW_PORT:-4173}:4173"
+    volumes:
+      - ${WEBGAME_PROJECTS_DIR:-../../webgame-projects}:/workspace/cocos

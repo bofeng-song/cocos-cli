@@ -34,6 +34,8 @@
         "compiler:engine": "node --max-old-space-size=8192 workflow/compiler-engine.js --force",
         "build:cc-module": "node workflow/build-cc-module.js",
         "build:npm-web-mobile": "node --max-old-space-size=8192 workflow/build-npm-web-mobile.js",
+        "build:webgame-docker:packages": "node packages/webgame-docker/scripts/prepare-packages.mjs",
+        "build:webgame-docker:image": "node packages/webgame-docker/scripts/build-image.mjs",
         "build:static-web": "node workflow/build-scene-bundle.js && node workflow/build-polyfills.js",
         "build:platform-views": "node workflow/build-platform-views.js && node workflow/build-platform-assets.js",
         "build": "npm run build:clear && node workflow/prepare-dts.js && tsc -b && npm run build:static-web && node workflow/generate-schema.js && npm run generate:dts && npm run build:platform-views",

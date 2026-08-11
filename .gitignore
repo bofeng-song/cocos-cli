@@ -10,6 +10,7 @@
 .user.json
 .DS_Store
 .temp
+.env
 
 # tsconfig
 tsconfig.tsbuildinfo
@@ -20,6 +21,7 @@ tsconfig.tsbuildinfo
 packages/engine/
 
 # packages
+packages/*.tgz
 packages/cc-module/editor
 packages/platforms/
 packages/cocos-cli-types/**/*
@@ -47,6 +49,7 @@ bin
 !packages/webgame-mcp/bin/cocos-webgame-mcp.js
 packages/webgame-mcp/my-game/
 packages/webgame-mcp/package-lock.json
+webgame-projects/
 
 # test project
 e2e/.workspace/

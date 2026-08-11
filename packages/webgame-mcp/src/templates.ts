@@ -50,7 +50,7 @@ export function packageJsonTemplate(name, cocosPackage) {
       preview: 'vite preview',
     },
     dependencies: {
-      cocos: cocosPackage || 'latest',
+      cocos: cocosPackage || 'file:../../packages/cocos.tgz',
     },
     devDependencies: {
       typescript: '^5.4.5',
