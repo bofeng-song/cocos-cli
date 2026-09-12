@@ -31,7 +31,7 @@ async function bundle(target, source, cli, sources, output) {
     if (report.status !== 'prepared' || report.sourceStatus !== 'passed' || !catalog.engines.length) throw new Error('All engine sources must be prepared before sharding');
     fs.mkdirSync(output);
     const manifest = { schemaVersion: 1, target, host: host(), coverage: catalog.coverage, snapshotId: catalog.snapshotId, cli: report.cli, engines: catalog.engines, archives: {} };
-    for (const [name, root, files] of [['candidate.tar', source, entries], ['cli.tar', cli], ...catalog.engines.map((engine, i) => [`engine-${i}.tar`, engine.location])]) {
+    for (const [name, root, files] of [['candidate.tar', source, [...entries, ...['jest.parallel.config.ts', 'jest.serial.config.ts'].filter(file => fs.existsSync(path.join(source, file)))]], ['cli.tar', cli], ...catalog.engines.map((engine, i) => [`engine-${i}.tar`, engine.location])]) {
         const file = path.join(output, name);
         archive(path.resolve(root), file, files);
         manifest.archives[name] = await digest(file);

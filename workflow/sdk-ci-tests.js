@@ -42,7 +42,7 @@ async function runCiTests(config, source, timeoutMs = 60 * 60 * 1000) {
         }
         await fsp.mkdir(root);
         const entries = ['src', 'tests', 'e2e', 'dist', 'static', 'workflow', 'packages', '@types', 'node_modules', '.github', '.vscodeignore', 'package.json', 'package-lock.json', 'tsconfig.json', 'jest.config.ts', 'engine-compatibility.json'];
-        for (const entry of entries) {
+        for (const entry of [...entries, ...['jest.parallel.config.ts', 'jest.serial.config.ts'].filter(file => fs.existsSync(path.join(source, file)))]) {
             await fsp.cp(path.join(source, entry), path.join(root, entry), { recursive: true, dereference: true, filter: file => {
                 const rel = path.relative(source, file).replace(/\\/g, '/');
                 if (rel === 'packages/engine' || rel.startsWith('packages/engine/')) return false;

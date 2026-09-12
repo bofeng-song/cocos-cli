@@ -96,6 +96,7 @@ function rendererSocket(options: IMockRendererOptions = {}) {
 
 describe('reflection probe WebGL renderer bridge', () => {
     beforeEach(() => jest.clearAllMocks());
+    afterEach(() => jest.restoreAllMocks());
 
     it('selects an explicitly requested scene', async () => {
         const other = rendererSocket({ id: 'other', sceneUrl: 'db://assets/Other.scene' });
@@ -113,10 +114,12 @@ describe('reflection probe WebGL renderer bridge', () => {
         expect(other.emit).not.toHaveBeenCalled();
     });
 
-    it('ignores Pink\'s empty preloaded renderer when one scene is loaded', async () => {
+    it.each([0, 1, 25])('ignores Pink\'s empty preloaded renderer with %i ms spent selecting the scene', async (elapsedMs) => {
         const scene = rendererSocket({ id: 'scene' });
         const preloader = rendererSocket({ id: 'preloader', sceneUrl: '', visible: false });
         mockFetchSockets.mockResolvedValue([scene, preloader]);
+        // captureActive forwards the remaining budget, not the original timeout.
+        jest.spyOn(Date, 'now').mockReturnValueOnce(1000).mockReturnValue(1000 + elapsedMs);
 
         await expect(reflectionProbeRenderer.captureActive('Probe', 1500)).resolves.toEqual({
             ...captureResult('db://assets/Target.scene'),
@@ -127,7 +130,7 @@ describe('reflection probe WebGL renderer bridge', () => {
             {
                 sceneUrl: 'db://assets/Target.scene',
                 nodePath: 'Probe',
-                timeoutMs: 1500,
+                timeoutMs: 1500 - elapsedMs,
             },
             expect.any(Function),
         );
