@@ -14,6 +14,10 @@ runs:
     
     - name: Install dependencies
       shell: bash
+      env:
+        # postinstall still prepares the engine, cc modules, i18n types and tools.
+        # Build the CLI once, in the explicit step below, after tools are ready.
+        COCOS_SKIP_POSTINSTALL_BUILD: 'true'
       run: npm ci
     
     - name: Build project

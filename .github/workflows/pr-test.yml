@@ -102,6 +102,11 @@ jobs:
       - name: Build simulator runtime artifacts
         run: npm run build:simulator:runtime
 
+      - name: Verify test scheduling
+        run: |
+          node --test workflow/test-runner.test.cjs workflow/postinstall.test.cjs
+          npm run test:groups
+
       - name: Run unit tests
         id: unit-tests
         run: npm run test:quiet

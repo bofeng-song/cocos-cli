@@ -19,8 +19,6 @@ jobs:
 
       - uses: ./.github/actions/setup-env
 
-      - run: npm ci
-
       - run: npm run generate:dts
 
       - run: cp packages/engine/bin/.declarations/cc.d.ts packages/cocos-cli-types/cc.d.ts
