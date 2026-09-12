@@ -12,7 +12,7 @@ const { installEngine } = require('../install-engine');
 const UpdateRepo = require('../update-repo');
 
 function fixture(t) {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cocos install workflow '));
+    const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'cocos install workflow ')));
     t.after(() => fs.rmSync(root, { recursive: true, force: true }));
     return root;
 }

@@ -51,7 +51,7 @@ function dependencies(root, manifest) {
             const mapping = mappings.filter(item => inside(item.source, installed)).sort((a, b) => b.source.length - a.source.length)[0];
             if (!mapping) throw new Error(`Dependency ${installed} resolves outside SDK source ${root}; install it inside the SDK source first.`);
             const destination = slash(path.join(mapping.destination, path.relative(mapping.source, installed)));
-            const source = fs.realpathSync(installed);
+            const source = fs.realpathSync.native(installed);
             if (!inside(root, source)) throw new Error(`Dependency link escapes SDK source: ${installed} -> ${source}`);
             const pkg = readJson(path.join(source, 'package.json'));
             if (semver.validRange(spec) && !semver.satisfies(pkg.version, spec)) {
@@ -113,7 +113,7 @@ async function mapLimit(items, action, concurrency = 8) {
 
 async function planSdk({ kind, source }) {
     if (!Object.hasOwn(REQUIRED, kind)) throw new Error('kind must be cli or engine');
-    const root = fs.realpathSync(source);
+    const root = fs.realpathSync.native(source);
     const pkg = readJson(path.join(root, 'package.json'));
     if (!semver.valid(pkg.version)) throw new Error(`Invalid ${kind} version: ${pkg.version}`);
     for (const required of REQUIRED[kind]) {
@@ -149,9 +149,15 @@ async function fileHash(filename) {
     return hash.digest('hex');
 }
 
+function canonicalDestination(destination) {
+    const absolute = path.resolve(destination);
+    if (fs.existsSync(absolute)) return fs.realpathSync.native(absolute);
+    return path.join(canonicalDestination(path.dirname(absolute)), path.basename(absolute));
+}
+
 async function packSdk(options) {
     const plan = await planSdk(options);
-    const output = path.resolve(options.output || path.join(__dirname, '..', '.publish', 'sdk', `cocos-${plan.kind}-sdk-${plan.version}-${process.platform}-${process.arch}`));
+    const output = canonicalDestination(options.output || path.join(__dirname, '..', '.publish', 'sdk', `cocos-${plan.kind}-sdk-${plan.version}-${process.platform}-${process.arch}`));
     if (inside(output, plan.root)) throw new Error('Output cannot be the source directory or an ancestor of it');
     const reserved = [...(plan.kind === 'cli' ? CLI_ROOTS : ENGINE_ROOTS), 'node_modules'];
     if (reserved.some(relative => inside(path.join(plan.root, relative), output))) throw new Error('Output cannot be inside an SDK input directory');
