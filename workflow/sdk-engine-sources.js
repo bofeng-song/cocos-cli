@@ -118,8 +118,8 @@ async function prepareSources(options) {
         }
         report.status = 'running'; report.errors = []; save();
         if (options.planOnly) { report.status = 'planned'; save(); return report; }
-        const npmCli = process.env.npm_execpath || path.join(path.dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
-        if (!fs.existsSync(npmCli)) throw new Error('Cannot locate npm CLI; run through npm run test:sdk-tags');
+        const npmCli = [process.env.npm_execpath, path.join(path.dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js'), path.join(path.dirname(process.execPath), '../lib/node_modules/npm/bin/npm-cli.js')].find(file => file && fs.existsSync(file));
+        if (!npmCli) throw new Error('Cannot locate the npm CLI bundled with Node.js');
         const catalog = { schemaVersion: 1, coverage: 'published', snapshotId: path.basename(output), engines: [], clis: [] };
         let externalCache = options.externalCache;
         for (let index = 0; index < report.refs.length; index++) {

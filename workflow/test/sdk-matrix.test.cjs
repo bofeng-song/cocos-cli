@@ -173,13 +173,15 @@ test('CI archives relocate workspace links and preserve hidden files without emb
     fs.mkdirSync(path.join(source, 'node_modules'), { recursive: true });
     write(path.join(source, 'packages/engine/unwanted'), 'engine');
     write(path.join(source, 'packages/tool/.hidden'), 'tool');
+    write(path.join(source, '@types/runtime.d.ts'), 'export {};');
     fs.symlinkSync(path.join(source, 'packages/tool'), path.join(source, 'node_modules/tool'), process.platform === 'win32' ? 'junction' : 'dir');
     const tar = path.join(dir, 'source.tar');
-    archive(source, tar, ['packages', 'node_modules']);
+    archive(source, tar, ['packages', '@types', 'node_modules']);
     const hash = crypto.createHash('sha256').update(fs.readFileSync(tar)).digest('hex');
     const destination = path.join(dir, 'restored');
     await extract(dir, 'source.tar', destination, hash);
     assert.equal(fs.existsSync(path.join(destination, 'packages/engine')), false);
+    assert.equal(fs.readFileSync(path.join(destination, '@types/runtime.d.ts'), 'utf8'), 'export {};');
     assert.equal(fs.readFileSync(path.join(destination, 'node_modules/tool/.hidden'), 'utf8'), 'tool');
     assert.equal(fs.lstatSync(path.join(destination, 'node_modules/tool')).isSymbolicLink(), false);
     await assert.rejects(extract(dir, 'source.tar', path.join(dir, 'bad'), 'wrong'), /digest/);

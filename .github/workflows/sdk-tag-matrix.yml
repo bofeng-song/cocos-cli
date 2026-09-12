@@ -67,13 +67,13 @@ jobs:
           npm ci
           npm run fetch:engine
           npm run install:engine
-          npm run setup:dev -- --force
+          node workflow/setup-dev.js --force
       - name: Pack exact CLI candidate
         working-directory: harness
         run: node workflow/pack-sdk.js --kind cli --source ../candidate --output ../candidate-sdk
       - name: Prepare all supported engine SDKs with shared download caches
         working-directory: harness
-        run: npm run test:sdk-tags -- --cli ../candidate-sdk --prepare-only --external-cache ../candidate/packages/engine/native/external --output ../tag-matrix
+        run: node workflow/sdk-engine-sources.js --cli ../candidate-sdk --prepare-only --external-cache ../candidate/packages/engine/native/external --output ../tag-matrix
       - name: Bundle immutable SDKs and prepared test source
         working-directory: harness
         env:

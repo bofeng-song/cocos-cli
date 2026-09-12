@@ -15,7 +15,7 @@ const entries = ['src', 'tests', 'e2e', 'dist', 'static', 'workflow', 'packages'
 
 function archive(source, destination, files) {
     const excludes = files ? ['--exclude=packages/engine', '--exclude=.git', '--exclude=.workspace'] : [];
-    execFileSync('tar', ['-chf', destination, ...excludes, '-C', source, ...(files || ['.'])], { stdio: 'inherit' });
+    execFileSync('tar', ['-chf', destination, ...excludes, '-C', source, ...(files || ['.']).map(file => './' + file)], { stdio: 'inherit' });
 }
 async function extract(bundle, archiveName, destination, expectedHash) {
     const file = path.join(bundle, archiveName);
