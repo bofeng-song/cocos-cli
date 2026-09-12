@@ -8,6 +8,7 @@ import { config } from './display/config';
 import { PreviewCommand } from './commands/preview';
 import { setEnginePathOverride } from './global';
 import { DoctorCommand } from './commands/doctor';
+import { SimulatorCommand } from './commands/simulator';
 
 const program = new Command();
 
@@ -39,6 +40,7 @@ commandRegistry.register(new UploadCommand(program));
 commandRegistry.register(new PublishCommand(program));
 commandRegistry.register(new PreviewCommand(program));
 commandRegistry.register(new DoctorCommand(program));
+commandRegistry.register(new SimulatorCommand(program));
 
 // 注册所有命令
 commandRegistry.registerAll();

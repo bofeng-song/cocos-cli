@@ -153,6 +153,7 @@ async function prepareSources(options) {
                 await run(process.execPath, [npmCli, 'ci'], source, log);
                 // Compile through the prepared CLI toolchain; never rebuild in the developer checkout.
                 await run(process.execPath, [path.join(__dirname, 'sdk-source-compile.cjs'), path.resolve(options.cli), source], work, log);
+                await run(process.execPath, [path.join(__dirname, 'build-simulator-runtime.js'), '--enginePath', source], work, log);
                 const artifact = path.join(work, `engine-sdk-${Date.now()}`);
                 await packSdk({ kind: 'engine', source, output: artifact });
                 const descriptor = await describeArtifact(artifact, 'engine');
