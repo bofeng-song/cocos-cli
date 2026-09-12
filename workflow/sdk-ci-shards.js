@@ -44,7 +44,7 @@ function plan(manifests) {
         const target = manifest.target;
         if (!/^target-\d+$/.test(target.id) || ids.has(target.id) || !manifest.engines.length) throw new Error('Invalid or duplicate target');
         ids.add(target.id);
-        manifest.engines.forEach((engine, index) => include.push({ id: `${target.id}-engine-${index}`, target: target.id, runner: target.runner, node: target.node, index, cliRevision: manifest.cli.revision, engineRevision: engine.revision }));
+        manifest.engines.forEach((engine, index) => include.push({ id: `${target.id}-engine-${index}`, target: target.id, runner: target.runner, node: target.node, index, engineVersion: engine.version, cliRevision: manifest.cli.revision, engineRevision: engine.revision }));
     }
     if (!include.length || include.length > 256) throw new Error('Matrix must contain 1..256 jobs');
     return { include };
@@ -81,10 +81,15 @@ async function verify(job, directory, output) {
         const catalog = path.join(output, 'catalog.json');
         write(catalog, { schemaVersion: 1, coverage: manifest.coverage, snapshotId: manifest.snapshotId, engines: [descriptor], clis: [] });
         const report = await runMatrix({ cli, catalog, testRoot: source, output: path.join(output, 'matrix'), cache: path.join(output, 'cache') });
+        result.suites = report.pairs[0]?.ci?.suites;
         if (report.status !== 'passed' || report.pairs.length !== 1) throw new Error('Full unit/E2E shard failed');
         result.status = 'passed';
     } catch (error) { result.error = error.message; }
     write(path.join(output, 'shard-result.json'), result);
+    if (process.env.GITHUB_STEP_SUMMARY) {
+        const rows = Object.entries(result.suites || {}).map(([name, suite]) => `| ${name} | ${suite.status} | ${suite.passed ?? '-'} / ${suite.total ?? '-'} | ${suite.durationMs === undefined ? '-' : (suite.durationMs / 1000).toFixed(1)} |`);
+        fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### ${job.id}: ${result.status}\n\n| Suite | Result | Passed / Total | Seconds |\n|---|---|---|---|\n${rows.join('\n')}\n`);
+    }
     return result;
 }
 function filesNamed(directory, name) {

@@ -84,7 +84,10 @@ async function runCiTests(config, source, timeoutMs = 60 * 60 * 1000) {
             ['e2e', [jest, '--config', 'e2e/jest.config.e2e.ts', '--json', '--outputFile', path.join(config.work, 'e2e.json')]],
         ]) {
             report.suites[name] = { status: 'running' }; write(reportFile, report);
+            const startedAt = new Date().toISOString();
+            console.log((process.env.GITHUB_ACTIONS ? '::group::' : '') + 'Run full ' + name);
             report.suites[name] = await run(args, root, path.join(config.work, `${name}.log`), env, timeoutMs);
+            Object.assign(report.suites[name], { startedAt, completedAt: new Date().toISOString(), durationMs: Date.now() - Date.parse(startedAt) });
             if (name !== 'mcp-types') {
                 try {
                     const results = read(path.join(config.work, `${name}.json`));
@@ -92,6 +95,8 @@ async function runCiTests(config, source, timeoutMs = 60 * 60 * 1000) {
                     if (!results.success || !results.numTotalTests || results.numFailedTests || results.numFailedTestSuites) report.suites[name].status = 'failed';
                 } catch (error) { report.suites[name].status = 'failed'; report.suites[name].error = `Missing Jest completion report: ${error.message}`; }
             }
+            console.log(name + ': ' + JSON.stringify(report.suites[name]));
+            if (process.env.GITHUB_ACTIONS) console.log('::endgroup::');
             write(reportFile, report);
         }
         report.status = Object.values(report.suites).every(suite => suite.status === 'passed') ? 'passed' : 'failed';

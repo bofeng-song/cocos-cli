@@ -134,6 +134,7 @@ async function prepareSources(options) {
             await fsp.mkdir(work, { recursive: options.resume });
             const log = path.join(work, 'build.log');
             entry.status = 'building'; delete entry.error; save();
+            console.log('[Engine SDK] Preparing ' + entry.ref + ' at ' + entry.commit);
             try {
                 await checkout(sourcePolicy.repository, entry.commit, source, log);
                 const version = JSON.parse(fs.readFileSync(path.join(source, 'package.json'), 'utf8')).version;
@@ -158,6 +159,7 @@ async function prepareSources(options) {
                 await packSdk({ kind: 'engine', source, output: artifact });
                 const descriptor = await describeArtifact(artifact, 'engine');
                 entry.sdk = descriptor; entry.status = 'passed';
+                console.log('[Engine SDK] Prepared ' + entry.ref + ': ' + descriptor.version + ' ' + descriptor.revision);
                 if (!catalog.engines.some(other => other.revision === descriptor.revision && other.version === descriptor.version)) catalog.engines.push(descriptor);
             } catch (error) { entry.status = 'failed'; entry.error = error.message; }
             save();

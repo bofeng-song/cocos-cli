@@ -186,3 +186,19 @@ test('fresh acquisition clones configured engine and external refs with argument
     assert.equal(calls[1].args.at(-1), path.join(root, 'packages/engine/native/external'));
     assert.equal(calls[0].options.shell, false);
 });
+
+test('DTS retries only known Windows native crashes and preserves failures', async () => {
+    const { generate } = require('../generate-dts-runner.js');
+    let calls = 0;
+    assert.equal(await generate(async () => ++calls < 3 ? 0xc0000374 : 0, 'win32'), 0);
+    assert.equal(calls, 3);
+    calls = 0;
+    assert.equal(await generate(async () => { calls++; return 1; }, 'win32'), 1);
+    assert.equal(calls, 1);
+    calls = 0;
+    assert.equal(await generate(async () => { calls++; return 0xc0000409; }, 'win32'), 0xc0000409);
+    assert.equal(calls, 3);
+    calls = 0;
+    assert.equal(await generate(async () => { calls++; return 0xc0000374; }, 'darwin'), 0xc0000374);
+    assert.equal(calls, 1);
+});

@@ -122,6 +122,7 @@ jobs:
           if-no-files-found: error
 
   verify:
+    name: Full unit/E2E (${{ matrix.id }}, ${{ matrix.engineVersion }}, ${{ matrix.runner }})
     needs: plan
     strategy:
       fail-fast: false
