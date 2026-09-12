@@ -165,3 +165,16 @@ test('identical payload has deterministic revision, changed bytes have a differe
     const third = await packSdk({ ...options, output: `${options.output}-3` });
     assert.notEqual(first.revision, third.revision);
 });
+
+test('dependency scanning and output checks normalize aliased source roots', async t => {
+    const options = fixture(t);
+    const pkg = { name: 'test-cli', version: '4.0.0', dependencies: { a: '^1.0.0' } };
+    write(options.source, 'package.json', pkg);
+    write(options.source, 'node_modules/a/package.json', { name: 'a', version: '1.0.0' });
+    const alias = path.join(path.dirname(options.source), 'source-alias');
+    fs.symlinkSync(options.source, alias, process.platform === 'win32' ? 'junction' : 'dir');
+    assert.equal(dependencies(alias, pkg).nodes.length, 1);
+    await assert.rejects(packSdk({ ...options, source: alias, output: path.join(alias, 'dist/packed') }), /inside an SDK input/);
+    await packSdk({ ...options, source: alias });
+    assert.equal(fs.existsSync(path.join(options.output, 'node_modules/a/package.json')), true);
+});

@@ -32,6 +32,7 @@ function findPackage(name, from) {
 
 /** Preserve npm's installed layout; materialize workspace links within the SDK. */
 function dependencies(root, manifest) {
+    root = fs.realpathSync.native(root);
     const nodes = new Map();
     const mappings = [{ source: root, destination: '' }];
     const queue = [{ source: root, destination: '', manifest }];
