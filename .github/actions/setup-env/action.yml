@@ -8,15 +8,32 @@ runs:
       shell: bash
       run: npm i -g node-gyp
 
-    - name: Init
-      shell: bash
-      run: npm run init
-    
     - name: Install dependencies
       shell: bash
       run: npm ci
-    
-    - name: Build project
+
+    - name: Test SDK install and packaging workflows
       shell: bash
-      run: npm run build
+      run: |
+        npm run test:install-workflow
+        npm run test:pack-sdk
+        npm run test:engine-compatibility
+
+    - name: Fetch engine source explicitly
+      shell: bash
+      run: npm run update:repos
+
+    - name: Install engine source dependencies explicitly
+      shell: bash
+      run: npm run install:engine
+    
+    - name: Prepare engine and CLI explicitly
+      shell: bash
+      run: npm run setup:dev -- --force
+
+    - name: Test engine selection
+      shell: bash
+      run: |
+        npm run test:engine-selection
+        npm run test:engine-diagnostics
 
