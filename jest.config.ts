@@ -29,7 +29,7 @@ const config: Config.InitialOptions = {
     bail: false, // 不因第一个失败而停止
     maxWorkers: 1, // 单线程运行，便于查看错误
     forceExit: true, 
-    detectOpenHandles: true,
+    detectOpenHandles: false,
     globalTeardown: '<rootDir>/src/core/test/global-teardown.ts',
     setupFilesAfterEnv: ['<rootDir>/src/core/test/setup-after-env.ts'],
 };

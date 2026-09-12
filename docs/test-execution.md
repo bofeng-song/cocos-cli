@@ -41,6 +41,16 @@ npm test -- --maxWorkers=4
 
 `test:quiet` 的 `--silent` 会屏蔽测试中的 console 输出，断言失败和异常栈仍会显示。`detectOpenHandles` 用于排查未关闭的定时器、连接等资源，有额外开销，不应用它测量并行性能。
 
+普通运行默认关闭 `detectOpenHandles`。需要定位泄漏时执行 `npm test -- --detectOpenHandles`，该命令仍使用一次完整串行运行。
+
+配置校验的 mock 用例放入 parallel 组，真实场景 UUID/URL 校验放在资产查询文件中，共用其项目初始化。
+
+## E2E 环境
+
+每次运行使用 `e2e/.workspace/run-*` 独立目录。全局 setup 启动一个 MCP 服务，并通过环境变量传递端口和项目路径；普通 API 测试文件连接该服务，不重复复制项目或启动服务。文件开始时关闭当前场景，文件结束时关闭客户端连接，全局 teardown 最后停止服务并清理工作区。构建、prefab 操作和自定义端口测试各自使用单独的项目和服务，避免复用残留的引擎与资源状态。
+
+E2E 仍以单 worker 执行。共享服务中的当前场景和资源状态不能并发修改；后续并行需要为每个执行组分配独立服务和项目。
+
 ## CI 构建
 
 共享 `setup-env` action 在安装步骤设置 `COCOS_SKIP_POSTINSTALL_BUILD=true`。postinstall 仍编译引擎、生成 cc 模块和 i18n 类型、下载工具；CLI 在后续 `Build project` 步骤构建一次。

@@ -77,6 +77,14 @@ export class MCPTestClient {
         return this.port;
     }
 
+    /** Connect to a server owned by globalSetup; close() only closes this connection. */
+    async connectToRunningServer(): Promise<void> {
+        if (!Number.isInteger(this.port) || this.port <= 0 || this.port > 65535) {
+            throw new Error('A valid server port is required');
+        }
+        await this.connectClient();
+    }
+
     /**
      * 启动 MCP 服务器并连接客户端
      */
