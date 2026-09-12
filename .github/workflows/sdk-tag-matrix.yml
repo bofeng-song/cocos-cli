@@ -14,6 +14,9 @@ on:
 permissions:
   contents: read
 
+env:
+  NODE_OPTIONS: --max-old-space-size=8192
+
 concurrency:
   group: sdk-tag-matrix-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
