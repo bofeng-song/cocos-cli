@@ -33,144 +33,22 @@ jobs:
           CANDIDATE_REF: ${{ github.event_name == 'pull_request' && github.sha || '' }}
         run: node -e 'const fs=require("fs");let targets=require("./workflow/sdk-maintained-clis.json");if(!Array.isArray(targets)||!targets.length)throw Error("Empty maintained CLI list");targets=targets.map((target,index)=>({...target,id:"target-"+index,ref:process.env.CANDIDATE_REF||target.ref}));fs.appendFileSync(process.env.GITHUB_OUTPUT,"value="+JSON.stringify(targets)+"\n");'
 
-  build:
+  test:
+    name: SDK tests (${{ matrix.target.runner }}, ${{ matrix.target.id }})
     needs: targets
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 2
       matrix:
         target: ${{ fromJson(needs.targets.outputs.targets) }}
-    runs-on: ${{ matrix.target.runner }}
-    timeout-minutes: 180
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          path: harness
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.target.node }}
-          cache: npm
-          cache-dependency-path: harness/package-lock.json
-      - name: Install harness dependencies
-        working-directory: harness
-        run: npm ci --ignore-scripts
-      - name: Test matrix orchestration
-        working-directory: harness
-        run: npm run test:sdk-matrix
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ matrix.target.ref }}
-          path: candidate
-      - name: Prepare CLI source and development engine
-        working-directory: candidate
-        run: |
-          npm ci
-          npm run fetch:engine
-          npm run install:engine
-          node workflow/setup-dev.js --force
-      - name: Pack exact CLI candidate
-        working-directory: harness
-        run: node workflow/pack-sdk.js --kind cli --source ../candidate --output ../candidate-sdk
-      - name: Prepare all supported engine SDKs with shared download caches
-        working-directory: harness
-        run: node workflow/sdk-engine-sources.js --cli ../candidate-sdk --prepare-only --external-cache ../candidate/packages/engine/native/external --output ../tag-matrix
-      - name: Bundle immutable SDKs and prepared test source
-        working-directory: harness
-        env:
-          TARGET: ${{ toJson(matrix.target) }}
-        run: node workflow/sdk-ci-shards.js bundle ../candidate ../candidate-sdk ../tag-matrix ../bundle
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sdk-input-${{ matrix.target.id }}
-          path: bundle
-          compression-level: 0
-          retention-days: 3
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sdk-plan-${{ matrix.target.id }}
-          path: bundle/manifest.json
-          if-no-files-found: error
-      - name: Retain source reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: sdk-source-${{ matrix.target.id }}
-          path: |
-            tag-matrix/source-report.json
-            tag-matrix/git-refs.snapshot.txt
-            tag-matrix/catalog.json
-            tag-matrix/source-*/build.log
-          if-no-files-found: warn
-
-  plan:
-    needs: [targets, build]
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.plan.outputs.matrix }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: sdk-plan-*
-          path: plans
-      - id: plan
-        env:
-          TARGETS: ${{ needs.targets.outputs.targets }}
-        run: node workflow/sdk-ci-shards.js plan plans matrix.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sdk-expected-matrix
-          path: matrix.json
-          if-no-files-found: error
-
-  verify:
-    name: Full unit/E2E (${{ matrix.id }}, ${{ matrix.engineVersion }}, ${{ matrix.runner }})
-    needs: plan
-    strategy:
-      fail-fast: false
-      max-parallel: 4
-      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 180
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          path: harness
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node }}
-          cache: npm
-          cache-dependency-path: harness/package-lock.json
-      - name: Install harness dependencies
-        working-directory: harness
-        run: npm ci --ignore-scripts
-      - uses: actions/download-artifact@v4
-        with:
-          name: sdk-input-${{ matrix.target }}
-          path: bundle
-      - name: Run complete unit and E2E for this engine
-        working-directory: harness
-        env:
-          SHARD: ${{ toJson(matrix) }}
-        run: node workflow/sdk-ci-shards.js verify ../bundle ../verification
-      - name: Retain shard result and test evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: sdk-result-${{ matrix.id }}
-          path: |
-            verification/shard-result.json
-            verification/matrix/report.json
-            verification/matrix/catalog.snapshot.json
-            verification/matrix/pair-*/*.json
-            verification/matrix/pair-*/*.log
-          if-no-files-found: error
+    uses: ./.github/workflows/sdk-target-tests.yml
+    with:
+      target: ${{ toJson(matrix.target) }}
 
   gate:
     name: Engine SDK compatibility gate
     if: always()
-    needs: [targets, build, plan, verify]
+    needs: [targets, test]
     runs-on: ubuntu-latest
     steps:
       - name: Require every stage to succeed
@@ -180,14 +58,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: sdk-expected-matrix
-          path: expected
+          pattern: sdk-plan-*
+          path: plans
       - uses: actions/download-artifact@v4
         with:
           pattern: sdk-result-*
           path: results
+      - name: Reconstruct complete expected coverage
+        env:
+          TARGETS: ${{ needs.targets.outputs.targets }}
+        run: node workflow/sdk-ci-shards.js plan plans matrix.json
       - name: Require exact coverage and candidate identities
-        run: node workflow/sdk-ci-shards.js aggregate expected/matrix.json results
+        run: node workflow/sdk-ci-shards.js aggregate matrix.json results
 
   verified:
     needs: [targets, gate]

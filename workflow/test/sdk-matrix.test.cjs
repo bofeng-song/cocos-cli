@@ -205,13 +205,24 @@ test('prepare-only retains the complete frozen source catalog without starting t
     assert.equal(JSON.parse(fs.readFileSync(path.join(output, 'catalog.json'))).engines.length, 1);
 });
 
-test('CI workflow limits parallelism and gates publication on all shard results', () => {
+test('platform pipelines start independently and publication requires all results', () => {
     const yaml = require('js-yaml');
     const workflow = yaml.load(fs.readFileSync(path.join(root, '.github/workflows/sdk-tag-matrix.yml'), 'utf8'));
-    assert.equal(workflow.jobs.verify.strategy['max-parallel'], 4);
-    assert.equal(workflow.jobs.verify.strategy['fail-fast'], false);
+    const target = yaml.load(fs.readFileSync(path.join(root, '.github/workflows/sdk-target-tests.yml'), 'utf8'));
+    assert.equal(workflow.jobs.test.uses, './.github/workflows/sdk-target-tests.yml');
+    assert.equal(workflow.jobs.test.needs, 'targets');
+    assert.equal(target.jobs.build.needs, undefined);
+    assert.equal(target.jobs.plan.needs, 'build');
+    assert.equal(target.jobs.verify.needs, 'plan');
+    assert.equal(workflow.jobs.test.strategy['max-parallel'] * target.jobs.verify.strategy['max-parallel'], 4);
+    assert.equal(workflow.jobs.test.strategy['fail-fast'], false);
+    assert.equal(target.jobs.verify.strategy['fail-fast'], false);
     assert.equal(workflow.jobs.gate.if, 'always()');
-    assert.deepEqual(workflow.jobs.gate.needs, ['targets', 'build', 'plan', 'verify']);
+    assert.deepEqual(workflow.jobs.gate.needs, ['targets', 'test']);
+    assert(workflow.jobs.gate.steps.some(step => step.run?.includes('plan plans matrix.json')));
+    assert(workflow.jobs.gate.steps.some(step => step.run?.includes('aggregate matrix.json results')));
     assert(workflow.jobs.verified.needs.includes('gate'));
-    assert(workflow.jobs.build.steps.some(step => step.run?.includes('--prepare-only')));
+    assert(target.jobs.build.steps.some(step => step.run?.includes('--prepare-only')));
+    assert(target.jobs.plan.steps.some(step => step.with?.name?.startsWith('sdk-plan-')));
+    assert(workflow.jobs.verified.steps.every(step => !step.run));
 });

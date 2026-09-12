@@ -105,12 +105,12 @@ npm run test:sdk-tags -- --cli .publish/sdk/full-ci-candidate --test-root . --ou
 
 1. `targets` 确定维护中的 CLI ref；PR 使用候选合并提交。
 2. `build` 为每个 CLI / 平台准备一次候选源码和 CLI SDK，枚举全部支持的引擎 ref，并执行 `--prepare-only` 生成 Engine SDK。准备成功仅表示产物可供测试。
-3. `plan` 汇集全部准备清单，生成 CLI / Engine SDK / 平台组合。
+3. 每个 CLI / 平台独立调用 `sdk-target-tests.yml`，其 `plan` 只等待自己的 `build`，准备完成即可生成本平台的引擎测试组合，不等待其他平台。
 4. `verify` 将各组合分发到独立 runner，每组执行原有完整 unit / E2E 和最小构建。
 5. `gate` 要求所有前置任务成功，并检查每组结果、候选身份和覆盖数量。失败、取消、重复结果或缺少结果均不能通过。
 6. `verified` 只在总门禁通过后提供原始 CLI SDK 的 `cli.tar`，无需重新构建。
 
-并发数由 `.github/workflows/sdk-tag-matrix.yml` 的 `jobs.verify.strategy.max-parallel` 控制，默认 4。`fail-fast: false` 保留其他组合的测试结果。同一 PR 的新提交取消尚未完成的旧提交任务。实际并发数仍受仓库 runner 配额限制。
+父工作流 `jobs.test.strategy.max-parallel` 最多同时运行 2 个 CLI / 平台；子工作流 `sdk-target-tests.yml` 的 `jobs.verify.strategy.max-parallel` 每个目标最多运行 2 组测试，总计最多 4 组。`fail-fast: false` 保留其他组合的测试结果。同一 PR 的新提交取消尚未完成的旧提交任务。实际并发数仍受仓库 runner 配额限制。
 
 引擎源码准备在各 CLI / 平台内部顺序执行，完整测试按引擎并发。这样编译器和 CLI 工具链只准备一次，相同 external 仓库 / commit 可从该任务已有 checkout 复用 Git 对象；首次也尝试复用开发引擎的 external。每个历史引擎仍有独立 checkout 和按自身锁文件安装的 node_modules。Actions 的 npm 缓存跨任务复用下载内容，不共享可写安装目录。
 
@@ -119,3 +119,4 @@ npm run test:sdk-tags -- --cli .publish/sdk/full-ci-candidate --test-root . --ou
 当前每组下载所属 CLI / 平台的完整输入包，只解压该组引擎；输入包保留 3 天。因此并发缩短测试等待时间，但仍有 artifact 传输开销。完整 Engine SDK 暂不跨工作流轮次缓存，也不在不同 CLI 工具链之间直接复用。后续可在固定历史 ZIP 格式后按引擎单独下载；接入跨轮缓存时还需纳入引擎 / external commit、工具链身份和平台条件。
 
 上述归档用于 CI 内部任务传递，不代表已经支持官方历史版本 ZIP 下载。现有本地 `test:sdk-tags` 默认仍串行执行完整流程；`--prepare-only` 只准备产物，不能作为兼容性通过结果。
+候选 SDK 在测试前打包，完整 unit / E2E 使用这些候选及其身份清单。打包成功不等于发布批准；全部目标通过总门禁后，仅提升同一份 CLI 候选为 verified 制品，不在测试后重新构建。历史 Engine SDK 是测试输入，本流程不重新发布历史引擎，也不自动发布当前 Engine SDK。
