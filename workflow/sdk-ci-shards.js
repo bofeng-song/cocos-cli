@@ -13,15 +13,17 @@ async function digest(file) {
 const host = () => ({ platform: process.platform, arch: process.arch, nodeAbi: process.versions.modules });
 const entries = ['src', 'tests', 'e2e', 'dist', 'static', 'workflow', 'packages', '@types', 'node_modules', '.github', '.vscodeignore', 'package.json', 'package-lock.json', 'tsconfig.json', 'jest.config.ts', 'engine-compatibility.json'];
 
+// Preserve SDK AppleDouble files as ordinary files, without macOS metadata conversion.
+const tarOptions = () => ({ stdio: 'inherit', env: { ...process.env, COPYFILE_DISABLE: '1' } });
 function archive(source, destination, files) {
     const excludes = files ? ['--exclude=packages/engine', '--exclude=.git', '--exclude=.workspace'] : [];
-    execFileSync('tar', ['-chf', destination, ...excludes, '-C', source, ...(files || ['.']).map(file => './' + file)], { stdio: 'inherit' });
+    execFileSync('tar', ['-chf', destination, ...excludes, '-C', source, ...(files || ['.']).map(file => './' + file)], tarOptions());
 }
 async function extract(bundle, archiveName, destination, expectedHash) {
     const file = path.join(bundle, archiveName);
     if (await digest(file) !== expectedHash) throw new Error(`Bundle digest mismatch: ${archiveName}`);
     fs.mkdirSync(destination); // Each job owns a new, separate workspace.
-    execFileSync('tar', ['-xf', file, '-C', destination], { stdio: 'inherit' });
+    execFileSync('tar', ['-xf', file, '-C', destination], tarOptions());
 }
 async function bundle(target, source, cli, sources, output) {
     const report = read(path.join(sources, 'source-report.json'));
