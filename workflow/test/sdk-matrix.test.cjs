@@ -93,9 +93,11 @@ test('materialized SDK validates hashes, isolates files, and repairs corrupt cac
     write(path.join(source, 'package.json'), { version: '4.0.0', name: 'engine' });
     for (const file of REQUIRED.engine) write(path.join(source, file), 'prepared');
     write(path.join(source, 'bin/simulator/import-map.json'), { imports: {} });
+    write(path.join(source, 'bin/native-preview/base.js'), 'runtime');
     await packSdk({ kind: 'engine', source, output: artifact });
     const descriptor = await describeArtifact(artifact, 'engine');
     assert.equal(fs.existsSync(path.join(artifact, 'bin/simulator/import-map.json')), true);
+    assert.equal(fs.readFileSync(path.join(artifact, 'bin/native-preview/base.js'), 'utf8'), 'runtime');
     const cache = path.join(dir, 'cache');
     await materialize(descriptor, 'engine', cache, path.join(dir, 'first'));
     const stored = path.join(cache, 'engine', platform.platform, platform.arch, platform.nodeAbi, descriptor.revision.slice(7), 'package.json');

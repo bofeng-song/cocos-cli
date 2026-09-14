@@ -86,7 +86,20 @@ async function runCiTests(config, source, timeoutMs = 60 * 60 * 1000) {
             report.suites[name] = { status: 'running' }; write(reportFile, report);
             const startedAt = new Date().toISOString();
             console.log((process.env.GITHUB_ACTIONS ? '::group::' : '') + 'Run full ' + name);
-            report.suites[name] = await run(args, root, path.join(config.work, `${name}.log`), env, timeoutMs);
+            if (name === 'mcp-types') {
+                const { generate } = require('./generate-dts-runner');
+                const attempts = [];
+                await generate(async () => {
+                    const logName = attempts.length ? name + '-retry-' + attempts.length : name;
+                    const result = await run(args, root, path.join(config.work, logName + '.log'), env, timeoutMs);
+                    attempts.push(result);
+                    report.suites[name] = result;
+                    return result.status === 'timeout' || result.error ? 1 : result.exitCode;
+                }, process.platform, name);
+                report.suites[name] = { ...report.suites[name], attempts };
+            } else {
+                report.suites[name] = await run(args, root, path.join(config.work, name + '.log'), env, timeoutMs);
+            }
             Object.assign(report.suites[name], { startedAt, completedAt: new Date().toISOString(), durationMs: Date.now() - Date.parse(startedAt) });
             if (name !== 'mcp-types') {
                 try {

@@ -2,12 +2,12 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 
 const nativeCrashes = new Set([0xc0000374, 0xc0000409]);
-async function generate(runOnce, platform = process.platform) {
+async function generate(runOnce, platform = process.platform, label = 'generate-dts') {
     for (let attempt = 1; attempt <= 3; attempt++) {
         const code = await runOnce();
         if (code === 0) return 0;
         if (platform !== 'win32' || !nativeCrashes.has(code >>> 0) || attempt === 3) return code ?? 1;
-        console.error(`[generate-dts] Native process crash 0x${(code >>> 0).toString(16)}; retry ${attempt}/2`);
+        console.error(`[${label}] Native process crash 0x${(code >>> 0).toString(16)}; retry ${attempt}/2`);
     }
 }
 
