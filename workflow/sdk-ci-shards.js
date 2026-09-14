@@ -23,10 +23,7 @@ async function extract(bundle, archiveName, destination, expectedHash) {
     const file = path.join(bundle, archiveName);
     if (await digest(file) !== expectedHash) throw new Error(`Bundle digest mismatch: ${archiveName}`);
     fs.mkdirSync(destination); // Each job owns a new, separate workspace.
-    // libarchive's reader has a separate AppleDouble decoder; COPYFILE_DISABLE
-    // only controls filesystem metadata collection when creating an archive.
-    const readerOptions = ['darwin', 'win32'].includes(process.platform) ? ['--no-mac-metadata', '--options', '!mac-ext'] : [];
-    execFileSync('tar', [...readerOptions, '-xf', file, '-C', destination], tarOptions());
+    await require('tar').x({ file, cwd: destination, strict: true, preservePaths: false });
 }
 async function bundle(target, source, cli, sources, output) {
     const report = read(path.join(sources, 'source-report.json'));
