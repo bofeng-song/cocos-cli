@@ -25,7 +25,7 @@ async function extract(bundle, archiveName, destination, expectedHash) {
     fs.mkdirSync(destination); // Each job owns a new, separate workspace.
     // libarchive's reader has a separate AppleDouble decoder; COPYFILE_DISABLE
     // only controls filesystem metadata collection when creating an archive.
-    const readerOptions = ['darwin', 'win32'].includes(process.platform) ? ['--options', '!mac-ext'] : [];
+    const readerOptions = ['darwin', 'win32'].includes(process.platform) ? ['--no-mac-metadata', '--options', '!mac-ext'] : [];
     execFileSync('tar', [...readerOptions, '-xf', file, '-C', destination], tarOptions());
 }
 async function bundle(target, source, cli, sources, output) {
