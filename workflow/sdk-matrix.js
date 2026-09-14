@@ -151,7 +151,7 @@ function executePair(configFile, logFile, timeoutMs) {
         const log = fs.openSync(logFile, 'w');
         const config = json(configFile);
         const guard = path.join(__dirname, 'sdk-matrix-guard.cjs');
-        const env = { ...process.env, SDK_MATRIX_CONFIG: configFile, NODE_PATH: '', NODE_OPTIONS: `--require ${JSON.stringify(guard)}` };
+        const env = { ...process.env, SDK_MATRIX_CONFIG: configFile, NODE_PATH: '', NODE_OPTIONS: `--max-old-space-size=8192 --require ${JSON.stringify(guard)}` };
         delete env.SDK_CATALOG_TOKEN;
         delete env.SDK_CATALOG_AUTH_ORIGIN;
         const child = spawn(process.execPath, [path.join(__dirname, 'sdk-matrix-pair.cjs'), configFile], {
