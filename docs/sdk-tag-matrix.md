@@ -5,10 +5,10 @@
 ## 枚举规则
 
 1. 读取待测试 CLI SDK 内的 engine-compatibility.json，列出远端全部 tag。
-2. 接受 SemVer tag 或带 v 前缀的 tag，用同一兼容性规则选择全部匹配版本；稳定 ~4.0.0 覆盖全部稳定 4.0.x，预发布系列按独立声明筛选。不只测试最老 / 最新版本。
+2. 接受 SemVer tag 或带 v 前缀的 tag，用同一兼容性规则选择全部匹配版本；稳定 ~4.0.0 覆盖全部稳定 4.0.x，预发布系列按独立声明筛选，其中 alpha 只选择受支持候选中 SemVer 最高的一个，跨 core 比较；同版本 tag 别名确定性地取一个。稳定版本仍覆盖全部受支持补丁版本。
 3. 将 tag 固定到 commit；annotated tag 使用剥离后的 commit。下载后验证 HEAD，验证 package.json.version 与 tag 版本一致。不重写版本号以使测试通过。
-4. 当前没有稳定 4.0.0 tag 时，额外测试 refs/heads/v4.0.0，仍固定本轮 commit，并读取实际包版本。出现 4.0.0 / v4.0.0 tag 后自动停止临时分支兜底。分支基线不是正式版。
-5. 同版本的多个 tag / revision 均保留来源记录；只有产物版本和内容 revision 完全一致时合并相同的执行组合。分支或 tag 被移动会在下一份 commit 快照中体现。
+4. 当前既没有受支持的 alpha tag，也没有稳定 4.0.0 tag 时，兜底测试 refs/heads/v4.0.0，仍固定本轮 commit，并读取实际包版本。出现 4.0.0 / v4.0.0 tag 后自动停止临时分支兜底。分支基线不是正式版。
+5. 原始 tag 快照保留全部来源记录；alpha 按上述规则取一个 tag，其余版本的多个 tag / revision 均保留；只有产物版本和内容 revision 完全一致时合并相同的执行组合。分支或 tag 被移动会在下一份 commit 快照中体现。
 
 来源规则在 workflow/engine-source-policy.json。每个历史引擎 checkout 的 native/external-config.json 决定其原生依赖仓库及 ref，另固定依赖 commit；不使用当前 CLI 的 repo.json 去覆盖历史引擎的原生依赖版本。不支持的旧配置结构明确失败，不能默默套用新版本配置。
 
@@ -77,7 +77,7 @@ workflow/sdk-matrix.js 也支持读取本地或 HTTPS 索引来复用已经生�
 npm run test:sdk-tags -- --validation-tag 4.0.0-alpha.33 --cli .publish/sdk/cli-candidate --output .publish/alpha33-validation
 ```
 
-该模式要求存在且受支持的精确 tag，不会改版本号或回退到分支；报告记录 validationTag，索引标记为 local，仅用于单版本验证。省略 --validation-tag 时仍自动枚举全部受支持历史 tag。
+该模式要求存在且受支持的精确 tag，不会改版本号或回退到分支；报告记录 validationTag，索引标记为 local，仅用于单版本验证。省略 --validation-tag 时自动选择全部受支持稳定 tag 和最新一个受支持 alpha tag。显式指定旧 alpha tag 仍可用于问题复现。
 
 工具复用规则：同一 CLI SDK 内的编译器和工具链共用；同一 external 仓库 / commit 的 Git 对象可复用下载缓存，各 tag 仍拥有独立工作目录。同一轮默认复用上一份 external checkout，跨轮可用 --external-cache <已下载的 external Git 仓库>。读取缓存前检查 origin 及目标 commit，下载后验证 HEAD；实际使用的命令保留在日志。npm 自身下载缓存可共用，但每个 tag 的 node_modules 仍按它自己的锁文件通过 npm ci 准备，不把另一版本的安装目录直接拿来用。
 

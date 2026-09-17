@@ -17,7 +17,7 @@ function selectRefs(text, policies, sourcePolicy, validationTag) {
         if (!/^[a-f0-9]{40}$/.test(commit || '') || !/^refs\/(heads|tags)\//.test(ref || '')) throw new Error('Invalid git ls-remote output');
         refs.set(ref, commit);
     }
-    const selected = [];
+    let selected = [];
     const supported = version => policies.some(policy => matchEngineVersion(version, policy).supported);
     for (const [ref, commit] of refs) {
         if (!ref.startsWith('refs/tags/') || ref.endsWith('^{}')) continue;
@@ -26,8 +26,14 @@ function selectRefs(text, policies, sourcePolicy, validationTag) {
         if (!semver.valid(version) || !supported(version)) continue;
         selected.push({ ref, tag, version, commit: refs.get(`${ref}^{}`) || commit, baseline: false });
     }
+    // Alpha history is sampled at its newest supported SemVer; stable patches retain full coverage.
+    const isAlpha = entry => semver.prerelease(entry.version)?.[0] === 'alpha';
+    if (validationTag === undefined) {
+        const newest = selected.filter(isAlpha).sort((a, b) => semver.rcompare(a.version, b.version) || a.ref.localeCompare(b.ref))[0];
+        selected = selected.filter(entry => !isAlpha(entry) || entry === newest);
+    }
     const baseline = sourcePolicy.baseline;
-    if (validationTag === undefined && baseline && supported(baseline.untilStableTag) && !refs.has(`refs/tags/${baseline.untilStableTag}`) && !refs.has(`refs/tags/v${baseline.untilStableTag}`)) {
+    if (validationTag === undefined && !selected.some(isAlpha) && baseline && supported(baseline.untilStableTag) && !refs.has(`refs/tags/${baseline.untilStableTag}`) && !refs.has(`refs/tags/v${baseline.untilStableTag}`)) {
         if (!baseline.ref.startsWith('refs/heads/')) throw new Error('Baseline must name a branch ref');
         const commit = refs.get(baseline.ref);
         if (!commit) throw new Error(`Missing baseline branch ${baseline.ref}`);

@@ -241,3 +241,20 @@ test('platform pipelines start independently and publication requires all result
     assert(target.jobs.plan.steps.some(step => step.with?.name?.startsWith('sdk-plan-')));
     assert(workflow.jobs.verified.steps.every(step => !step.run));
 });
+
+test('automatic source matrix keeps only the newest supported alpha and no duplicate branch baseline', () => {
+    const commit = 'a'.repeat(40), peeled = 'b'.repeat(40);
+    const config = { baseline: { ref: 'refs/heads/v4.0.0', untilStableTag: '4.0.0' } };
+    const text = ['4.0.0-alpha.33', '4.0.0-alpha.100', '4.0.0-alpha.99', '4.0.0-alpha.31', '5.0.0-alpha.999']
+        .map(tag => commit + '\trefs/tags/' + tag).concat(peeled + '\trefs/tags/4.0.0-alpha.100^{}', commit + '\trefs/heads/v4.0.0').join('\n');
+    const selected = selectRefs(text, [policy], config);
+    assert.equal(selected.length, 1);
+    assert.equal(selected[0].version, '4.0.0-alpha.100');
+    assert.equal(selected[0].commit, peeled);
+    assert.equal(selected[0].baseline, false);
+    assert.equal(selectRefs(text, [policy], config, '4.0.0-alpha.33')[0].version, '4.0.0-alpha.33');
+    const withStable = selectRefs(text + '\n' + commit + '\trefs/tags/4.0.0\n' + commit + '\trefs/tags/4.0.1', [policy], config);
+    assert.deepEqual(withStable.map(entry => entry.version).sort(), ['4.0.0', '4.0.0-alpha.100', '4.0.1']);
+    const withNext = selectRefs(text + '\n' + commit + '\trefs/tags/4.1.0-alpha.1', [policy], config);
+    assert.deepEqual(withNext.map(entry => entry.version), ['4.1.0-alpha.1']);
+});
