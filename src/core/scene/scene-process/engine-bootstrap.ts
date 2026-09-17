@@ -3,12 +3,14 @@ import * as EditorExtends from '../../engine/editor-extends';
 import { Rpc } from './rpc';
 import { serviceManager } from './service/service-manager';
 import { Service as DecoratorService } from './service/core/decorator';
+import { ServiceEvents } from './service/core';
 import { ReferenceImageService } from './service/reference-image';
 import { messageManager } from './service/message';
 import { initLocalI18n } from './i18n';
 import { CUSTOM_PIPELINE_MODULE } from '../../engine/graphics-config';
 import { fetchSceneEditorSettings, syncSceneEditorBundles } from './scene-editor-assets';
-import { ServiceEvents } from './service/core/global-events';
+import { installLightProbeNormalReset } from './light-probe-normal-reset';
+import type { IEditorSessionService } from './service/core/editor-session';
 
 import './service';
 
@@ -122,6 +124,7 @@ export async function startup(options: {
     cc.physics.selector.runInEditor = true;
 
     await cc.game.init(config);
+    installLightProbeNormalReset(cc);
     // scene 进程运行在编辑器内嵌视图中，屏幕方向无意义；项目设置默认 'auto' 会让
     // screenAdapter.orientation 停在 Orientation.AUTO(13)，引擎 resize 时对未映射方向打 DEBUG 告警，这里固定为竖屏。
     cc.view.setOrientation(cc.macro.ORIENTATION_PORTRAIT);
@@ -241,8 +244,9 @@ async function setupBrowserInvokeChannel(serverURL: string) {
             rendererVisible = visible;
             socket.emit('scene-renderer:visibility', { visible });
         };
-        // Pink sends this event to each retained scene Webview when its editor
-        // tab is shown or hidden. Observe it without taking over Pink's bridge.
+        // Pink retains a hidden, empty Scene Webview for preloading. Track the
+        // host-reported visibility without taking over Pink's bridge, so Node-side
+        // tools select the displayed scene.
         window.addEventListener('message', (event: MessageEvent) => {
             const message = event.data;
             if (message?.kind === 'event'
@@ -274,6 +278,68 @@ async function setupBrowserInvokeChannel(serverURL: string) {
         socket.on('scene:invoke', (msg: { module?: string; method?: string; args?: any[] }) => {
             if (msg && msg.module && msg.method) {
                 invoke(msg.module, msg.method, msg.args);
+            }
+        });
+        socket.on('scene:invoke-lightfx', async (
+            msg: {
+                sceneUrl?: string;
+                module?: 'LightProbeBake' | 'LightmapBake';
+                method?: 'bake' | 'querySettings' | 'queryBakeInfo' | 'queryCapabilities' | 'clearBake' | 'cancel';
+                args?: unknown[];
+            },
+            reply: (response: { result?: unknown; sceneUrl?: string; error?: string }) => void,
+        ) => {
+            try {
+                const methods = msg?.module === 'LightProbeBake'
+                    ? new Set(['bake', 'querySettings', 'queryCapabilities', 'clearBake', 'cancel'])
+                    : msg?.module === 'LightmapBake'
+                        ? new Set(['bake', 'queryCapabilities', 'queryBakeInfo', 'clearBake', 'cancel'])
+                        : null;
+                if (!methods?.has(msg.method || '')) {
+                    throw new Error('Invalid LightFX scene request.');
+                }
+
+                if (msg.module === 'LightProbeBake' && msg.method === 'querySettings') {
+                    // This frequently polled read must not call queryCurrent(), which
+                    // encodes all baked probes and tetrahedra just to obtain the URL.
+                    const editor = DecoratorService.Editor as typeof DecoratorService.Editor & IEditorSessionService;
+                    const session = editor.getEditorSession();
+                    const scene = cc.director.getScene();
+                    const assertCurrent = () => {
+                        if (!scene || cc.director.getScene() !== scene || !editor.isCurrentEditorSession(session)) {
+                            throw new Error('The source scene changed during the light-probe settings query.');
+                        }
+                    };
+                    assertCurrent();
+                    if (!session.uuid || editor.getCurrentEditorType() !== 'scene') {
+                        throw new Error('Light-probe settings require an open scene.');
+                    }
+                    const assetInfo = await Rpc.getInstance().request('assetManager', 'queryAssetInfo', [session.uuid]);
+                    assertCurrent();
+                    const sceneUrl = assetInfo?.url;
+                    if (!sceneUrl || sceneUrl !== msg.sceneUrl) {
+                        throw new Error(`The selected scene renderer is not displaying the requested scene: ${msg.sceneUrl || 'unknown'}.`);
+                    }
+                    const result = await DecoratorService.LightProbeBake.querySettings();
+                    assertCurrent();
+                    reply({ result, sceneUrl });
+                    return;
+                }
+
+                const currentSceneUrl = await querySceneUrl();
+                if (msg.method !== 'cancel' && (!currentSceneUrl || currentSceneUrl !== msg.sceneUrl)) {
+                    throw new Error(
+                        `The selected scene renderer is not displaying the requested scene: ${msg.sceneUrl || 'unknown'}.`,
+                    );
+                }
+
+                const service = (DecoratorService as any)[msg.module!];
+                const result = await service[msg.method!](...(msg.args || []));
+                const finalSceneUrl = await querySceneUrl().catch(() => '');
+                if (finalSceneUrl) updateRendererScene(finalSceneUrl);
+                reply({ result, sceneUrl: finalSceneUrl });
+            } catch (error) {
+                reply({ error: error instanceof Error ? error.message : String(error) });
             }
         });
         socket.on('scene:capture-reflection-probe', async (

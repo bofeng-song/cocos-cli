@@ -36,6 +36,10 @@ import {
     IPublicReflectionProbeService,
     IPublicReferenceImageService,
     IReferenceImageService,
+    IPublicLightProbeBakeService,
+    ILightProbeBakeService,
+    IPublicLightmapBakeService,
+    ILightmapBakeService,
     IParticleService,
     IPublicParticleService,
     IPublicTerrainService,
@@ -64,6 +68,8 @@ export interface IPublicServiceManager {
     UI: IPublicUIService,
     ReflectionProbe: IPublicReflectionProbeService,
     ReferenceImage: IPublicReferenceImageService,
+    LightProbeBake: IPublicLightProbeBakeService,
+    LightmapBake: IPublicLightmapBakeService,
     Particle: IPublicParticleService,
     Terrain: IPublicTerrainService,
 }
@@ -88,6 +94,8 @@ export interface IServiceManager {
     UI: IUIService,
     ReflectionProbe: IReflectionProbeService,
     ReferenceImage: IReferenceImageService,
+    LightProbeBake: ILightProbeBakeService,
+    LightmapBake: ILightmapBakeService,
     Particle: IParticleService,
     Terrain: ITerrainService,
 }

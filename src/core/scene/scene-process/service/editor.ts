@@ -1,5 +1,5 @@
 import cc from 'cc';
-import { BaseService, register, Service } from './core';
+import { BaseService, register, Service, queryRegisteredService } from './core';
 import { InternalServiceEvents } from './core/internal-events';
 import {
     IBaseIdentifier,
@@ -18,6 +18,7 @@ import { IAssetInfo } from '../../../assets/@types/public';
 import { Rpc } from '../rpc';
 import { enrichMissingDependencyError } from './error-utils';
 import type { IEditorSessionService, IEditorSessionSnapshot } from './core/editor-session';
+import type { ITerrainService } from '../../common/terrain';
 
 /**
  * EditorAsset - 统一的编辑器管理入口
@@ -93,6 +94,22 @@ export class EditorService extends BaseService<IEditorEvents> implements IEditor
         return session.generation === this.editorSessionGeneration
             && session.uuid === this.currentEditorUuid
             && this.isOpen;
+    }
+
+    public runForSession<T>(session: IEditorSessionSnapshot, operation: (save: () => Promise<unknown>) => Promise<T>): Promise<T> {
+        return this.runLifecycle(async () => {
+            const assertCurrent = () => {
+                if (!session.uuid || !this.isCurrentEditorSession(session)) {
+                    throw new Error('The source scene session changed before its result could be applied.');
+                }
+            };
+            assertCurrent();
+            return operation(async () => {
+                assertCurrent();
+                // Already inside the lifecycle queue. Re-entering save() would deadlock.
+                return this.saveUnlocked({ urlOrUUID: session.uuid! });
+            });
+        });
     }
 
     private invalidateEditorSession(): void {
@@ -308,17 +325,12 @@ export class EditorService extends BaseService<IEditorEvents> implements IEditor
 
     /** Terrain data lives in .terrain assets, not in the scene JSON. */
     private async saveTerrainAssets(): Promise<void> {
-        try {
-            const terrain = (Service as any).Terrain;
-            if (!terrain?.saveAsset) return;
-            const result = await terrain.saveAsset(false);
-            if (result === 2) {
-                throw new Error('Terrain asset save failed or requires a Save As target.');
-            }
-        } catch (error) {
-            // During early bootstrap or isolated editor tests TerrainService may
-            // not be registered. Real terrain save failures use the explicit error above.
-            if (error instanceof Error && error.message.includes('requires a Save As')) throw error;
+        // Missing registration during bootstrap is distinct from a registered service failing.
+        const terrain = queryRegisteredService<ITerrainService>('Terrain');
+        if (!terrain) return;
+        const result = await terrain.saveAsset(false);
+        if (result === 2) {
+            throw new Error('Terrain asset save failed or requires a Save As target.');
         }
     }
 

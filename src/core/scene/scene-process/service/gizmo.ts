@@ -1175,7 +1175,7 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
         } else {
             this.execGizmoMethods('cc.LightProbeGroup', 'changeEditMode', ['none']);
         }
-        return mode;
+        return this.queryLightProbeEditMode();
     }
 
     queryLightProbeEditMode(): boolean {
@@ -1191,7 +1191,7 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
         } else {
             this.execGizmoMethods('cc.LightProbeGroup', 'changeEditMode', ['none']);
         }
-        return mode;
+        return this.queryLightProbeBoundingBoxEditMode();
     }
 
     queryLightProbeBoundingBoxEditMode(): boolean {
@@ -1212,12 +1212,12 @@ export class GizmoService extends BaseService<IGizmoEvents> implements IGizmoSer
     }
 
     // 删除 / 复制 vertex 模式下选中的探针（也可由 gizmo onKeyDown 直接触发）。
-    deleteSelectedLightProbes(): number {
-        return this.execGizmoMethods('cc.LightProbeGroup', 'deleteSelectedProbes', []) ?? 0;
+    async deleteSelectedLightProbes(): Promise<number> {
+        return await this.execGizmoMethods('cc.LightProbeGroup', 'deleteSelectedProbes', []) ?? 0;
     }
 
-    duplicateSelectedLightProbes(): number {
-        return this.execGizmoMethods('cc.LightProbeGroup', 'duplicateSelectedProbes', []) ?? 0;
+    async duplicateSelectedLightProbes(): Promise<number> {
+        return await this.execGizmoMethods('cc.LightProbeGroup', 'duplicateSelectedProbes', []) ?? 0;
     }
 
     // 框选探针（方案 A）：上层框选时主动调用，把屏幕矩形交给 light-probe gizmo 自行投影判定。

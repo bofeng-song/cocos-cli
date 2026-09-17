@@ -7,6 +7,8 @@ import { ServiceEvents } from './core/global-events';
 import type { ISnapshotAdapter } from './undo/commands/snapshot-command';
 import { restoreComponentSnapshotDump, restoreNodeSnapshotDump, snapshotMapsEqual } from './undo/commands/command-utils-shared';
 import dumpUtil from './dump';
+import { withLightProbeTransformScenes } from './scene/light-probe-transform';
+import { deletedLightmapAssets } from './baking/lightfx/deleted-lightmap-assets';
 
 interface IRecordingComponentSnapshot {
     uuid: string;
@@ -44,7 +46,16 @@ export class UndoService extends BaseService<IUndoEvents> implements IUndoServic
     }
 
     beginRecording(uuids: string[], options?: IUndoBeginOptions): string {
-        return this._undoMgr.beginRecording(uuids, options);
+        const nodes = uuids.map(uuid => {
+            const node = this._getEditorNodeManager()?.getNode?.(uuid) as Node | undefined;
+            return node ?? (this._getEditorComponentManager()?.getComponent?.(uuid) as Component | undefined)?.node;
+        }).filter((node): node is Node => this._isNodeInCurrentScene(node));
+        // Fix the target set before the mutation. Even if a component is disabled
+        // while recording, before/after must capture the same scene globals.
+        const scenes = withLightProbeTransformScenes(nodes).filter(node => node === node.scene);
+        const targets = new Set(uuids);
+        for (const scene of scenes) { targets.delete(scene.uuid); targets.add(scene.uuid); }
+        return this._undoMgr.beginRecording([...targets], options);
     }
 
     async endRecording(commandId: string): Promise<void> {
@@ -241,7 +252,7 @@ export class UndoService extends BaseService<IUndoEvents> implements IUndoServic
             kind: 'node',
             uuid: node.uuid,
             path: this._getNodePath(node),
-            dump: this._cloneDump(dumpUtil.dumpNode(node, { includeComponents: false })),
+            dump: deletedLightmapAssets.capture(node.scene, this._cloneDump(dumpUtil.dumpNode(node, { includeComponents: false }))),
             components: node.components
                 .map(component => this._captureComponentSnapshot(component as Component))
                 .filter((snapshot): snapshot is IRecordingComponentSnapshot => !!snapshot),
@@ -260,7 +271,7 @@ export class UndoService extends BaseService<IUndoEvents> implements IUndoServic
             nodePath: this._getNodePath(component.node),
             index: component.node.components.indexOf(component),
             type: this._getComponentType(component),
-            dump: this._cloneDump(dumpUtil.dumpComponent(component)),
+            dump: deletedLightmapAssets.capture(component.node.scene, this._cloneDump(dumpUtil.dumpComponent(component))),
         };
     }
 

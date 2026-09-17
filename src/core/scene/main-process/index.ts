@@ -9,6 +9,7 @@ import { PrefabProxy } from './proxy/prefab-proxy';
 import { ReflectionProbeProxy } from './proxy/reflection-probe-proxy';
 import { reflectionProbeRenderer } from './reflection-probe-renderer';
 import { ReferenceImageProxy } from './proxy/reference-image-proxy';
+import { LightmapBakeProxy, LightProbeBakeProxy } from './proxy/lightfx-bake-proxy';
 import { PreviewProxy } from './proxy/preview-proxy';
 import { ParticleProxy } from './proxy/particle-proxy';
 
@@ -18,6 +19,7 @@ import { sceneConfigInstance } from '../scene-configs';
 import i18n from '../../base/i18n';
 import { referenceImageFiles } from './reference-image-files';
 import { referenceImageStore } from './reference-image-store';
+import { lightFXBakeHost } from './lightfx-bake-host';
 import { reflectionProbeBakeHost } from './reflection-probe-bake-host';
 
 export interface IMainModule {
@@ -28,6 +30,7 @@ export interface IMainModule {
     'reflectionProbeRenderer': typeof reflectionProbeRenderer;
     'referenceImageFiles': typeof referenceImageFiles;
     'referenceImageStore': typeof referenceImageStore;
+    'lightFXBakeHost': typeof lightFXBakeHost;
     'reflectionProbeBakeHost': typeof reflectionProbeBakeHost;
 }
 
@@ -38,6 +41,8 @@ export const Scene = {
     ...EngineProxy,
     ...PrefabProxy,
     ReferenceImage: ReferenceImageProxy,
+    LightProbeBake: LightProbeBakeProxy,
+    LightmapBake: LightmapBakeProxy,
     Preview: PreviewProxy,
     // 粒子系统相关接口（play/pause/stop/restart/setPlaySpeed/queryPlayInfo）
     Particle: ParticleProxy,

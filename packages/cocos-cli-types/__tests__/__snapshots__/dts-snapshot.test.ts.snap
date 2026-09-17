@@ -6446,6 +6446,7 @@ export declare type IAssetType =
 | 'RenderFlow';
 export declare interface IBaseCreateNodeParams {
     path: string;
+    insertSide?: 'before' | 'after';
     name?: string;
     workMode?: '2d' | '3d';
     position?: IVec3;
@@ -6573,6 +6574,13 @@ export declare interface ICreateByAssetParams extends IBaseCreateNodeParams {
 }
 export declare interface ICreateByNodeTypeParams extends IBaseCreateNodeParams {
     nodeType: NodeType;
+}
+export declare interface ICreateBySerializedDataParams {
+    data: SerializedNodeData;
+    parentPath: string;
+    siblingIndex?: number;
+    keepWorldTransform?: boolean;
+    externalReferences?: 'resolve' | 'clear';
 }
 export declare interface ICreateNodePreflightResult {
     action: 'create' | 'choose-prefab-canvas-handling';
@@ -6705,8 +6713,8 @@ export declare interface IGizmoService {
     selectAllLightProbes(): void;
     unselectAllLightProbes(): void;
     queryLightProbeSelectedCount(): number;
-    deleteSelectedLightProbes(): number;
-    duplicateSelectedLightProbes(): number;
+    deleteSelectedLightProbes(): Promise<number>;
+    duplicateSelectedLightProbes(): Promise<number>;
     generateLightProbes(): number;
     regionSelectLightProbes(left: number, right: number, top: number, bottom: number, additive: boolean): number;
 }
@@ -6718,6 +6726,147 @@ export declare interface IInsertLODOptions {
 }
 export declare interface IIsPrefabInstanceParams {
     nodePath: string;
+}
+export declare interface ILightFXCancelResult {
+    cancelled: boolean;
+    target: 'light-probe' | 'lightmap' | null;
+}
+export declare interface ILightFXDiagnostics {
+    operationId?: string;
+    version: 1;
+    stage: string;
+    logs: string[];
+    progress?: string;
+    rate?: number;
+}
+export declare interface ILightmapBakeCapabilities {
+    outputDirectory?: true;
+    diagnostics?: ILightFXDiagnostics;
+    version: 1;
+    resultLifecycleVersion: 1;
+    sceneTransactionVersion: 1;
+    assetVersion: 1;
+    assetCleanupVersion?: 1;
+    cancelVersion?: 1;
+    cancellable?: boolean;
+    busy: boolean;
+}
+export declare interface ILightmapBakeInfo {
+    sceneUrl: string;
+    baked: boolean;
+    meshCount: number;
+    terrainCount: number;
+    highp: boolean;
+    stationaryMainLight: boolean;
+    textures: ILightmapTextureInfo[];
+    missingTextureUuids: string[];
+}
+export declare interface ILightmapBakeOptions {
+    outputUrl?: string;
+    msaa?: 1 | 2 | 4 | 8;
+    resolution?: 128 | 256 | 512 | 1024 | 2048;
+    filter?: boolean;
+    highp?: boolean;
+    giScale?: number;
+    giSamples?: number;
+    giPathLength?: 1 | 2 | 3 | 4;
+    aoLevel?: 0 | 1 | 2;
+    aoStrength?: number;
+    aoRadius?: number;
+    aoColor?: [number, number, number, number?];
+    threads?: number;
+    saveScene?: boolean;
+    timeoutMs?: number;
+}
+export declare interface ILightmapBakeResult {
+    diagnostics?: ILightFXDiagnostics;
+    sceneUrl: string;
+    textureUrls: string[];
+    meshCount: number;
+    terrainCount: number;
+    durationMs: number;
+}
+export declare interface ILightmapBakeService extends IServiceEvents {
+    queryCapabilities(): Promise<ILightmapBakeCapabilities>;
+    bake(options: ILightmapBakeOptions): Promise<ILightmapBakeResult>;
+    queryBakeInfo(): Promise<ILightmapBakeInfo>;
+    clearBake(options?: {
+        saveScene?: boolean;
+        deleteAssets?: boolean;
+    }): Promise<ILightmapClearResult>;
+    cancel(): Promise<ILightFXCancelResult>;
+}
+export declare interface ILightmapClearResult {
+    clearedCount: number;
+    deletedAssetCount: number;
+    retainedAssetCount: number;
+    failedAssetCount: number;
+}
+export declare interface ILightmapTextureInfo {
+    uuid: string;
+    url: string;
+    filename: string;
+    size: number;
+    createdAt: number;
+    modifiedAt: number;
+}
+export declare interface ILightProbeBakeCapabilities {
+    diagnostics?: ILightFXDiagnostics;
+    version: 1;
+    cancelVersion?: 1;
+    cancellable?: boolean;
+    resultLifecycleVersion: 1;
+    sceneTransactionVersion: 1;
+    busy: boolean;
+}
+export declare interface ILightProbeBakeOptions {
+    giScale?: number;
+    giSamples?: number;
+    bounces?: number;
+    reduceRinging?: number;
+    showWireframe?: boolean;
+    showConvex?: boolean;
+    lightProbeSphereVolume?: number;
+    saveScene?: boolean;
+    timeoutMs?: number;
+}
+export declare interface ILightProbeBakeResult {
+    diagnostics?: ILightFXDiagnostics;
+    sceneUrl: string;
+    probeCount: number;
+    giScale: number;
+    giSamples: number;
+    bounces: number;
+    reduceRinging: number;
+    showWireframe: boolean;
+    showConvex: boolean;
+    lightProbeSphereVolume: number;
+    durationMs: number;
+}
+export declare interface ILightProbeBakeService extends IServiceEvents {
+    querySettings(): Promise<ILightProbeSettings>;
+    queryCapabilities(): Promise<ILightProbeBakeCapabilities>;
+    bake(options: ILightProbeBakeOptions): Promise<ILightProbeBakeResult>;
+    clearBake(options?: {
+        saveScene?: boolean;
+    }): Promise<{
+        probeCount: number;
+    }>;
+    cancel(): Promise<ILightFXCancelResult>;
+}
+export declare interface ILightProbeSetting<T extends number | boolean> {
+    value: T;
+    type: string;
+    readonly: boolean;
+}
+export declare interface ILightProbeSettings {
+    giScale: ILightProbeSetting<number>;
+    giSamples: ILightProbeSetting<number>;
+    bounces: ILightProbeSetting<number>;
+    reduceRinging: ILightProbeSetting<number>;
+    showWireframe: ILightProbeSetting<boolean>;
+    showConvex: ILightProbeSetting<boolean>;
+    lightProbeSphereVolume: ILightProbeSetting<number>;
 }
 export declare interface ILODGroupBoundsResult {
     localBoundaryCenter: IVec3;
@@ -6812,6 +6961,8 @@ export declare interface INodeDumpOptions {
     includeComponents?: boolean;
 }
 export declare interface INodeService extends IServiceEvents {
+    serialize(params: ISerializeNodesParams): Promise<SerializedNodeData>;
+    createBySerializedData(params: ICreateBySerializedDataParams): Promise<string[]>;
     createByType(params: ICreateByNodeTypeParams): Promise<INode | null>;
     createByAsset(params: ICreateByAssetParams): Promise<INode | null>;
     preflightCreate(params: ICreateByNodeTypeParams | ICreateByAssetParams): Promise<ICreateNodePreflightResult>;
@@ -6984,6 +7135,12 @@ export declare type IPropertyLock = {
     message: string
 };
 export declare type IPropertyValueType = IProperty | IProperty[] | null | undefined | number | boolean | string | Vec4 | Vec3 | Vec2 | Mat4 | any | Array<unknown>
+export declare interface IQuat {
+    x: number;
+    y: number;
+    z: number;
+    w: number;
+}
 export declare interface IQueryClassesOptions {
     extends?: string | string[];
     excludeSelf?: boolean;
@@ -7283,6 +7440,9 @@ export declare interface ISelectionService {
     isSelect(path: string): boolean;
     reset(): void;
 }
+export declare interface ISerializeNodesParams {
+    paths: string[];
+}
 export declare interface IServiceEvents {
     onEditorOpened?(): void;
     onEditorReload?(): void;
@@ -7333,6 +7493,8 @@ export declare interface IServiceManager {
     UI: IUIService;
     ReflectionProbe: IReflectionProbeService;
     ReferenceImage: IReferenceImageService;
+    LightProbeBake: ILightProbeBakeService;
+    LightmapBake: ILightmapBakeService;
     Particle: IParticleService;
     Terrain: ITerrainService;
 }
@@ -7864,6 +8026,20 @@ export declare interface SerializedAssetFinder {
     textures?: Array<string | null>;
     materials?: Array<string | null>;
     scenes?: Array<string | null>;
+}
+export declare interface SerializedNodeData {
+    version: 1;
+    serialized: string;
+    rootTransforms: {
+        position: IVec3;
+        rotation: IQuat;
+        scale: IVec3;
+    }[];
+    externalReferences: {
+        id: string;
+        type: 'node' | 'component';
+        uuid: string;
+    }[];
 }
 export declare interface SimplifyOptions {
     targetRatio?: number;

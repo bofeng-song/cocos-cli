@@ -7,6 +7,7 @@ import BoxController from '../../controller/box';
 import PositionController from '../../node/position-controller';
 import ControllerUtils from '../../utils/controller-utils';
 import { addMeshToNode, create3DNode, getModel, setMeshColor } from '../../utils/engine-utils';
+import { buildLightProbeConvex } from '../../utils/light-probe-convex';
 import { registerGizmo } from '../../gizmo-defines';
 
 // 探针数量超过该阈值时只画包围盒/线框、不逐个建球，避免海量节点
@@ -27,6 +28,7 @@ const tempDragB = new Vec3();
 // 框选投影用临时量（复用避免每帧分配）
 const tempRegionWorld = new Vec3();
 const tempRegionScreen = new Vec3();
+const unitScale = new Vec3(1, 1, 1);
 
 // 进入 vertex 模式时备份的变换工具 pivot，退出时还原（模块级：pivot 是全局共享状态）。
 let pivotBackup: string | undefined;
@@ -37,6 +39,7 @@ let pivotBackup: string | undefined;
 // 导致拖动移动的是整个 LightProbeGroup 节点而非单个探针（对齐 Creator：进入探针
 // 编辑模式后不显示节点变换 gizmo）。
 let toolNameBackup: string | undefined;
+let viewModeBackup: string | undefined;
 
 // ── 编辑模式状态机（内联复刻 Creator manager.ts + types.ts，本仓库约定单文件）──────────
 
@@ -57,8 +60,13 @@ const GizmoList: LightProbeGroupComponentGizmo[] = [];
 let sharedProbeController: PositionController | null = null;
 let sharedProbeControllerOwner: LightProbeGroupComponentGizmo | null = null;
 
+function isUsableProbeGizmo(comp: LightProbeGroupComponentGizmo): boolean {
+    const target = comp.target as any;
+    return comp.visible() && !!target && target.isValid !== false && target.enabledInHierarchy !== false;
+}
+
 function isActiveProbeGizmo(comp: LightProbeGroupComponentGizmo): boolean {
-    return comp.visible() && !!comp.target && (comp as any)._vertexEditMode === true &&
+    return isUsableProbeGizmo(comp) && (comp as any)._vertexEditMode === true &&
         (comp as any)._selected?.size > 0;
 }
 
@@ -154,6 +162,7 @@ export function getEditMode(): LightEditMode {
 /** 切换编辑模式：先发 MODE_CHANGED(new, old)，再落地 currentEditMode。 */
 export function changeEditMode(mode: LightEditMode | `${LightEditMode}`): void {
     const next = mode as LightEditMode;
+    if (next === currentEditMode) return;
     eventEmitter.emit(MODE_CHANGED, next, currentEditMode);
     currentEditMode = next;
 }
@@ -172,6 +181,7 @@ export function lightProbeInfoChanged(): void {
 /** 全选所有组的所有探针（vertex 模式生效）。 */
 export function selectAllProbes(): void {
     for (const comp of GizmoList) {
+        if (!isUsableProbeGizmo(comp)) continue;
         try {
             comp.selectAllProbes();
         } catch (e) {
@@ -194,34 +204,47 @@ export function unselectAllProbes(): void {
 /** 查询当前选中探针总数（跨所有组求和）。 */
 export function getSelectedProbeCount(): number {
     let count = 0;
-    for (const comp of GizmoList) count += comp.selectedProbeCount;
+    for (const comp of GizmoList) {
+        if (isUsableProbeGizmo(comp)) count += comp.selectedProbeCount;
+    }
     return count;
 }
 
 /** 删除所有组中选中的探针，返回删除总数。 */
-export function deleteSelectedProbes(): number {
+async function editSelectedProbes(operation: 'delete' | 'duplicate'): Promise<number> {
+    const groups = GizmoList.filter(isActiveProbeGizmo);
+    if (groups.length === 0) return 0;
+    const service = getService();
+    let recording: string | null = null;
+    try {
+        recording = service?.Undo?.beginRecording?.(groups.map(comp => comp.target!.node.uuid)) ?? null;
+    } catch {
+        recording = null;
+    }
     let total = 0;
-    for (const comp of GizmoList) {
-        try {
-            total += comp.deleteCurrentSelectedProbes();
-        } catch (e) {
-            console.warn('[LightProbeGroup] deleteSelectedProbes failed:', e);
+    try {
+        for (const comp of groups) {
+            try {
+                total += operation === 'delete'
+                    ? comp.deleteCurrentSelectedProbes()
+                    : comp.duplicateCurrentSelectedProbes();
+            } catch (e) {
+                console.warn(`[LightProbeGroup] ${operation}SelectedProbes failed:`, e);
+            }
         }
+    } finally {
+        if (recording) await service?.Undo?.endRecording?.(recording);
     }
     return total;
 }
 
+export async function deleteSelectedProbes(): Promise<number> {
+    return editSelectedProbes('delete');
+}
+
 /** 复制所有组中选中的探针（原位副本），返回新增总数。 */
-export function duplicateSelectedProbes(): number {
-    let total = 0;
-    for (const comp of GizmoList) {
-        try {
-            total += comp.duplicateCurrentSelectedProbes();
-        } catch (e) {
-            console.warn('[LightProbeGroup] duplicateSelectedProbes failed:', e);
-        }
-    }
-    return total;
+export async function duplicateSelectedProbes(): Promise<number> {
+    return editSelectedProbes('duplicate');
 }
 
 /**
@@ -237,6 +260,7 @@ export function regionSelectProbes(
 ): number {
     let total = 0;
     for (const comp of GizmoList) {
+        if (!isUsableProbeGizmo(comp)) continue;
         try {
             total += comp.regionSelectProbes(left, right, top, bottom, additive);
         } catch (e) {
@@ -251,7 +275,7 @@ export function generateLightProbes(): number {
     let total = 0;
     for (const comp of GizmoList) {
         // 当前项目的 gizmo 实例在选中节点时才会保持可见并绑定 target。
-        if (!comp.visible() || !comp.target) continue;
+        if (!isUsableProbeGizmo(comp)) continue;
         if (comp.generateLightProbes()) total++;
     }
     return total;
@@ -272,19 +296,23 @@ eventEmitter.on(MODE_CHANGED, (newMode: LightEditMode, _oldMode: LightEditMode) 
         const ttd = gizmoSvc?.transformToolData;
         if (gizmoSvc && ttd) {
             if (vertexOn) {
-                if (toolNameBackup === undefined) toolNameBackup = ttd.toolName;
+                if (toolNameBackup === undefined) {
+                    toolNameBackup = ttd.toolName;
+                    viewModeBackup = ttd.viewMode;
+                }
                 // toolName='view' 的 setter 是 toggle 语义（依据当前 viewMode 翻转）。
                 // 先强制 viewMode='select'，再设 'view'，确保结果稳定为 view 模式，
                 // 从而 changeTool 换成空的 ViewGizmo 并隐藏 position/rotation/scale controller。
-                if (ttd.toolName !== 'view' || ttd.viewMode !== 'view') {
-                    ttd.viewMode = 'select';
-                    gizmoSvc.transformToolName = 'view';
-                }
+                if (ttd.toolName !== 'view') gizmoSvc.transformToolName = 'view';
+                ttd.viewMode = 'select';
             } else {
                 // 退出 vertex（切到 BOX 或 NONE）：还原为备份工具名，无备份则回到 position。
-                const restore = toolNameBackup ?? 'position';
+                const restoreTool = toolNameBackup;
+                const restoreViewMode = viewModeBackup;
                 toolNameBackup = undefined;
-                if (ttd.toolName !== restore) gizmoSvc.transformToolName = restore;
+                viewModeBackup = undefined;
+                if (restoreTool !== undefined && ttd.toolName !== restoreTool) gizmoSvc.transformToolName = restoreTool;
+                if (restoreViewMode !== undefined) ttd.viewMode = restoreViewMode;
             }
         }
     } catch (e) {
@@ -312,6 +340,9 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
     private _dotsRoot: Node | null = null;      // 探针球容器（跟随节点世界变换）
     private _wireframeNode: Node | null = null;  // 四面体线框（世界坐标、单位阵）
     private _probesRef: Vec3[] | null = null;
+    private _convexNode: Node | null = null;
+    private _normalNode: Node | null = null;
+    private _boundTarget: LightProbeGroup | null = null;
     private _dotsVolume = -1;                     // 上次建点用的球体积，用于失效缓存
     private _reuseMesh: any = null;
     private _lastInfoSig = '';                    // lightProbeInfo 显示设置/数据签名，用于按需刷新
@@ -399,15 +430,18 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
 
     onHide() {
         this._shown = false;
+        this._selected.clear();
         this._controller.hide();
         this._probeController?.hide();
         if (this._dotsRoot) this._dotsRoot.active = false;
         if (this._wireframeNode) this._wireframeNode.active = false;
+        if (this._convexNode) this._convexNode.active = false;
+        if (this._normalNode) this._normalNode.active = false;
         this._lastInfoSig = '';
         // 与 onShow 的「选中即进 vertex」配对：取消选中/切走节点时自动退出 vertex 模式，
         // 让 currentEditMode 复位为 none（否则状态机会一直停留在 vertex，导致下次选中不再自动进入，
         // 且面板 "Exit Probe Edit Mode" 按钮态无法复位）。box 模式为用户主动开启，这里不动它。
-        if (getEditMode() !== LightEditMode.NONE) {
+        if (getEditMode() !== LightEditMode.NONE && !GizmoList.some(isUsableProbeGizmo)) {
             changeEditMode(LightEditMode.NONE);
         }
     }
@@ -430,6 +464,13 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
         this._wireframeNode.parent = gizmoRoot;
         this._wireframeNode.active = false;
 
+        this._convexNode = create3DNode('LightProbeConvex');
+        this._convexNode.parent = gizmoRoot;
+        this._convexNode.active = false;
+        this._normalNode = create3DNode('LightProbeConvexNormals');
+        this._normalNode.parent = gizmoRoot;
+        this._normalNode.active = false;
+
         // 包围盒默认隐藏：仅在 box 编辑模式（_boxEditMode===true）下才显示。
         this._controller.hide();
     }
@@ -438,7 +479,7 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
         if (!this._isInitialized || this.target === null) return;
         this._minPos.set(this.target.minPos);
         this._maxPos.set(this.target.maxPos);
-        this._scale = this.target.node.getWorldScale();
+        this._scale.set(1, 1, 1);
         this._minPropPath = this.getCompPropPath('minPos');
         this._maxPropPath = this.getCompPropPath('maxPos');
     }
@@ -514,6 +555,10 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
 
     updateControllerData() {
         if (!this._isInitialized || this.target == null) return;
+        if (this._boundTarget !== this.target) {
+            this._selected.clear();
+            this._boundTarget = this.target;
+        }
         // 未处于显示状态（节点未选中/已切走）：强制隐藏所有可视元素并早退。
         // 否则 onUpdate 的每帧刷新会把探针球/线框重新激活，导致取消选中后探针不消失。
         if (!this._shown) {
@@ -521,28 +566,30 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
             this._probeController?.hide();
             if (this._dotsRoot) this._dotsRoot.active = false;
             if (this._wireframeNode) this._wireframeNode.active = false;
+            if (this._convexNode) this._convexNode.active = false;
+            if (this._normalNode) this._normalNode.active = false;
             return;
         }
-        if (!(this.target instanceof LightProbeGroup)) {
+        if (!(this.target instanceof LightProbeGroup) || (this.target as any).enabledInHierarchy === false) {
             this._controller.hide();
             if (this._dotsRoot) this._dotsRoot.active = false;
             if (this._wireframeNode) this._wireframeNode.active = false;
+            if (this._convexNode) this._convexNode.active = false;
+            if (this._normalNode) this._normalNode.active = false;
             return;
         }
 
         const node = this.target.node;
-        const worldScale = node.getWorldScale();
         const worldPos = node.getWorldPosition();
-        const worldRot = tempQuat_a;
-        node.getWorldRotation(worldRot);
+        Quat.identity(tempQuat_a);
 
         // 绿色可拖包围盒：仅在 box 编辑模式下显示并可编辑，否则隐藏（避免选中即进入 Edit Area Box）。
         if (this._boxEditMode) {
             this._controller.show();
             this._controller.checkEdit();
-            this._controller.setScale(worldScale);
+            this._controller.setScale(unitScale);
             this._controller.setPosition(worldPos);
-            this._controller.setRotation(worldRot);
+            this._controller.setRotation(tempQuat_a);
             const min = this.target.minPos;
             const max = this.target.maxPos;
             const center = Vec3.multiplyScalar(new Vec3(), Vec3.add(new Vec3(), min, max), 0.5);
@@ -555,14 +602,15 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
         // 探针球容器跟随节点世界变换
         if (this._dotsRoot) {
             this._dotsRoot.setWorldPosition(worldPos);
-            this._dotsRoot.setWorldRotation(worldRot);
-            this._dotsRoot.setWorldScale(worldScale);
+            this._dotsRoot.setWorldRotation(tempQuat_a);
+            this._dotsRoot.setWorldScale(1, 1, 1);
         }
         this._rebuildDots(false);
         // 探针坐标可能因 undo/redo 等外部改动而变，但引擎的四面体数据（info.data）未随之重算，
         // 会导致线框与探针球脱节。检测到脱节时先让引擎重剖分，再重画线框。
         this._syncEngineIfProbesChanged();
         this._rebuildWireframe();
+        this._rebuildConvex();
         // vertex 模式下探针数据可能因 undo/redo 等外部变化而改变位置：
         // 数据刷新后同步把 3 轴 gizmo 重新移到当前选中探针中心（拖动中不重定位，见内部 _ctrlDragging 守卫），
         // 否则会出现「探针 undo 跳回原位、但 gizmo 停在旧位置」的不同步。
@@ -684,6 +732,30 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
         this._wireframeNode.setRotationFromEuler(0, 0, 0);
         this._wireframeNode.setWorldScale(1, 1, 1);
         ControllerUtils.drawLines(this._wireframeNode, positions, indices, WIREFRAME_COLOR);
+    }
+
+    private _rebuildConvex(): void {
+        if (!this._convexNode || !this._normalNode) return;
+        this._convexNode.active = false;
+        this._normalNode.active = false;
+        const info = this._getLightProbeInfo();
+        const data = info?.data;
+        if (!this.target || !info?.showConvex || !data || data.empty?.()) return;
+
+        const geometry = buildLightProbeConvex(data.probes ?? [], data.tetrahedrons ?? []);
+        for (const node of [this._convexNode, this._normalNode]) {
+            node.setWorldPosition(0, 0, 0);
+            node.setRotationFromEuler(0, 0, 0);
+            node.setWorldScale(1, 1, 1);
+        }
+        if (geometry.indices.length > 0) {
+            ControllerUtils.drawLines(this._convexNode, geometry.positions, geometry.indices, WIREFRAME_COLOR);
+            this._convexNode.active = true;
+        }
+        if (geometry.normalIndices.length > 0) {
+            ControllerUtils.drawLines(this._normalNode, geometry.normalPositions, geometry.normalIndices, WIREFRAME_COLOR);
+            this._normalNode.active = true;
+        }
     }
 
     /**
@@ -1299,15 +1371,6 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
         if (delIndices.length === 0) return 0;
 
         const node = this.target.node;
-        const svc = getService();
-        const propPath = this.getCompPropPath('probes');
-        let undoId: string | null = null;
-        try {
-            undoId = svc?.Undo?.beginRecording?.([node.uuid]) ?? null;
-        } catch (e) {
-            undoId = null;
-        }
-        if (propPath) this.onControlUpdate(propPath);
 
         // 过滤掉被选中的探针（用 Set 判定索引）。
         const delSet = new Set(delIndices);
@@ -1326,12 +1389,6 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
         this.onComponentChanged(node);
         // 选中已清空：隐藏 3 轴 gizmo。
         this._updateProbeControllerTransform();
-        if (propPath) this.onControlEnd(propPath);
-        try {
-            if (undoId) svc?.Undo?.endRecording?.(undoId);
-        } catch (e) {
-            // ignore
-        }
         this._repaint();
         return delIndices.length;
     }
@@ -1345,15 +1402,6 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
         if (dupIndices.length === 0) return 0;
 
         const node = this.target.node;
-        const svc = getService();
-        const propPath = this.getCompPropPath('probes');
-        let undoId: string | null = null;
-        try {
-            undoId = svc?.Undo?.beginRecording?.([node.uuid]) ?? null;
-        } catch (e) {
-            undoId = null;
-        }
-        if (propPath) this.onControlUpdate(propPath);
 
         const next = probes.slice();
         for (const i of dupIndices) {
@@ -1375,12 +1423,6 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
         this.onComponentChanged(node);
         // 选中变为新复制出来的探针：把 3 轴 gizmo 移到它们的世界中心。
         this._updateProbeControllerTransform();
-        if (propPath) this.onControlEnd(propPath);
-        try {
-            if (undoId) svc?.Undo?.endRecording?.(undoId);
-        } catch (e) {
-            // ignore
-        }
         this._repaint();
         return dupIndices.length;
     }
@@ -1400,11 +1442,11 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
             return;
         }
         if (isDuplicate) {
-            this.duplicateCurrentSelectedProbes();
+            void duplicateSelectedProbes().catch(e => console.warn('[LightProbeGroup] duplicateSelectedProbes failed:', e));
             return false;
         }
         if (isDelete) {
-            this.deleteCurrentSelectedProbes();
+            void deleteSelectedProbes().catch(e => console.warn('[LightProbeGroup] deleteSelectedProbes failed:', e));
             return false;
         }
     }
@@ -1465,9 +1507,11 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
             info ? (info.lightProbeSphereVolume ?? 1) : 1,
             info ? (info.showProbe ?? true) : true,
             info ? (info.showWireframe ?? true) : true,
+            info ? (info.showConvex ?? false) : false,
             data?.tetrahedrons?.length ?? 0,
             data?.probes?.length ?? 0,
             posSum.toFixed(3),
+            this.target?.node.worldPosition?.toString?.() ?? '',
         ].join('|');
     }
 
@@ -1483,6 +1527,14 @@ class LightProbeGroupComponentGizmo extends GizmoBase<LightProbeGroup> {
         if (this._wireframeNode) {
             this._wireframeNode.destroy();
             this._wireframeNode = null;
+        }
+        if (this._convexNode) {
+            this._convexNode.destroy();
+            this._convexNode = null;
+        }
+        if (this._normalNode) {
+            this._normalNode.destroy();
+            this._normalNode = null;
         }
         if (sharedProbeControllerOwner === this) {
             sharedProbeController?.hide();

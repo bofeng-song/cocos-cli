@@ -20,4 +20,5 @@ export * from './reflection-probe';
 export * from './terrain';
 export * from './message';
 export * from './reference-image';
+export * from './lightfx-bake';
 export * from './particle';

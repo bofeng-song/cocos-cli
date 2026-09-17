@@ -289,7 +289,7 @@ describe('ServiceEvents 事件发射集成测试', () => {
             );
         });
 
-        it('forwards all LightProbe facade operations with the expected method names and parameters', () => {
+        it('forwards all LightProbe facade operations with the expected method names and parameters', async () => {
             const exec = jest.fn((name: string, method: string) => {
                 if (method === 'getEditMode') return 'none';
                 if (method === 'getSelectedProbeCount') return 3;
@@ -308,8 +308,8 @@ describe('ServiceEvents 事件发射集成测试', () => {
             gizmoService.selectAllLightProbes();
             gizmoService.unselectAllLightProbes();
             expect(gizmoService.queryLightProbeSelectedCount()).toBe(3);
-            expect(gizmoService.deleteSelectedLightProbes()).toBe(1);
-            expect(gizmoService.duplicateSelectedLightProbes()).toBe(2);
+            await expect(gizmoService.deleteSelectedLightProbes()).resolves.toBe(1);
+            await expect(gizmoService.duplicateSelectedLightProbes()).resolves.toBe(2);
             expect(gizmoService.regionSelectLightProbes(1, 2, 3, 4, true)).toBe(4);
             expect(gizmoService.generateLightProbes()).toBe(2);
 
@@ -610,6 +610,34 @@ describe('ServiceEvents 事件发射集成测试', () => {
             await editorService.save({ urlOrUUID: uuid });
 
             expect(listener).toHaveBeenCalledTimes(1);
+        });
+
+        it.each(['reported', 'thrown'])('does not write the scene or mark it saved after a %s Terrain failure', async failure => {
+            const { SceneEditor } = require('../../scene-process/service/editors');
+            const core = require('../../scene-process/service/core/decorator');
+            const terrain = { saveAsset: jest.fn(async () => {
+                if (failure === 'thrown') throw new Error('Terrain storage failed');
+                return 2;
+            }) };
+            const query = jest.spyOn(core, 'queryRegisteredService').mockReturnValue(terrain);
+            const markSaved = jest.spyOn(editorService, '_markUndoSaved');
+            const listener = jest.fn();
+            globalEventEmitter.on('editor:save', listener);
+            const uuid = 'terrain-save-failed-scene';
+            const editor = Object.assign(Object.create(SceneEditor.prototype), { save: jest.fn() });
+            editorService.editorMap.set(uuid, editor);
+            editorService.currentEditorUuid = uuid;
+            mockRpcRequest.mockResolvedValueOnce({ uuid, url: 'test.scene', type: 'scene' });
+            try {
+                await expect(editorService.save({})).rejects.toThrow(failure === 'thrown' ? 'Terrain storage failed' : 'Terrain asset save failed');
+                expect(terrain.saveAsset).toHaveBeenCalledWith(false);
+                expect(editor.save).not.toHaveBeenCalled();
+                expect(markSaved).not.toHaveBeenCalled();
+                expect(listener).not.toHaveBeenCalled();
+            } finally {
+                query.mockRestore();
+                markSaved.mockRestore();
+            }
         });
     });
 
