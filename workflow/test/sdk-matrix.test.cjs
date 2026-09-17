@@ -280,16 +280,22 @@ test('automatic source matrix keeps only the newest supported alpha and no dupli
     assert.deepEqual(withNext.map(entry => entry.version), ['4.1.0-alpha.1']);
 });
 
-test('PR unit and E2E use independent runner jobs and both are required by existing checks', () => {
+test('PR tests prepare once per platform and run unit before E2E', () => {
     const yaml = require('js-yaml');
     const workflow = yaml.load(fs.readFileSync(path.join(root, '.github/workflows/pr-test.yml'), 'utf8'));
-    const suites = workflow.jobs['suite-test'];
-    assert.deepEqual(suites.strategy.matrix.suite, ['unit', 'e2e']);
-    assert.equal(suites.strategy['fail-fast'], false);
-    assert.equal(suites.steps.find(step => step.name === 'Run unit tests').if, "matrix.suite == 'unit'");
-    assert.equal(suites.steps.find(step => step.name === 'Run E2E tests').if, "matrix.suite == 'e2e'");
-    assert(suites.steps.find(step => step.name === 'Run AssetDB package tests').if.includes("matrix.suite == 'unit'"));
-    assert.deepEqual(workflow.jobs['pr-test'].needs, ['check-changes', 'suite-test']);
-    assert(workflow.jobs['pr-test'].if.includes('always()'));
-    assert(workflow.jobs['pr-test'].steps[0].run.includes('success'));
+    assert.equal(workflow.jobs['suite-test'], undefined);
+    const job = workflow.jobs['pr-test'];
+    assert.deepEqual(job.strategy.matrix, { os: ['windows-2022', 'macos-latest'] });
+    assert.equal(job.needs, 'check-changes');
+    assert.equal(job.strategy['fail-fast'], false);
+    assert.equal(job.steps.filter(step => step.name === 'Setup environment').length, 1);
+    const setup = job.steps.findIndex(step => step.name === 'Setup environment');
+    const unit = job.steps.findIndex(step => step.name === 'Run unit tests');
+    const e2e = job.steps.findIndex(step => step.name === 'Run E2E tests');
+    assert(setup < unit && unit < e2e);
+    assert.equal(job.steps[setup].env.MINIMAL_DOWNLOAD_TOOLS, 'true');
+    assert.equal(job.steps[unit].if, undefined);
+    assert.equal(job.steps[e2e].if, undefined);
+    assert(job.steps.some(step => step.name === 'Restore Jest cache'));
+    assert(job.steps.some(step => step.name === 'Check E2E coverage'));
 });

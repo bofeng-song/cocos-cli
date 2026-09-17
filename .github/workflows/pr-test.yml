@@ -54,8 +54,7 @@ jobs:
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           fi
 
-  suite-test:
-    name: ${{ matrix.suite }} (${{ matrix.os }})
+  pr-test:
     needs: check-changes
     if: needs.check-changes.outputs.should_run == 'true'
 
@@ -64,7 +63,6 @@ jobs:
       matrix:
         # Windows native build still uses the bundled CMake 3.24.3 and VS2022 generator.
         os: [windows-2022, macos-latest]
-        suite: [unit, e2e]
 
     runs-on: ${{matrix.os}}
 
@@ -99,7 +97,6 @@ jobs:
           MINIMAL_DOWNLOAD_TOOLS: 'true'
 
       - name: Type check
-        if: matrix.suite == 'unit'
         id: type-check
         run: npx tsc -b
 
@@ -107,13 +104,11 @@ jobs:
         run: npm run build:simulator:runtime
 
       - name: Verify test scheduling
-        if: matrix.suite == 'unit'
         run: |
           node --test workflow/test-runner.test.cjs workflow/postinstall.test.cjs
           npm run test:groups
 
       - name: Restore Jest cache
-        if: matrix.suite == 'unit'
         id: jest-cache
         uses: actions/cache/restore@v4
         with:
@@ -123,12 +118,11 @@ jobs:
             jest-v1-${{ runner.os }}-${{ runner.arch }}-node22.17.0-${{ hashFiles('package-lock.json', 'repo.json', 'jest*.ts', 'tsconfig*.json') }}-
 
       - name: Run unit tests
-        if: matrix.suite == 'unit'
         id: unit-tests
         run: npm run test:quiet
 
       - name: Save Jest cache
-        if: matrix.suite == 'unit' && steps.jest-cache.outputs.cache-hit != 'true'
+        if: steps.jest-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: .cache/jest
@@ -136,11 +130,10 @@ jobs:
 
       # pull_request 与 issue_comment 的 PR 标题字段不同，取当前事件中存在的标题进行检测。
       - name: Run AssetDB package tests
-        if: matrix.suite == 'unit' && runner.os == 'Windows' && contains(github.event.pull_request.title || github.event.issue.title, 'asset-db')
+        if: runner.os == 'Windows' && contains(github.event.pull_request.title || github.event.issue.title, 'asset-db')
         run: npm run test:asset-db
 
       - name: Run E2E tests
-        if: matrix.suite == 'e2e'
         id: e2e-tests
         uses: ./.github/actions/run-e2e-tests
         with:
@@ -149,23 +142,7 @@ jobs:
           debug: ${{ github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, 'rerun pr test:debug') }}
       
       - name: Check E2E coverage
-        if: matrix.suite == 'e2e'
         id: coverage
         uses: ./.github/actions/check-e2e-coverage
         with:
           report-server-url: ${{ steps.setup-config.outputs.REPORT_SERVER_URL }}
-
-
-  pr-test:
-    name: pr-test (${{ matrix.os }})
-    if: always() && needs.check-changes.outputs.should_run == 'true'
-    needs: [check-changes, suite-test]
-    strategy:
-      matrix:
-        os: [windows-2022, macos-latest]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require all unit and E2E jobs
-        env:
-          RESULT: ${{ needs.suite-test.result }}
-        run: node -e 'if(process.env.RESULT!=="success")process.exit(1)'

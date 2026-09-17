@@ -118,4 +118,4 @@ Actions 分别显示依赖安装、开发引擎获取、开发引擎安装、CLI
 
 本地 test:sdk-tags 默认仍串行执行，--prepare-only 仅表示产物准备完成。
 
-普通 PR Test 按平台和 suite（unit / e2e）分成独立 runner 任务，分别准备环境，避免共享引擎缓存、项目和端口。保留 pr-test (windows-2022) / pr-test (macos-latest) 汇总检查名，两者均要求所有套件任务成功；失败或取消不能通过。Unit 任务保留类型检查、测试分组校验、Jest 缓存及原有 AssetDB 条件测试，E2E 任务保留 debug 参数和覆盖率报告。并行提高 runner 用量且重复环境准备，实际墙钟收益受排队影响。
+普通 PR Test 每个平台使用一个 runner，只准备一次环境，然后串行执行 unit 和 E2E。Windows 与 macOS 仍并行，保留原有类型检查、测试分组校验、Jest 缓存、AssetDB 条件测试、E2E debug 参数和覆盖率报告。SDK 兼容性矩阵中的 unit/E2E 独立副本并发执行不受此调整影响。
