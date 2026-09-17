@@ -46,7 +46,25 @@ jobs:
       - name: Install development engine dependencies
         working-directory: candidate
         run: npm run install:engine
-      - name: Compile CLI and prepare platform tools
+      - name: Restore complete platform tools
+        id: platform-tools-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: candidate/static/tools
+          key: sdk-tools-v1-${{ runner.os }}-${{ runner.arch }}-${{ fromJson(inputs.target).node }}-${{ hashFiles('candidate/workflow/download-tools.js', 'harness/workflow/sdk-platform-tools.js') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            sdk-tools-v1-${{ runner.os }}-${{ runner.arch }}-${{ fromJson(inputs.target).node }}-${{ hashFiles('candidate/workflow/download-tools.js', 'harness/workflow/sdk-platform-tools.js') }}-
+      - name: Validate platform tools and download missing tools
+        id: platform-tools
+        working-directory: harness
+        run: node workflow/sdk-platform-tools.js ../candidate
+      - name: Save complete platform tools
+        if: steps.platform-tools.outputs.changed == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: candidate/static/tools
+          key: ${{ steps.platform-tools-cache.outputs.cache-primary-key }}
+      - name: Compile CLI with prepared platform tools
         working-directory: candidate
         run: node workflow/setup-dev.js --force
       - name: Pack exact CLI candidate

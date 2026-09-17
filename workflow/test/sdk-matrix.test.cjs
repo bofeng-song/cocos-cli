@@ -2,6 +2,7 @@
 /* global require, process, __dirname */
 require('./sdk-process.test.cjs');
 require('./sdk-source-shards.test.cjs');
+require('./sdk-platform-tools.test.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
