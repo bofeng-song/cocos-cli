@@ -101,22 +101,19 @@ npm run test:sdk-tags -- --cli .publish/sdk/full-ci-candidate --test-root . --ou
 
 ## CI 并发与依赖复用
 
-工作流按以下阶段执行：
+1. targets 确定维护中的 CLI ref；PR 使用候选合并提交。
+2. 每个 CLI / 平台的 build 只准备一次 CLI 和完整测试源码，并用 --plan-only 冻结所有支持的引擎 tag / 分支 commit。此时不编译历史引擎。
+3. plan 根据冻结清单生成版本矩阵；每个平台独立推进，不等待另一平台。
+4. 每个 verify 任务只下载公共 CLI 和测试源码，在自己的 runner 上浅克隆对应引擎 commit、安装依赖、编译 SDK，然后立即运行该版本的完整 unit / E2E、MCP 类型生成和冒烟构建。不等待其他版本准备结束，不上传或下载中间 Engine SDK。
+5. gate 检查所有任务成功、完整覆盖、CLI 身份、引擎 ref / commit 和生成的 SDK revision。缺失、重复、失败或身份改变均不能通过。
+6. verified 在总检查通过后提供原始 CLI 候选归档，不重新构建或自动发布引擎。
 
-1. `targets` 确定维护中的 CLI ref；PR 使用候选合并提交。
-2. `build` 为每个 CLI / 平台准备一次候选源码和 CLI SDK，枚举全部支持的引擎 ref，并执行 `--prepare-only` 生成 Engine SDK。准备成功仅表示产物可供测试。
-3. 每个 CLI / 平台独立调用 `sdk-target-tests.yml`，其 `plan` 只等待自己的 `build`，准备完成即可生成本平台的引擎测试组合，不等待其他平台。
-4. `verify` 将各组合分发到独立 runner，每组执行原有完整 unit / E2E 和最小构建。
-5. `gate` 要求所有前置任务成功，并检查每组结果、候选身份和覆盖数量。失败、取消、重复结果或缺少结果均不能通过。
-6. `verified` 只在总门禁通过后提供原始 CLI SDK 的 `cli.tar`，无需重新构建。
+父工作流同时运行最多 2 个 CLI / 平台，每个平台同时执行最多 3 个版本的准备和测试，共最多 6 个版本任务。fail-fast: false 保留其他组合的结果。实际并发仍受 runner 配额和排队限制。
 
-父工作流 `jobs.test.strategy.max-parallel` 最多同时运行 2 个 CLI / 平台；子工作流 `sdk-target-tests.yml` 的 `jobs.verify.strategy.max-parallel` 每个目标最多运行 2 组测试，总计最多 4 组。`fail-fast: false` 保留其他组合的测试结果。同一 PR 的新提交取消尚未完成的旧提交任务。实际并发数仍受仓库 runner 配额限制。
+各版本从自己的 native/external-config.json 解析 external 仓库和 ref，并锁定解析出的 commit。每个 runner 保留独立 checkout 和 node_modules，不跨版本共用可写目录。已有本地 external 只有仓库及目标 commit 匹配才可复用；独立 runner 不会自动继承公共准备任务的 external。npm 缓存复用下载内容，完整 Engine SDK 缓存在这条并行 CI 路径中暂不启用。
 
-引擎源码准备在各 CLI / 平台内部顺序执行，完整测试按引擎并发。这样编译器和 CLI 工具链只准备一次，相同 external 仓库 / commit 可从该任务已有 checkout 复用 Git 对象；首次也尝试复用开发引擎的 external。每个历史引擎仍有独立 checkout 和按自身锁文件安装的 node_modules。Actions 的 npm 缓存跨任务复用下载内容，不共享可写安装目录。
+共享 CLI 和测试源码分别作为 sdk-cli-*、sdk-tests-* 制品保留 3 天。恢复时校验归档 SHA256、平台、架构、Node ABI 和 CLI manifest；测试执行器继续逐文件验证 SDK。源码快照与每版本 source-report、安装编译日志、测试结果一并保留。
 
-准备任务把 CLI SDK、各 Engine SDK 和已编译测试源码封装为 tar，通过本轮 artifact 分发。tar 保留隐藏文件和执行权限，测试源码的 workspace 链接展开为文件副本；不包含开发引擎及本机 config.local.json。每组先验证归档 SHA256，再核对 SDK manifest，并由矩阵执行器逐文件验证 SDK 内容。原生工具随各平台产物传递，平台、架构或 Node ABI 不符时拒绝使用。
+Actions 分别显示依赖安装、开发引擎获取、开发引擎安装、CLI/工具准备，以及每版本引擎准备和完整测试耗时。引擎准备日志中的子命令记录开始时间、退出码和耗时。平台工具缓存尚未接入本矩阵。
 
-当前每组下载所属 CLI / 平台的完整输入包，只解压该组引擎；输入包保留 3 天。因此并发缩短测试等待时间，但仍有 artifact 传输开销。完整 Engine SDK 暂不跨工作流轮次缓存，也不在不同 CLI 工具链之间直接复用。后续可在固定历史 ZIP 格式后按引擎单独下载；接入跨轮缓存时还需纳入引擎 / external commit、工具链身份和平台条件。
-
-上述归档用于 CI 内部任务传递，不代表已经支持官方历史版本 ZIP 下载。现有本地 `test:sdk-tags` 默认仍串行执行完整流程；`--prepare-only` 只准备产物，不能作为兼容性通过结果。
-候选 SDK 在测试前打包，完整 unit / E2E 使用这些候选及其身份清单。打包成功不等于发布批准；全部目标通过总门禁后，仅提升同一份 CLI 候选为 verified 制品，不在测试后重新构建。历史 Engine SDK 是测试输入，本流程不重新发布历史引擎，也不自动发布当前 Engine SDK。
+本地 test:sdk-tags 默认仍串行执行，--prepare-only 仅表示产物准备完成。

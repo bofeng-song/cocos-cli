@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 /* global require, process, __dirname */
 require('./sdk-process.test.cjs');
+require('./sdk-source-shards.test.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -227,7 +228,7 @@ test('platform pipelines start independently and publication requires all result
     assert.equal(target.jobs.build.needs, undefined);
     assert.equal(target.jobs.plan.needs, 'build');
     assert.equal(target.jobs.verify.needs, 'plan');
-    assert.equal(workflow.jobs.test.strategy['max-parallel'] * target.jobs.verify.strategy['max-parallel'], 4);
+    assert.equal(workflow.jobs.test.strategy['max-parallel'] * target.jobs.verify.strategy['max-parallel'], 6);
     assert.equal(workflow.jobs.test.strategy['fail-fast'], false);
     assert.equal(target.jobs.verify.strategy['fail-fast'], false);
     assert.equal(workflow.jobs.gate.if, 'always()');
@@ -235,7 +236,7 @@ test('platform pipelines start independently and publication requires all result
     assert(workflow.jobs.gate.steps.some(step => step.run?.includes('plan plans matrix.json')));
     assert(workflow.jobs.gate.steps.some(step => step.run?.includes('aggregate matrix.json results')));
     assert(workflow.jobs.verified.needs.includes('gate'));
-    assert(target.jobs.build.steps.some(step => step.run?.includes('--prepare-only')));
+    assert(target.jobs.build.steps.some(step => step.run?.includes('--plan-only')));
     assert(target.jobs.plan.steps.some(step => step.with?.name?.startsWith('sdk-plan-')));
     assert(workflow.jobs.verified.steps.every(step => !step.run));
 });

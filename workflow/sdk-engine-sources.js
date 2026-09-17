@@ -45,7 +45,8 @@ function selectRefs(text, policies, sourcePolicy, validationTag) {
 function run(command, args, cwd, logFile, timeoutMs = 30 * 60 * 1000) {
     return new Promise((resolve, reject) => {
         const fd = fs.openSync(logFile, 'a');
-        fs.writeSync(fd, `\n${command} ${args.join(' ')}\n`);
+        const started = Date.now();
+        fs.writeSync(fd, `[${new Date(started).toISOString()}] ${command} ${args.join(' ')}\n`);
         const child = spawn(command, args, { cwd, stdio: ['ignore', fd, fd], windowsHide: true, detached: process.platform !== 'win32', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
         let expired = false;
         const timer = setTimeout(() => {
@@ -56,7 +57,9 @@ function run(command, args, cwd, logFile, timeoutMs = 30 * 60 * 1000) {
         let spawnError;
         child.once('error', error => { spawnError = error; });
         child.once('close', code => {
-            clearTimeout(timer); fs.closeSync(fd);
+            clearTimeout(timer);
+            fs.writeSync(fd, `[${new Date().toISOString()}] exit=${code} durationMs=${Date.now() - started}\n`);
+            fs.closeSync(fd);
             if (code === 0 && !expired && !spawnError) resolve();
             else reject(spawnError || new Error(`${path.basename(command)} ${expired ? 'timed out' : `failed (${code})`}; see source build log`));
         });
@@ -106,10 +109,15 @@ async function prepareSources(options) {
         const policies = [readPolicy(options.cli || root)];
         if (options.resume && (report.validationTag ?? null) !== (options.validationTag ?? null)) throw new Error('Resume validation scope mismatch');
         const refs = options.resume ? fs.readFileSync(path.join(output, 'git-refs.snapshot.txt'), 'utf8')
-            : execFileSync('git', ['ls-remote', '--heads', '--tags', sourcePolicy.repository], { encoding: 'utf8', timeout: 120000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+            : options.frozenRefs ?? execFileSync('git', ['ls-remote', '--heads', '--tags', sourcePolicy.repository], { encoding: 'utf8', timeout: 120000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
         if (!options.resume) {
             fs.writeFileSync(path.join(output, 'git-refs.snapshot.txt'), refs);
-            report.refs = selectRefs(refs, policies, sourcePolicy, options.validationTag).map(entry => ({ ...entry, status: 'pending' }));
+            let selected = selectRefs(refs, policies, sourcePolicy, options.validationTag);
+            if (options.refIndex !== undefined) {
+                if (!options.frozenRefs || !Number.isInteger(options.refIndex) || !selected[options.refIndex]) throw Error('Invalid frozen source index');
+                selected = [selected[options.refIndex]];
+            }
+            report.refs = selected.map(entry => ({ ...entry, status: 'pending' }));
         }
         if (options.cli) {
             const cli = await describeArtifact(options.cli, 'cli');

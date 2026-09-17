@@ -46,7 +46,8 @@ function plan(manifests) {
         const target = manifest.target;
         if (!/^target-\d+$/.test(target.id) || ids.has(target.id) || !manifest.engines.length) throw new Error('Invalid or duplicate target');
         ids.add(target.id);
-        manifest.engines.forEach((engine, index) => include.push({ id: `${target.id}-engine-${index}`, target: target.id, runner: target.runner, node: target.node, index, engineVersion: engine.version, cliRevision: manifest.cli.revision, engineRevision: engine.revision }));
+        if (manifest.schemaVersion === 2 && manifest.engines.some(engine => !engine.source || !/^[a-f0-9]{40}$/.test(engine.source.commit || '') || !/^refs\/(heads|tags)\//.test(engine.source.ref || ''))) throw Error('Invalid frozen engine source');
+        manifest.engines.forEach((engine, index) => include.push({ id: `${target.id}-engine-${index}`, target: target.id, runner: target.runner, node: target.node, index, engineVersion: engine.version, cliRevision: manifest.cli.revision, ...(engine.source ? { engineCommit: engine.source.commit, engineRef: engine.source.ref } : { engineRevision: engine.revision }) }));
     }
     if (!include.length || include.length > 256) throw new Error('Matrix must contain 1..256 jobs');
     return { include };
@@ -58,7 +59,7 @@ function aggregate(matrix, results) {
         const job = expected.get(result.id);
         if (!job || seen.has(result.id)) throw new Error('Unexpected or duplicate shard result');
         seen.add(result.id);
-        if (result.status !== 'passed' || result.cliRevision !== job.cliRevision || result.engineRevision !== job.engineRevision) throw new Error(`Shard failed or identity changed: ${result.id}`);
+        if (result.status !== 'passed' || result.cliRevision !== job.cliRevision || (job.engineCommit ? result.engineCommit !== job.engineCommit || result.engineRef !== job.engineRef || !/^sha256:[a-f0-9]{64}$/.test(result.engineRevision || '') : result.engineRevision !== job.engineRevision)) throw new Error(`Shard failed or identity changed: ${result.id}`);
     }
     if (!expected.size || seen.size !== expected.size) throw new Error('Missing shard results');
     return { status: 'passed', count: seen.size };
