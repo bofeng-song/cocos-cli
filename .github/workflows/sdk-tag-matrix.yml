@@ -82,10 +82,10 @@ jobs:
         with:
           name: sdk-cli-${{ matrix.target.id }}
           path: bundle
-      - name: Expose the original verified CLI SDK
+      - name: Expose the original verified CLI test SDK
         uses: actions/upload-artifact@v4
         with:
-          name: verified-cli-sdk-${{ matrix.target.id }}
+          name: verified-cli-test-sdk-${{ matrix.target.id }}
           path: |
             bundle/cli.tar
             bundle/manifest.json

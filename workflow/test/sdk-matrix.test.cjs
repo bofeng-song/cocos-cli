@@ -33,12 +33,33 @@ test('full CI gate keeps unit failure, still runs E2E, and binds copied tests to
     write(path.join(config.cli, 'dist/core/base/sentry.js'), sentry);
     write(path.join(config.cli, 'cli-sdk.json'), { cliVersion: '1.0.0', files: [{ path: 'dist/core/base/sentry.js', sha256: crypto.createHash('sha256').update(sentry).digest('hex') }] });
     for (const file of ['packages/cc-module/cc.d.ts', 'node_modules/cc/cc.d.ts']) write(path.join(source, file), '/// <reference path="../engine/bin/.declarations/cc.d.ts"/>\n');
-    write(path.join(source, 'node_modules/tsx/dist/cli.mjs'), '');
-    write(path.join(source, 'node_modules/jest/bin/jest.js'), `const fs=require('fs');const args=process.argv;const unit=args.includes('jest.config.ts');fs.writeFileSync(args[args.indexOf('--outputFile')+1], JSON.stringify({success:!unit,numTotalTests:1,numPassedTests:unit?0:1,numFailedTests:unit?1:0,numFailedTestSuites:unit?1:0}));process.exitCode=unit?1:0;`);
+    write(path.join(source, 'node_modules/tsx/dist/cli.mjs'), `import fs from 'node:fs'; import path from 'node:path'; fs.writeFileSync(path.resolve('..', 'mcp.ready'), 'ready');`);
+    write(path.join(source, 'node_modules/jest/bin/jest.js'), `
+        const fs = require('fs'), path = require('path'), assert = require('assert/strict');
+        const args = process.argv, unit = args.includes('jest.config.ts'), name = unit ? 'unit' : 'e2e';
+        const output = args[args.indexOf('--outputFile') + 1], work = path.dirname(output);
+        const engine = JSON.parse(fs.readFileSync('config.local.json', 'utf8')).enginePath;
+        fs.writeFileSync(path.join(engine, 'suite-marker'), name);
+        fs.writeFileSync(path.join(work, name + '.started'), 'ready');
+        (async () => {
+            const limit = Date.now() + 3000;
+            while (!fs.existsSync(path.join(work, (unit ? 'e2e' : 'unit') + '.started'))) {
+                if (Date.now() > limit) throw Error('Suites did not overlap');
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+            assert.equal(fs.readFileSync(path.join(engine, 'suite-marker'), 'utf8'), name);
+            if (!unit) assert(fs.existsSync(path.join(work, 'mcp.ready')));
+            fs.writeFileSync(output, JSON.stringify({success:!unit,numTotalTests:1,numPassedTests:unit?0:1,numFailedTests:unit?1:0,numFailedTestSuites:unit?1:0}));
+            process.exitCode = unit ? 1 : 0;
+        })().catch(error => { console.error(error); process.exitCode = 2; });
+    `);
     const result = await runCiTests(config, source, 5000);
     assert.equal(result.status, 'failed', result.error);
     assert.equal(result.suites.unit.status, 'failed');
     assert.equal(result.suites.e2e.status, 'passed');
+    assert.equal(fs.realpathSync(path.join(config.work, 'unit-tests/packages/engine')), fs.realpathSync(path.join(config.work, 'unit-engine')));
+    assert.equal(fs.readFileSync(path.join(config.engine, 'suite-marker'), 'utf8'), 'e2e');
+    assert.equal(fs.readFileSync(path.join(config.work, 'unit-engine/suite-marker'), 'utf8'), 'unit');
     assert.equal(fs.readFileSync(path.join(config.work, 'tests/.vscodeignore'), 'utf8'), 'packages/asset-db/test');
     assert.equal(fs.realpathSync(path.join(config.work, 'tests/packages/engine')), fs.realpathSync(config.engine));
     assert.equal(JSON.parse(fs.readFileSync(path.join(config.work, 'tests/config.local.json'))).enginePath, config.engine);
@@ -257,4 +278,18 @@ test('automatic source matrix keeps only the newest supported alpha and no dupli
     assert.deepEqual(withStable.map(entry => entry.version).sort(), ['4.0.0', '4.0.0-alpha.100', '4.0.1']);
     const withNext = selectRefs(text + '\n' + commit + '\trefs/tags/4.1.0-alpha.1', [policy], config);
     assert.deepEqual(withNext.map(entry => entry.version), ['4.1.0-alpha.1']);
+});
+
+test('PR unit and E2E use independent runner jobs and both are required by existing checks', () => {
+    const yaml = require('js-yaml');
+    const workflow = yaml.load(fs.readFileSync(path.join(root, '.github/workflows/pr-test.yml'), 'utf8'));
+    const suites = workflow.jobs['suite-test'];
+    assert.deepEqual(suites.strategy.matrix.suite, ['unit', 'e2e']);
+    assert.equal(suites.strategy['fail-fast'], false);
+    assert.equal(suites.steps.find(step => step.name === 'Run unit tests').if, "matrix.suite == 'unit'");
+    assert.equal(suites.steps.find(step => step.name === 'Run E2E tests').if, "matrix.suite == 'e2e'");
+    assert(suites.steps.find(step => step.name === 'Run AssetDB package tests').if.includes("matrix.suite == 'unit'"));
+    assert.deepEqual(workflow.jobs['pr-test'].needs, ['check-changes', 'suite-test']);
+    assert(workflow.jobs['pr-test'].if.includes('always()'));
+    assert(workflow.jobs['pr-test'].steps[0].run.includes('success'));
 });

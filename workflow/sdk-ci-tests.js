@@ -75,43 +75,68 @@ async function runCiTests(config, source, timeoutMs = 60 * 60 * 1000) {
         delete env.SDK_CATALOG_TOKEN;
         delete env.SDK_CATALOG_AUTH_ORIGIN;
         delete env.SDK_MATRIX_CONFIG;
-        const jest = path.join(root, 'node_modules/jest/bin/jest.js');
-        report.status = 'running'; write(reportFile, report);
-        // Same complete configs as test:quiet and test:e2e; no test-name/path filters.
-        for (const [name, args] of [
-            ['unit', [jest, '--config', 'jest.config.ts', '--silent', '--json', '--outputFile', path.join(config.work, 'unit.json')]],
-            ['mcp-types', [path.join(root, 'node_modules/tsx/dist/cli.mjs'), 'e2e/scripts/generate-mcp-types.ts']],
-            ['e2e', [jest, '--config', 'e2e/jest.config.e2e.ts', '--json', '--outputFile', path.join(config.work, 'e2e.json')]],
-        ]) {
-            report.suites[name] = { status: 'running' }; write(reportFile, report);
-            const startedAt = new Date().toISOString();
-            console.log((process.env.GITHUB_ACTIONS ? '::group::' : '') + 'Run full ' + name);
-            if (name === 'mcp-types') {
-                const { generate } = require('./generate-dts-runner');
-                const attempts = [];
-                await generate(async () => {
-                    const logName = attempts.length ? name + '-retry-' + attempts.length : name;
-                    const result = await run(args, root, path.join(config.work, logName + '.log'), env, timeoutMs);
-                    attempts.push(result);
-                    report.suites[name] = result;
-                    return result.status === 'timeout' || result.error ? 1 : result.exitCode;
-                }, process.platform, name);
-                report.suites[name] = { ...report.suites[name], attempts };
-            } else {
-                report.suites[name] = await run(args, root, path.join(config.work, name + '.log'), env, timeoutMs);
-            }
-            Object.assign(report.suites[name], { startedAt, completedAt: new Date().toISOString(), durationMs: Date.now() - Date.parse(startedAt) });
-            if (name !== 'mcp-types') {
-                try {
-                    const results = read(path.join(config.work, `${name}.json`));
-                    Object.assign(report.suites[name], { total: results.numTotalTests, passed: results.numPassedTests, failed: results.numFailedTests, pending: results.numPendingTests });
-                    if (!results.success || !results.numTotalTests || results.numFailedTests || results.numFailedTestSuites) report.suites[name].status = 'failed';
-                } catch (error) { report.suites[name].status = 'failed'; report.suites[name].error = `Missing Jest completion report: ${error.message}`; }
-            }
-            console.log(name + ': ' + JSON.stringify(report.suites[name]));
-            if (process.env.GITHUB_ACTIONS) console.log('::endgroup::');
-            write(reportFile, report);
+        // Unit tests and E2E may rebuild engine caches and mutate project settings.
+        // Copy writable inputs before either suite starts; never share hard links.
+        const unitRoot = path.join(config.work, 'unit-tests');
+        const unitEngine = path.join(config.work, 'unit-engine');
+        const unitCli = path.join(config.work, 'unit-cli');
+        await fsp.cp(root, unitRoot, { recursive: true, dereference: true,
+            filter: file => file !== path.join(root, 'packages/engine') });
+        await fsp.cp(config.engine, unitEngine, { recursive: true, dereference: true });
+        await fsp.cp(config.cli, unitCli, { recursive: true, dereference: true });
+        await fsp.symlink(unitEngine, path.join(unitRoot, 'packages/engine'), process.platform === 'win32' ? 'junction' : 'dir');
+        for (const file of [path.join(unitRoot, 'packages/cc-module/cc.d.ts'), path.join(unitRoot, 'node_modules/cc/cc.d.ts')]) {
+            const text = await fsp.readFile(file, 'utf8');
+            await fsp.writeFile(file, text.split(config.engine.replace(/\\/g, '/')).join(unitEngine.replace(/\\/g, '/')));
         }
+        write(path.join(unitRoot, 'config.local.json'), { enginePath: unitEngine });
+        write(path.join(unitCli, 'config.local.json'), { enginePath: unitEngine });
+        report.preparationMs = Date.now() - Date.parse(report.startedAt);
+        report.status = 'running'; write(reportFile, report);
+        const executeSuite = async name => {
+            const suiteRoot = name === 'unit' ? unitRoot : root;
+            const suiteEnv = name === 'unit' ? { ...env, NODE_OPTIONS: '--max-old-space-size=4096', E2E_CLI_PATH: path.join(unitCli, 'dist/cli.js') } : env;
+            const jest = path.join(suiteRoot, 'node_modules/jest/bin/jest.js');
+            const args = name === 'mcp-types'
+                ? [path.join(suiteRoot, 'node_modules/tsx/dist/cli.mjs'), 'e2e/scripts/generate-mcp-types.ts']
+                : [jest, '--config', name === 'unit' ? 'jest.config.ts' : 'e2e/jest.config.e2e.ts', '--maxWorkers=1', ...(name === 'unit' ? ['--silent'] : []), '--json', '--outputFile', path.join(config.work, name + '.json')];
+            try {
+                report.suites[name] = { status: 'running' }; write(reportFile, report);
+                const startedAt = new Date().toISOString();
+                console.log('Run full ' + name);
+                if (name === 'mcp-types') {
+                    const { generate } = require('./generate-dts-runner');
+                    const attempts = [];
+                    await generate(async () => {
+                        const logName = attempts.length ? name + '-retry-' + attempts.length : name;
+                        const result = await run(args, suiteRoot, path.join(config.work, logName + '.log'), suiteEnv, timeoutMs);
+                        attempts.push(result);
+                        report.suites[name] = result;
+                        return result.status === 'timeout' || result.error ? 1 : result.exitCode;
+                    }, process.platform, name);
+                    report.suites[name] = { ...report.suites[name], attempts };
+                } else {
+                    report.suites[name] = await run(args, suiteRoot, path.join(config.work, name + '.log'), suiteEnv, timeoutMs);
+                }
+                Object.assign(report.suites[name], { startedAt, completedAt: new Date().toISOString(), durationMs: Date.now() - Date.parse(startedAt) });
+                if (name !== 'mcp-types') {
+                    try {
+                        const results = read(path.join(config.work, `${name}.json`));
+                        Object.assign(report.suites[name], { total: results.numTotalTests, passed: results.numPassedTests, failed: results.numFailedTests, pending: results.numPendingTests });
+                        if (!results.success || !results.numTotalTests || results.numFailedTests || results.numFailedTestSuites) report.suites[name].status = 'failed';
+                    } catch (error) { report.suites[name].status = 'failed'; report.suites[name].error = `Missing Jest completion report: ${error.message}`; }
+                }
+                console.log(name + ': ' + JSON.stringify(report.suites[name]));
+                write(reportFile, report);
+            } catch (error) {
+                report.suites[name] = { status: 'failed', error: error.message };
+                write(reportFile, report);
+            }
+        };
+        await Promise.all([
+            executeSuite('unit'),
+            (async () => { await executeSuite('mcp-types'); await executeSuite('e2e'); })(),
+        ]);
         report.status = Object.values(report.suites).every(suite => suite.status === 'passed') ? 'passed' : 'failed';
     } catch (error) { report.status = 'failed'; report.error = error.message; }
     report.completedAt = new Date().toISOString(); write(reportFile, report);

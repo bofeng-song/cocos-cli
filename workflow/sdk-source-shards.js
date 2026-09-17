@@ -19,7 +19,7 @@ async function bundle(target, source, cli, snapshot, output) {
     const candidate = await describeArtifact(cli, 'cli');
     if (candidate.manifestSha256 !== report.cli.manifestSha256) throw Error('CLI changed after planning');
     fs.mkdirSync(output);
-    const manifest = { schemaVersion: 2, target, host: host(), cli: candidate, repository: report.repository,
+    const manifest = { schemaVersion: 2, target, host: host(), toolsMode: process.env.MINIMAL_DOWNLOAD_TOOLS === 'true' ? 'minimal' : 'full', cli: candidate, repository: report.repository,
         sourceSnapshot: fs.readFileSync(path.join(snapshot, 'git-refs.snapshot.txt'), 'utf8'),
         engines: report.refs.map(ref => ({ version: ref.version || ref.ref, source: ref })), archives: {} };
     const files = ['src', 'tests', 'e2e', 'dist', 'static', 'workflow', 'packages', '@types', 'node_modules', '.github', '.vscodeignore', 'package.json', 'package-lock.json', 'tsconfig.json', 'jest.config.ts', 'engine-compatibility.json', ...['jest.parallel.config.ts', 'jest.serial.config.ts'].filter(file => fs.existsSync(path.join(source, file)))];

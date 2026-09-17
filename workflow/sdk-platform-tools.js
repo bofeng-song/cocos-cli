@@ -26,11 +26,12 @@ async function inventory(root) {
     if (!files.some(file => file.sha256 && file.size > 0)) throw Error('Tool directory contains no nonempty files');
     return files;
 }
-async function prepare(downloader, output = process.env.GITHUB_OUTPUT) {
+async function prepare(downloader, output = process.env.GITHUB_OUTPUT, minimal = process.env.MINIMAL_DOWNLOAD_TOOLS === 'true') {
     const started = Date.now();
     const root = path.resolve(downloader.toolsDir);
-    // A full SDK must retain every platform and common tool.
-    downloader.minimal = false;
+    // Test SDKs may omit optional platform packagers; cache modes must not mix.
+    downloader.minimal = minimal;
+    const mode = minimal ? 'minimal' : 'full';
     const manifestFile = path.join(root, '.sdk-tool-integrity.json');
     let previous = {};
     try { previous = JSON.parse(fs.readFileSync(manifestFile, 'utf8')); } catch { /* Cold or invalid cache. */ }
@@ -42,7 +43,7 @@ async function prepare(downloader, output = process.env.GITHUB_OUTPUT) {
         if (path.dirname(target) !== root || fs.lstatSync(root).isSymbolicLink()) throw Error('Invalid tool destination');
         let valid = false, cachedFiles;
         try {
-            valid = previous.schemaVersion === 1 && previous.platform === process.platform && previous.arch === process.arch
+            valid = previous.schemaVersion === 1 && previous.mode === mode && previous.platform === process.platform && previous.arch === process.arch
                 && previous.tools?.[tool.dist]?.url === tool.url
                 && downloader.manifest?.[tool.dist]?.url === tool.url
                 && JSON.stringify(cachedFiles = await inventory(target)) === JSON.stringify(previous.tools[tool.dist].files);
@@ -63,7 +64,7 @@ async function prepare(downloader, output = process.env.GITHUB_OUTPUT) {
     await downloader.run();
     if (counts.failed || !Object.keys(records).length) throw Error('Incomplete platform tools; refusing to save cache');
     const temporary = manifestFile + '.tmp';
-    fs.writeFileSync(temporary, JSON.stringify({ schemaVersion: 1, platform: process.platform, arch: process.arch, tools: records }));
+    fs.writeFileSync(temporary, JSON.stringify({ schemaVersion: 1, mode, platform: process.platform, arch: process.arch, tools: records }));
     fs.renameSync(temporary, manifestFile);
     const durationMs = Date.now() - started;
     console.log('[Platform tools] ' + JSON.stringify({ ...counts, durationMs }));

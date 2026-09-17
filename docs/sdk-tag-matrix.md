@@ -55,7 +55,7 @@ npm run test:sdk-matrix
 
 workflow/sdk-maintained-clis.json 声明仍受维护的 CLI ref、Node 和 runner。当前配置 main / Node 22.17.0，覆盖 Windows 2022 和 macOS；正式 CLI SDK 发布后应增加仍受维护的 CLI tag。PR 使用候选合并提交；定时和手动任务按维护列表构建各 CLI ref，再用候选自身的支持声明枚举 Engine tag。不会因某组失败取消其他维护版本的验证。
 
-仅汇总门禁通过后，原始 CLI SDK 候选才以 cli.tar 上传为 verified-cli-sdk 制品，后续正式 SDK 发布必须使用同一份候选及其报告，不能重新构建后沿用旧测试结论。现有 legacy release / FTP / Electron 发布入口尚未改接这个独立 SDK 流程；新增工作流不代表这些旧发布入口已获得全版本发布门禁。
+仅汇总门禁通过后，原始 CLI 测试候选才以 cli.tar 上传为 verified-cli-test-sdk 制品。当前兼容性矩阵使用最小工具集，该产物不是完整发行 SDK，不能直接作为正式 SDK 发布；完整发行候选应准备全部工具并重新验证，不能沿用精简测试包的结论。现有 legacy release / FTP / Electron 发布入口尚未改接这个独立 SDK 流程；新增工作流不代表这些旧发布入口已获得全版本发布门禁。
 
 首次远程运行仍需仓库中存在这些修改，以及 runner 具备引擎原生依赖构建环境和 Git / npm 网络访问。Windows 已完成本地验证；macOS 已配置 CI，结果待远端验证。不同平台分别准备 SDK。
 
@@ -84,7 +84,7 @@ npm run test:sdk-tags -- --validation-tag 4.0.0-alpha.33 --cli .publish/sdk/cli-
 后续正式历史版本提供完整 ZIP，包含 Engine、工具及 node_modules 后，改为下载原始 ZIP、校验发布摘要、解压隔离并执行同一矩阵，不再安装依赖或编译引擎。仍检查平台 / Node ABI 和精确 revision。ZIP 的索引字段及解压接入在有正式产物格式后补齐；当前已实现本地 / HTTPS 原始 SDK 目录形式，尚不将 ZIP 当作现成支持项。Git tag 流程用于当前验证和缺少历史二进制包时的来源准备。
 ## 完整 CI 测试门禁
 
-每个选中的 Engine SDK 都必须执行最小导入 / Web 构建、完整根目录 Jest unit 测试、MCP 类型生成和完整 E2E Jest 测试；任一项失败、超时、缺失 Jest 报告或发现零用例，组合及总矩阵均返回失败。Unit 失败后仍运行 E2E 以收集完整证据。沿用 CI 配置自带的平台分支和 skip，用例 pending 数单独记录，不宣称所有用例都在本机执行。
+每个选中的 Engine SDK 都必须执行最小导入 / Web 构建、完整根目录 Jest unit 测试、MCP 类型生成和完整 E2E Jest 测试；任一项失败、超时、缺失 Jest 报告或发现零用例，组合及总矩阵均返回失败。Unit 与 MCP→E2E 链并发执行，各自使用独立可写的源码、CLI、引擎及项目目录；Unit 失败后仍等待 E2E 完成以收集证据。每套 Jest 限制一个 worker，Unit 堆上限 4 GiB，E2E 保留 8 GiB；实际收益需计入副本准备和同机资源竞争。沿用 CI 配置自带的平台分支和 skip，用例 pending 数单独记录，不宣称所有用例都在本机执行。
 
 `--test-root` 指定对应 CLI 候选的已准备源码目录，默认当前 CLI 仓库。先比对候选版本及全部 dist 文件摘要，再复制源码、测试、依赖与测试资源到每组独立目录。Unit 测试源码，E2E 通过 `E2E_CLI_PATH` 运行该组 CLI SDK。测试副本的 `config.local.json`、历史用例所需 `packages/engine` 别名和 cc 声明统一指向该组 Engine SDK；开发仓库引擎不会被复制进测试目录。测试副本关闭 Sentry 遥测，不修改源仓库的遥测代码。
 
@@ -94,7 +94,7 @@ npm run test:sdk-tags -- --cli .publish/sdk/full-ci-candidate --test-root . --ou
 
 每组新增 `ci-tests.json`、`unit.json`、`unit.log`、`mcp-types.log`、`e2e.json` 和 `e2e.log`。汇总报告中的 `smokeStatus` 只代表最小构建；最终 `status` 同时包含完整 CI 测试结果。完整测试结果见 [版本矩阵验证结果](sdk-full-ci-results.md)。
 
-新增的 tag matrix 工作流只有全矩阵通过才上传 `verified-cli-sdk`；既有独立 release 工作流尚未统一改为依赖此任务，不能宣称所有发布渠道已强制受此门禁控制。已完成的本地验证覆盖 Windows x64 / Node ABI 127，其他平台须在相应 CI runner 执行。
+新增的 tag matrix 工作流只有全矩阵通过才上传 `verified-cli-test-sdk`；既有独立 release 工作流尚未统一改为依赖此任务，不能宣称所有发布渠道已强制受此门禁控制。已完成的本地验证覆盖 Windows x64 / Node ABI 127，其他平台须在相应 CI runner 执行。
 
 通过矩阵表示所执行用例覆盖的场景通过，不保证任意用户项目不会崩溃。实际项目运行、渲染、设备和性能回归需要另外加入代表性项目及目标设备测试。
 
@@ -114,6 +114,8 @@ npm run test:sdk-tags -- --cli .publish/sdk/full-ci-candidate --test-root . --ou
 
 共享 CLI 和测试源码分别作为 sdk-cli-*、sdk-tests-* 制品保留 3 天。恢复时校验归档 SHA256、平台、架构、Node ABI 和 CLI manifest；测试执行器继续逐文件验证 SDK。源码快照与每版本 source-report、安装编译日志、测试结果一并保留。
 
-Actions 分别显示依赖安装、开发引擎获取、开发引擎安装、CLI/工具准备，以及每版本引擎准备和完整测试耗时。引擎准备日志中的子命令记录开始时间、退出码和耗时。平台工具缓存已接入：编译前恢复 candidate/static/tools，按平台、架构、Node 版本和候选下载脚本及校验脚本摘要隔离。每个工具校验来源 URL、文件清单、大小、权限及 SHA256；缺失或损坏的工具单独重新下载，保留完整工具集。成功补全后保存新的缓存代次，纯命中不重复上传；失败不保存。缓存恢复、校验/补下载、保存均为独立步骤，并汇总复用数、下载数和校验/下载耗时。首次未命中仍需下载全部工具，净收益需结合恢复和保存耗时评估。
+Actions 分别显示依赖安装、开发引擎获取、开发引擎安装、CLI/工具准备，以及每版本引擎准备和完整测试耗时。引擎准备日志中的子命令记录开始时间、退出码和耗时。平台工具缓存已接入：编译前恢复 candidate/static/tools，按完整/最小工具模式、平台、架构、Node 版本和候选下载脚本及校验脚本摘要隔离。每个工具校验来源 URL、文件清单、大小、权限及 SHA256；缺失或损坏的工具单独重新下载。兼容性矩阵设置 MINIMAL_DOWNLOAD_TOOLS=true，只准备标记为 essential 的工具；源码快照 manifest 的 toolsMode 标记为 minimal。成功补全后保存新的缓存代次，纯命中不重复上传；失败不保存。缓存恢复、校验/补下载、保存均为独立步骤，并汇总复用数、下载数和校验/下载耗时。首次未命中仍需下载全部工具，净收益需结合恢复和保存耗时评估。
 
 本地 test:sdk-tags 默认仍串行执行，--prepare-only 仅表示产物准备完成。
+
+普通 PR Test 按平台和 suite（unit / e2e）分成独立 runner 任务，分别准备环境，避免共享引擎缓存、项目和端口。保留 pr-test (windows-2022) / pr-test (macos-latest) 汇总检查名，两者均要求所有套件任务成功；失败或取消不能通过。Unit 任务保留类型检查、测试分组校验、Jest 缓存及原有 AssetDB 条件测试，E2E 任务保留 debug 参数和覆盖率报告。并行提高 runner 用量且重复环境准备，实际墙钟收益受排队影响。
