@@ -1,3 +1,4 @@
+require('./sdk-ci-copy.test.cjs');
 /* eslint-disable @typescript-eslint/no-require-imports */
 /* global require, process, __dirname */
 const { test } = require('node:test');
@@ -81,6 +82,7 @@ test('one source shard restores shared inputs, builds only its commit and immedi
     } });
     const dependencies = { runMatrix: async options => {
         assert(prepared);
+        assert.equal(options.consumeTestSource, true);
         assert.equal(fs.readFileSync(path.join(options.testRoot, 'tests/marker'), 'utf8'), 'complete test source');
         const catalog = read(options.catalog); assert.equal(catalog.engines.length, 1);
         assert.equal(catalog.engines[0].version, '4.0.1');

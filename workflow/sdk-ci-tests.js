@@ -26,71 +26,98 @@ function run(args, cwd, logFile, env, timeoutMs) {
     });
 }
 
-async function runCiTests(config, source, timeoutMs = 60 * 60 * 1000) {
+async function runCiTests(config, source, timeoutMs = 60 * 60 * 1000, options = {}) {
     source = fs.realpathSync(source);
     const root = path.join(config.work, 'tests');
     const reportFile = path.join(config.work, 'ci-tests.json');
-    const report = { status: 'preparing', source, suites: {}, startedAt: new Date().toISOString() };
+    const report = { status: 'preparing', source, suites: {}, preparation: {}, startedAt: new Date().toISOString() };
     write(reportFile, report);
+    const timed = async (name, action) => {
+        const start = performance.now();
+        try { return await action(); }
+        finally {
+            report.preparation[name] = Math.round(performance.now() - start);
+            console.log('CI preparation ' + name + ': ' + report.preparation[name] + 'ms');
+            write(reportFile, report);
+        }
+    };
     try {
         const metadata = read(path.join(config.cli, 'cli-sdk.json'));
         if (read(path.join(source, 'package.json')).version !== metadata.cliVersion) throw new Error('Test source CLI version mismatch');
-        // Unit tests exercise source; ensure its prepared runtime matches the tested artifact.
-        for (const file of metadata.files.filter(file => file.path.startsWith('dist/'))) {
-            const digest = crypto.createHash('sha256').update(await fsp.readFile(path.join(source, file.path))).digest('hex');
-            if (digest !== file.sha256) throw new Error(`Test source build differs from CLI SDK: ${file.path}`);
-        }
-        await fsp.mkdir(root);
-        const entries = ['src', 'tests', 'e2e', 'dist', 'static', 'workflow', 'packages', '@types', 'node_modules', '.github', '.vscodeignore', 'package.json', 'package-lock.json', 'tsconfig.json', 'jest.config.ts', 'engine-compatibility.json'];
-        for (const entry of [...entries, ...['jest.parallel.config.ts', 'jest.serial.config.ts'].filter(file => fs.existsSync(path.join(source, file)))]) {
-            await fsp.cp(path.join(source, entry), path.join(root, entry), { recursive: true, dereference: true, filter: file => {
-                const rel = path.relative(source, file).replace(/\\/g, '/');
-                if (rel === 'packages/engine' || rel.startsWith('packages/engine/')) return false;
-                if (!rel.startsWith('node_modules/') && /(^|\/)(\.git|\.workspace)(\/|$)/.test(rel)) return false;
-                if (/^e2e\/(reports|logs|server\/reports)(\/|$)/.test(rel)) return false;
-                if (/^tests\/fixtures\/projects\/[^/]+\/(library|temp|build)(\/|$)/.test(rel)) return false;
-                return true;
-            } });
-        }
-        const localConfig = { enginePath: config.engine };
-        // Legacy CI cases address packages/engine directly. Alias only the tested
-        // isolated SDK, never the developer checkout or a second engine version.
-        await fsp.symlink(config.engine, path.join(root, 'packages/engine'), process.platform === 'win32' ? 'junction' : 'dir');
-        // cc-module's generated relative references assume an embedded engine.
-        // Both copied module locations must reference this pair's SDK declarations.
-        for (const file of [path.join(root, 'packages/cc-module/cc.d.ts'), path.join(root, 'node_modules/cc/cc.d.ts')]) {
-            const text = await fsp.readFile(file, 'utf8');
-            await fsp.writeFile(file, ['cc.d.ts', 'cc.editor.d.ts'].map(name => `/// <reference path="${path.join(config.engine, 'bin/.declarations', name).replace(/\\/g, '/')}"/>\n`).join('')
-                + text.replace(/\/\/\/ <reference path=.*cc(?:\.editor)?\.d\.ts.*\/>\r?\n/g, ''));
-        }
-        // Disable telemetry only in disposable copies; never upload test events.
-        for (const file of [path.join(root, 'src/core/base/sentry.ts'), path.join(root, 'dist/core/base/sentry.js'), path.join(config.cli, 'dist/core/base/sentry.js')]) {
-            const text = await fsp.readFile(file, 'utf8');
-            await fsp.writeFile(file, text.replace(/dsn: 'https:[^']*'/g, "dsn: ''"));
-        }
-        report.instrumentation = ['Sentry DSN disabled in disposable test copies'];
-        write(path.join(root, 'config.local.json'), localConfig);
-        write(path.join(config.cli, 'config.local.json'), localConfig);
+        await timed('validateSourceMs', async () => {
+            // Unit tests exercise source; ensure its prepared runtime matches the tested artifact.
+            for (const file of metadata.files.filter(file => file.path.startsWith('dist/'))) {
+                const digest = crypto.createHash('sha256').update(await fsp.readFile(path.join(source, file.path))).digest('hex');
+                if (digest !== file.sha256) throw new Error(`Test source build differs from CLI SDK: ${file.path}`);
+            }
+        });
+        await timed('sourceSnapshotMs', async () => {
+            if (options.consumeSource) {
+                // Only the single-engine CI shard opts in with its private extraction.
+                // Rename preserves independent files without another complete copy.
+                if (fs.existsSync(path.join(source, 'packages/engine'))) throw new Error('Disposable source contains an embedded engine');
+                await fsp.rename(source, root);
+                report.sourceMode = 'moved';
+                return;
+            }
+            report.sourceMode = 'copied';
+            await fsp.mkdir(root);
+            const entries = ['src', 'tests', 'e2e', 'dist', 'static', 'workflow', 'packages', '@types', 'node_modules', '.github', '.vscodeignore', 'package.json', 'package-lock.json', 'tsconfig.json', 'jest.config.ts', 'engine-compatibility.json'];
+            for (const entry of [...entries, ...['jest.parallel.config.ts', 'jest.serial.config.ts'].filter(file => fs.existsSync(path.join(source, file)))]) {
+                await fsp.cp(path.join(source, entry), path.join(root, entry), { recursive: true, dereference: true, filter: file => {
+                    const rel = path.relative(source, file).replace(/\\/g, '/');
+                    if (rel === 'packages/engine' || rel.startsWith('packages/engine/')) return false;
+                    if (!rel.startsWith('node_modules/') && /(^|\/)(\.git|\.workspace)(\/|$)/.test(rel)) return false;
+                    if (/^e2e\/(reports|logs|server\/reports)(\/|$)/.test(rel)) return false;
+                    if (/^tests\/fixtures\/projects\/[^/]+\/(library|temp|build)(\/|$)/.test(rel)) return false;
+                    return true;
+                } });
+            }
+        });
+        await timed('configureSnapshotsMs', async () => {
+            const localConfig = { enginePath: config.engine };
+            // Legacy CI cases address packages/engine directly. Alias only the tested
+            // isolated SDK, never the developer checkout or a second engine version.
+            await fsp.symlink(config.engine, path.join(root, 'packages/engine'), process.platform === 'win32' ? 'junction' : 'dir');
+            // cc-module's generated relative references assume an embedded engine.
+            // Both copied module locations must reference this pair's SDK declarations.
+            for (const file of [path.join(root, 'packages/cc-module/cc.d.ts'), path.join(root, 'node_modules/cc/cc.d.ts')]) {
+                const text = await fsp.readFile(file, 'utf8');
+                await fsp.writeFile(file, ['cc.d.ts', 'cc.editor.d.ts'].map(name => `/// <reference path="${path.join(config.engine, 'bin/.declarations', name).replace(/\\/g, '/')}"/>\n`).join('')
+                    + text.replace(/\/\/\/ <reference path=.*cc(?:\.editor)?\.d\.ts.*\/>\r?\n/g, ''));
+            }
+            // Disable telemetry only in disposable copies; never upload test events.
+            for (const file of [path.join(root, 'src/core/base/sentry.ts'), path.join(root, 'dist/core/base/sentry.js'), path.join(config.cli, 'dist/core/base/sentry.js')]) {
+                const text = await fsp.readFile(file, 'utf8');
+                await fsp.writeFile(file, text.replace(/dsn: 'https:[^']*'/g, "dsn: ''"));
+            }
+            report.instrumentation = ['Sentry DSN disabled in disposable test copies'];
+            write(path.join(root, 'config.local.json'), localConfig);
+            write(path.join(config.cli, 'config.local.json'), localConfig);
+        });
         const env = { ...process.env, NODE_OPTIONS: '--max-old-space-size=8192', NODE_PATH: '', E2E_CLI_PATH: path.join(config.cli, 'dist/cli.js'), E2E_TEST_SUITE: 'full' };
         delete env.SDK_CATALOG_TOKEN;
         delete env.SDK_CATALOG_AUTH_ORIGIN;
         delete env.SDK_MATRIX_CONFIG;
         // Unit tests and E2E may rebuild engine caches and mutate project settings.
         // Copy writable inputs before either suite starts; never share hard links.
+        // Request copy-on-write where supported, falling back to independent copies.
         const unitRoot = path.join(config.work, 'unit-tests');
         const unitEngine = path.join(config.work, 'unit-engine');
         const unitCli = path.join(config.work, 'unit-cli');
-        await fsp.cp(root, unitRoot, { recursive: true, dereference: true,
-            filter: file => file !== path.join(root, 'packages/engine') });
-        await fsp.cp(config.engine, unitEngine, { recursive: true, dereference: true });
-        await fsp.cp(config.cli, unitCli, { recursive: true, dereference: true });
-        await fsp.symlink(unitEngine, path.join(unitRoot, 'packages/engine'), process.platform === 'win32' ? 'junction' : 'dir');
-        for (const file of [path.join(unitRoot, 'packages/cc-module/cc.d.ts'), path.join(unitRoot, 'node_modules/cc/cc.d.ts')]) {
-            const text = await fsp.readFile(file, 'utf8');
-            await fsp.writeFile(file, text.split(config.engine.replace(/\\/g, '/')).join(unitEngine.replace(/\\/g, '/')));
-        }
-        write(path.join(unitRoot, 'config.local.json'), { enginePath: unitEngine });
-        write(path.join(unitCli, 'config.local.json'), { enginePath: unitEngine });
+        await timed('unitSourceCopyMs', () => fsp.cp(root, unitRoot, { recursive: true, dereference: true, mode: fs.constants.COPYFILE_FICLONE,
+            filter: file => file !== path.join(root, 'packages/engine') }));
+        await timed('unitEngineCopyMs', () => fsp.cp(config.engine, unitEngine, { recursive: true, dereference: true, mode: fs.constants.COPYFILE_FICLONE }));
+        await timed('unitCliCopyMs', () => fsp.cp(config.cli, unitCli, { recursive: true, dereference: true, mode: fs.constants.COPYFILE_FICLONE }));
+        await timed('configureUnitMs', async () => {
+            await fsp.symlink(unitEngine, path.join(unitRoot, 'packages/engine'), process.platform === 'win32' ? 'junction' : 'dir');
+            for (const file of [path.join(unitRoot, 'packages/cc-module/cc.d.ts'), path.join(unitRoot, 'node_modules/cc/cc.d.ts')]) {
+                const text = await fsp.readFile(file, 'utf8');
+                await fsp.writeFile(file, text.split(config.engine.replace(/\\/g, '/')).join(unitEngine.replace(/\\/g, '/')));
+            }
+            write(path.join(unitRoot, 'config.local.json'), { enginePath: unitEngine });
+            write(path.join(unitCli, 'config.local.json'), { enginePath: unitEngine });
+        });
         report.preparationMs = Date.now() - Date.parse(report.startedAt);
         report.status = 'running'; write(reportFile, report);
         const executeSuite = async name => {

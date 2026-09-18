@@ -65,7 +65,7 @@ async function verify(job, directory, output, dependencies = { runMatrix }) {
         if (descriptor.manifestSha256 !== entry.sdk.manifestSha256) throw Error('Prepared Engine SDK changed');
         result.engineRevision = descriptor.revision;
         result.external = entry.external;
-        const matrix = await dependencies.runMatrix({ cli: path.join(output, 'cli'), testRoot: path.join(output, 'candidate'),
+        const matrix = await dependencies.runMatrix({ cli: path.join(output, 'cli'), testRoot: path.join(output, 'candidate'), consumeTestSource: true,
             catalog: path.join(output, 'sources/catalog.json'), output: path.join(output, 'matrix'), cache: path.join(output, 'cache') });
         result.suites = matrix.pairs[0]?.ci?.suites;
         if (matrix.status !== 'passed' || matrix.pairs.length !== 1 || matrix.pairs[0].engine.revision !== descriptor.revision || matrix.pairs[0].cli.revision !== job.cliRevision) throw Error('Full unit/E2E shard failed');

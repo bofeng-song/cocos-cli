@@ -186,6 +186,7 @@ async function runMatrix(options) {
         if (options.requirePublished && catalog.coverage !== 'published') throw new Error('Release gate requires a published catalog, not a local sample');
         const candidates = options.cli ? [await describeArtifact(options.cli, 'cli')] : catalog.clis.filter(entry => entry.maintained && sameHost(entry));
         if (!candidates.length) throw new Error('No maintained CLI SDKs for this host');
+        if (options.consumeTestSource && (!options.testRoot || candidates.length !== 1 || catalog.engines.length !== 1)) throw new Error('Disposable test source requires exactly one CLI and engine');
         let ordinal = 0;
         for (const cli of candidates) {
             if (!sameHost(cli)) throw new Error('CLI SDK platform or Node ABI does not match this process');
@@ -213,7 +214,7 @@ async function runMatrix(options) {
                         if (pair.result.status !== 'passed' || pair.result.engineRevision !== engine.revision || pair.result.cliRevision !== cli.revision) throw new Error('Missing or mismatched pair completion evidence');
                     }
                     pair.smokeStatus = pair.status;
-                    pair.ci = await runCiTests(config, options.testRoot || path.join(__dirname, '..'), options.suiteTimeoutMs);
+                    pair.ci = await runCiTests(config, options.testRoot || path.join(__dirname, '..'), options.suiteTimeoutMs, { consumeSource: options.consumeTestSource === true });
                     pair.status = pair.smokeStatus === 'passed' && pair.ci.status === 'passed' ? 'passed' : 'failed';
                 } catch (error) { pair.status = 'failed'; pair.error = error.message; }
                 save();
