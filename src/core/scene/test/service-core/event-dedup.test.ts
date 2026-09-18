@@ -912,44 +912,7 @@ describe('场景事件契约测试', () => {
             });
         });
 
-        // ---------- CameraService ----------
-
-
-
-        // ---------- GizmoService ----------
-
-
-
-
-
-        // ---------- UIService ----------
-
-
-
-        // ---------- OperationService ----------
-
-        describe('OperationService (operation.ts)', () => {
-            const source = readSourceFile('operation.ts');
-
-            it('应 broadcast pointer-lock（出现 2 次：lock + unlock）', () => {
-                const count = (source.match(/this\.broadcast\(\s*['"]pointer-lock['"]/g) || []).length;
-                expect(count).toBe(2);
-            });
-
-            it('应 broadcast pointer-change（全文仅 1 次）', () => {
-                const count = (source.match(/this\.broadcast\(\s*['"]pointer-change['"]/g) || []).length;
-                expect(count).toBe(1);
-            });
-
-            it('不应同时 emit pointer-lock/pointer-change', () => {
-                expect(source).not.toMatch(/this\.emit\(\s*['"]pointer-lock['"]/);
-                expect(source).not.toMatch(/this\.emit\(\s*['"]pointer-change['"]/);
-            });
-        });
-
-        // ---------- SceneViewService ----------
-
-
+        // Private view/input event contracts are tested in the scene-editor package.
 
         // ---------- UndoService dirty:changed ----------
 
