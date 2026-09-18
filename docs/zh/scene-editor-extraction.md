@@ -53,6 +53,6 @@ node node_modules/jest/bin/jest.js --runInBand --runTestsByPath tests/scene-offs
 
 CLI 场景 Worker 启用引擎的烘焙能力，同时设置引擎预览行为标志以保持原有组件属性语义；这里的标志不启动浏览器或模拟器预览。
 
-私有包的 `cocos-cli/host/*` 使用精确匹配版本；源码已迁入独立仓库，目标 IDE 仍需更新导入入口并做实际预览验收。迁仓不移除 CLI 既有 Git 历史中的源码，独立仓库的访问权限需单独管理。
+私有包使用 CLI 明确列出的 `cocos-cli/host/...` 出口并要求精确匹配版本，已取消 `host/*` 通配导出。源码已迁入独立仓库，目标 IDE 仍需更新导入入口并做实际预览验收。新的内核和资源接口见 [场景 runtime 契约](scene-runtime-contract.md)。迁仓不移除 CLI 既有 Git 历史中的源码，独立仓库的访问权限需单独管理。
 
 CLI 中立服务接口仍描述宿主可注册的 Camera/Gizmo 等通信契约，便于复用 RPC 和服务容器；CLI 单独启动时不注册这些可视化实现。接口类型的存在不代表服务可直接调用，宿主应先加载私有包的 `scene-entry`。
