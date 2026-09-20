@@ -87,3 +87,29 @@ test('minimal mode omits optional packagers and rejects full-mode integrity reco
     assert.equal(workflow.jobs.build.env.MINIMAL_DOWNLOAD_TOOLS, 'true');
     assert.match(workflow.jobs.build.steps.find(step => step.id === 'platform-tools-cache').with.key, /MINIMAL_DOWNLOAD_TOOLS/);
 });
+
+test('tool inventory diagnosis identifies content, permissions, missing and additional files', () => {
+    const { inventoryDifference } = require('../sdk-platform-tools');
+    const file = { path: 'cmft', size: 10, mode: 493, sha256: 'a' };
+    assert.equal(inventoryDifference([file], [file]), null);
+    for (const [field, value] of [['sha256', 'b'], ['mode', 420], ['size', 11]]) {
+        assert.match(inventoryDifference([file], [{ ...file, [field]: value }]), new RegExp(field + ' changed'));
+    }
+    assert.match(inventoryDifference([file], []), /missing file/);
+    assert.match(inventoryDifference([], [file]), /unexpected file/);
+});
+test('engine cache ignores download timestamps but preserves URLs, binary hashes and modes', () => {
+    const { cacheKey, cacheInputs } = require('../sdk-prepared-cache');
+    const entry = { commit: 'engine', external: { commit: 'external' } };
+    const binary = { path: 'static/tools/cmft/cmft', sha256: 'binary', mode: 493, bytes: 10 };
+    const metadata = { path: 'static/tools/manifest.json', sha256: 'old-time' };
+    const sources = { cmft: { url: 'https://example.com/cmft.zip', timestamp: 'old' } };
+    const cli = { files: [binary, metadata] };
+    const key = cacheKey(entry, cli, [], {}, sources);
+    assert.equal(key, cacheKey(entry, { files: [{ ...metadata, sha256: 'new-time' }, binary] }, [], {}, { cmft: { ...sources.cmft, timestamp: 'new' } }));
+    assert.notEqual(key, cacheKey(entry, cli, [], {}, { cmft: { url: 'https://example.com/new.zip' } }));
+    for (const [field, value] of [['sha256', 'new-binary'], ['mode', 420]]) {
+        assert.notEqual(key, cacheKey(entry, { files: [{ ...binary, [field]: value }, metadata] }, [], {}, sources));
+    }
+    assert.notEqual(cacheInputs(entry, cli, [], {}, sources).tools, cacheInputs(entry, { files: [] }, [], {}, sources).tools);
+});

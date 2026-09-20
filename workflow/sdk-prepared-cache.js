@@ -3,16 +3,34 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 
-function cacheKey(entry, cli, scripts, environment = process.env) {
-    const files = cli.files.filter(file => file.path.startsWith('packages/engine-compiler/') || file.path.startsWith('node_modules/') || file.path.startsWith('static/tools/'));
-    return 'engine-sdk-v2-' + hash(JSON.stringify({
+function cacheInputs(entry, cli, scripts, environment = process.env, toolSources = {}) {
+    const files = cli.files.filter(file => !['static/tools/manifest.json', 'static/tools/.sdk-tool-integrity.json'].includes(file.path))
+        .map(({ path, bytes, mode, sha256 }) => ({ path, bytes, mode, sha256 }))
+        .sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+    const digest = prefix => hash(JSON.stringify(files.filter(file => file.path.startsWith(prefix))));
+    const tools = Object.fromEntries(Object.keys(toolSources).sort().map(name => [name, toolSources[name].url]));
+    return {
         repository: entry.repository, commit: entry.commit, external: entry.external, version: entry.version,
-        platform: process.platform, arch: process.arch, node: process.version,
-        abi: process.versions.modules, files, scripts,
-        toolsMode: environment.MINIMAL_DOWNLOAD_TOOLS || '',
-        spine: environment.SIMULATOR_SPINE_FEATURE || '',
+        platform: process.platform, arch: process.arch, node: process.version, abi: process.versions.modules,
+        compiler: digest('packages/engine-compiler/'), dependencies: digest('node_modules/'),
+        tools: digest('static/tools/'), toolSources: hash(JSON.stringify(tools)), scripts: hash(JSON.stringify(scripts)),
+        toolsMode: environment.MINIMAL_DOWNLOAD_TOOLS || '', spine: environment.SIMULATOR_SPINE_FEATURE || '',
         image: [environment.ImageOS || '', environment.ImageVersion || ''],
-    }));
+    };
+}
+function cacheKey(entry, cli, scripts, environment = process.env, toolSources = {}) {
+    return 'engine-sdk-v3-' + hash(JSON.stringify(cacheInputs(entry, cli, scripts, environment, toolSources)));
+}
+function readToolSources(cliRoot, cli) {
+    const relative = 'static/tools/manifest.json';
+    const file = cli.files.find(file => file.path === relative);
+    if (!file) throw Error('CLI SDK missing tool download manifest');
+    const bytes = fs.readFileSync(path.join(cliRoot, relative));
+    if (hash(bytes) !== file.sha256) throw Error('CLI tool download manifest changed');
+    const sources = JSON.parse(bytes);
+    if (!sources || typeof sources !== 'object' || Array.isArray(sources)
+        || Object.values(sources).some(tool => !tool || typeof tool.url !== 'string' || !tool.url)) throw Error('Invalid tool download manifest');
+    return sources;
 }
 
 async function checkFiles(directory, descriptor) {
@@ -74,4 +92,4 @@ async function save(key, directory, descriptor, client = require('@actions/cache
         return { location: tar, sha256: archiveSha256 };
     } catch (error) { console.warn('[Engine SDK cache] save skipped: ' + error.message); }
 }
-module.exports = { cacheKey, checkFiles, restore, save };
+module.exports = { cacheInputs, readToolSources, cacheKey, checkFiles, restore, save };

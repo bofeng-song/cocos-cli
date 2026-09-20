@@ -26,6 +26,19 @@ async function inventory(root) {
     if (!files.some(file => file.sha256 && file.size > 0)) throw Error('Tool directory contains no nonempty files');
     return files;
 }
+function inventoryDifference(expected, actual) {
+    if (!Array.isArray(expected)) return 'missing inventory';
+    const before = new Map(expected.map(file => [file.path, file]));
+    const after = new Map(actual.map(file => [file.path, file]));
+    for (const [name, file] of before) {
+        if (!after.has(name)) return 'missing file: ' + name;
+        for (const field of ['link', 'size', 'mode', 'sha256']) {
+            if (file[field] !== after.get(name)[field]) return name + ': ' + field + ' changed (' + file[field] + ' -> ' + after.get(name)[field] + ')';
+        }
+    }
+    for (const name of after.keys()) if (!before.has(name)) return 'unexpected file: ' + name;
+    return null;
+}
 async function prepare(downloader, output = process.env.GITHUB_OUTPUT, minimal = process.env.MINIMAL_DOWNLOAD_TOOLS === 'true') {
     const started = Date.now();
     const root = path.resolve(downloader.toolsDir);
@@ -41,14 +54,15 @@ async function prepare(downloader, output = process.env.GITHUB_OUTPUT, minimal =
         const target = path.resolve(root, tool.dist);
         // Only a configured direct child of this workspace's tools directory can be replaced.
         if (path.dirname(target) !== root || fs.lstatSync(root).isSymbolicLink()) throw Error('Invalid tool destination');
-        let valid = false, cachedFiles;
+        let valid = false, cachedFiles, reason;
         try {
-            valid = previous.schemaVersion === 1 && previous.mode === mode && previous.platform === process.platform && previous.arch === process.arch
-                && previous.tools?.[tool.dist]?.url === tool.url
-                && downloader.manifest?.[tool.dist]?.url === tool.url
-                && JSON.stringify(cachedFiles = await inventory(target)) === JSON.stringify(previous.tools[tool.dist].files);
-        } catch { /* Redownload only the affected tool. */ }
+            if (previous.schemaVersion !== 1 || previous.mode !== mode || previous.platform !== process.platform || previous.arch !== process.arch) reason = 'cache schema, mode or platform mismatch';
+            else if (previous.tools?.[tool.dist]?.url !== tool.url || downloader.manifest?.[tool.dist]?.url !== tool.url) reason = 'tool URL or download record mismatch';
+            else reason = inventoryDifference(previous.tools[tool.dist].files, cachedFiles = await inventory(target));
+            valid = !reason;
+        } catch (error) { reason = error.message; }
         if (!valid) {
+            console.log('[Platform tools] Rebuild ' + tool.dist + ': ' + reason);
             if (fs.existsSync(target) || (() => { try { fs.lstatSync(target); return true; } catch { return false; } })()) {
                 if (fs.lstatSync(target).isSymbolicLink()) fs.unlinkSync(target);
                 else fs.rmSync(target, { recursive: true, force: true });
@@ -79,4 +93,4 @@ if (require.main === module) {
     const { ToolDownloader } = require(path.join(candidate, 'workflow/download-tools.js'));
     prepare(new ToolDownloader()).catch(error => { console.error(error); process.exitCode = 1; });
 }
-module.exports = { inventory, prepare };
+module.exports = { inventory, inventoryDifference, prepare };
