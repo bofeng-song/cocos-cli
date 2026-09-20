@@ -4,13 +4,8 @@ import ts from 'typescript';
 import baseline from './fixtures/mcp-before-editor-extraction.json';
 
 const root = path.resolve(__dirname, '..');
-const removed = new Set([
-    'scene-bake-lightmap', 'scene-query-lightmap-bake-info', 'scene-clear-lightmap', 'scene-cancel-lightfx-bake',
-    'scene-start-reflection-probe-bake', 'scene-query-reflection-probe-bake', 'scene-cancel-reflection-probe-bake',
-    'scene-bake-reflection-probe', 'scene-bake-reflection-probes', 'scene-clear-reflection-probes',
-]);
 
-it('preserves non-baking and light-probe MCP declarations and removes only the agreed tools', () => {
+it('preserves all scene MCP declarations including every baking tool', () => {
     const actual: typeof baseline = [];
     for (const file of new Set(baseline.map(tool => tool.file))) {
         const source = ts.createSourceFile(file, fs.readFileSync(path.join(root, file), 'utf8'), ts.ScriptTarget.Latest, true);
@@ -29,8 +24,16 @@ it('preserves non-baking and light-probe MCP declarations and removes only the a
         visit(source);
     }
     expect(baseline).toHaveLength(104);
-    expect(actual.sort((a, b) => a.name.localeCompare(b.name))).toEqual(baseline.filter(t => !removed.has(t.name)));
-    expect(actual).toHaveLength(94);
+    // The fixture was recorded on Windows; compare declarations independent of checkout EOLs.
+    const normalizeText = (text: string) => text.replace(/\r\n/g, '\n');
+    const normalize = (entries: typeof baseline) => entries.map(entry => ({
+        ...entry,
+        decorators: entry.decorators.map(normalizeText),
+        parameters: entry.parameters.map(normalizeText),
+        ...(entry.returnType ? { returnType: normalizeText(entry.returnType) } : {}),
+    }));
+    expect(normalize(actual.sort((a, b) => a.name.localeCompare(b.name)))).toEqual(normalize(baseline));
+    expect(actual).toHaveLength(104);
 });
 
 it('publishes a CLI without private package dependencies or preview commands', () => {

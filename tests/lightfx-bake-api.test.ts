@@ -33,11 +33,13 @@ describe('LightFX bake API', () => {
         expect(probeBake).not.toHaveBeenCalled();
         expect(lightmapBake).not.toHaveBeenCalled();
     });
-    it('registers probe bake and clear while keeping the other baking tools private', () => {
+    it('registers probe, lightmap and shared cancellation MCP tools', () => {
         expect(toolRegistry.get('scene-bake-light-probes')?.meta.methodName).toBe('bakeLightProbes');
         expect(toolRegistry.get('scene-clear-light-probes')?.meta.methodName).toBe('clearLightProbes');
-        expect(toolRegistry.has('scene-bake-lightmap')).toBe(false);
-        expect(toolRegistry.has('scene-cancel-lightfx-bake')).toBe(false);
+        expect(toolRegistry.get('scene-bake-lightmap')?.meta.methodName).toBe('bakeLightmap');
+        expect(toolRegistry.get('scene-query-lightmap-bake-info')?.meta.methodName).toBe('queryLightmapBakeInfo');
+        expect(toolRegistry.get('scene-clear-lightmap')?.meta.methodName).toBe('clearLightmap');
+        expect(toolRegistry.get('scene-cancel-lightfx-bake')?.meta.methodName).toBe('cancel');
     });
     it('reports an unavailable scene from the settings read without starting a bake', async () => {
         queryLightProbeSettings.mockRejectedValue(new Error('No scene is currently open.'));

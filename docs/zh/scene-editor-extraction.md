@@ -1,6 +1,6 @@
 # 场景编辑器抽离与调用迁移
 
-CLI 独立保留非烘焙 MCP、场景数据操作、脚本/资源管线、构建运行、烘焙后端和模拟器编译。编辑器及预览已迁入独立的 `pink-scene-editor-extension` 仓库（模块名 `@cocos/scene-editor`）；CLI 不依赖该包，也不要求 IDE 在线。
+CLI 独立保留全部原有场景 MCP（含烘焙）、场景数据操作、脚本/资源管线、构建运行、烘焙后端和模拟器编译。编辑器及预览已迁入独立的 `pink-scene-editor-extension` 仓库（模块名 `@cocos/scene-editor`）；CLI 不依赖该包，也不要求 IDE 在线。
 
 | 职责 | 归属及入口 |
 | --- | --- |
@@ -16,9 +16,12 @@ CLI 独立保留非烘焙 MCP、场景数据操作、脚本/资源管线、构�
 
 CLI Launcher 的三类 preview 方法和 `preview` / `simulator` 预览命令迁到私有包。原生编译脚本保留；普通构建后 `run` 保留。Simulator SDK 只保留构建和产物查询，IDE 将预览/会话调用切换到私有包，参见 [模拟器文档](simulator.md)。
 
-烘焙的程序化 API 仍保留。2026-09-20 调整：Light Probe 的查询设置、烘焙、清理三个 MCP 工具保留在 CLI，允许用户通过 MCP 操作当前场景；Gizmo 和鼠标交互仍在私有包。只有以下 10 个 MCP 工具取消注册（不能通过 tools/call 调用）：
+2026-09-20 最终调整：烘焙的程序化 API 和以下全部 13 个 MCP 工具均保留在 CLI，可通过 tools/call 调用；Gizmo 和鼠标交互仍在私有包。
 
 ```
+scene-query-light-probe-settings
+scene-bake-light-probes
+scene-clear-light-probes
 scene-bake-lightmap
 scene-query-lightmap-bake-info
 scene-clear-lightmap
@@ -31,7 +34,7 @@ scene-bake-reflection-probes
 scene-clear-reflection-probes
 ```
 
-MCP 场景工具基线由 104 个减至 94 个（91 个非烘焙工具 + 3 个 Light Probe 工具）；基线测试逐项比较保留工具的声明、参数、返回类型与装饰器。底层取消/查询/清理仍用于 CLI 烘焙任务生命周期。
+MCP 场景工具基线保持完整的 104 项（91 项非烘焙工具 + 13 项烘焙工具）；基线测试逐项比较全部原始声明、参数、返回类型与装饰器。查询、取消、清理入口一并保留。
 
 ## 后端与环境
 

@@ -39,6 +39,7 @@ export class LightFXBakeApi {
         return execute(() => Scene.LightProbeBake.clearBake(options));
     }
 
+    @tool('scene-bake-lightmap')
     @title('Bake lightmap')
     @description('Bake the current scene lightmap with LightFX, import generated textures, bind them to renderers and save the scene.')
     @result(SchemaLightmapBakeResult)
@@ -46,6 +47,7 @@ export class LightFXBakeApi {
         return execute(() => Scene.LightmapBake.bake(options));
     }
 
+    @tool('scene-query-lightmap-bake-info')
     @title('Query lightmap bake information')
     @description('Query lightmap textures and bake flags currently bound to meshes and terrains in the active scene.')
     @result(SchemaLightmapBakeInfo)
@@ -53,6 +55,7 @@ export class LightFXBakeApi {
         return execute(() => Scene.LightmapBake.queryBakeInfo());
     }
 
+    @tool('scene-clear-lightmap')
     @title('Clear baked lightmap')
     @description('Unbind baked lightmaps and optionally delete unreferenced generated assets. Asset deletion saves the scene and prevents Undo/Redo from restoring pre-Clear baked results; unrelated edit history is preserved.')
     @result(SchemaClearCountResult)
@@ -65,6 +68,7 @@ export class LightFXBakeApi {
         return execute(() => Scene.LightmapBake.clearBake(options));
     }
 
+    @tool('scene-cancel-lightfx-bake')
     @title('Cancel LightFX bake')
     @description('Cancel the currently running light-probe or lightmap bake.')
     @result(SchemaLightFXCancelResult)
