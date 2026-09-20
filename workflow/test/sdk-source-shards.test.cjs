@@ -1,3 +1,4 @@
+require('./sdk-package-layout.test.cjs');
 require('./sdk-ci-copy.test.cjs');
 /* eslint-disable @typescript-eslint/no-require-imports */
 /* global require, process, __dirname */
