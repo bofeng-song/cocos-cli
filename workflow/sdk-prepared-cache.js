@@ -19,7 +19,7 @@ function cacheInputs(entry, cli, scripts, environment = process.env, toolSources
     };
 }
 function cacheKey(entry, cli, scripts, environment = process.env, toolSources = {}) {
-    return 'engine-sdk-v3-' + hash(JSON.stringify(cacheInputs(entry, cli, scripts, environment, toolSources)));
+    return 'engine-sdk-v4-' + hash(JSON.stringify(cacheInputs(entry, cli, scripts, environment, toolSources)));
 }
 function readToolSources(cliRoot, cli) {
     const relative = 'static/tools/manifest.json';

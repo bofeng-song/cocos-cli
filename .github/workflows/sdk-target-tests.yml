@@ -190,6 +190,7 @@ jobs:
             verification/sources/git-refs.snapshot.txt
             verification/sources/catalog.json
             verification/sources/source-*/build.log
+            verification/sources/source-*/cache-input-files.json
             verification/shard-result.json
             verification/matrix/report.json
             verification/matrix/catalog.snapshot.json

@@ -138,8 +138,9 @@ async function prepareSources(options) {
         let externalCache = options.externalCache;
         const preparedCache = require('./sdk-prepared-cache');
         const cliManifest = options.preparedCache ? JSON.parse(fs.readFileSync(path.join(options.cli, 'cli-sdk.json'), 'utf8')) : null;
+        const buildInputs = options.preparedCache ? require('./sdk-compiler-dependencies').compilerDependencies(options.cli, cliManifest) : null;
         const toolSources = options.preparedCache ? preparedCache.readToolSources(options.cli, cliManifest) : {};
-        const scripts = options.preparedCache ? ['sdk-source-compile.cjs', 'build-simulator-runtime.js', 'build-simulator.js', 'pack-sdk.js', 'sdk-engine-sources.js', 'sdk-prepared-cache.js', 'engine-path.js'].map(file => [file, fs.readFileSync(path.join(__dirname, file), 'utf8')]) : [];
+        const scripts = options.preparedCache ? ['sdk-source-compile.cjs', 'build-simulator-runtime.js', 'build-simulator.js', 'pack-sdk.js', 'sdk-engine-sources.js', 'sdk-prepared-cache.js', 'sdk-compiler-dependencies.js', 'engine-path.js'].map(file => [file, fs.readFileSync(path.join(__dirname, file), 'utf8')]) : [];
         if (options.preparedCache) scripts.push(['harness-lock', fs.readFileSync(path.join(__dirname, '../package-lock.json'), 'utf8')]);
         if (options.preparedCache && (process.env.SKIP_SIMULATOR_BUILD === '1' || process.env.SKIP_SIMULATOR_RUNTIME_BUILD === '1')) throw Error('Prepared SDK caching requires complete simulator builds');
         for (let index = 0; index < report.refs.length; index++) {
@@ -175,11 +176,13 @@ async function prepareSources(options) {
                 const commit = map.get(`refs/tags/${external.checkout}^{}`) || map.get(`refs/tags/${external.checkout}`) || map.get(`refs/heads/${external.checkout}`);
                 if (!commit) throw new Error('External dependency ref not found');
                 entry.external = { repository, ref: external.checkout, commit }; save();
-                const key = options.preparedCache ? preparedCache.cacheKey({ ...entry, repository: sourcePolicy.repository }, cliManifest, scripts, process.env, toolSources) : null;
+                const key = options.preparedCache ? preparedCache.cacheKey({ ...entry, repository: sourcePolicy.repository }, buildInputs.cli, scripts, process.env, toolSources) : null;
                 const cacheDirectory = key ? path.resolve(output, '..', 'prepared-engine-cache', key) : null;
                 entry.cacheKey = key;
                 if (key) {
-                    entry.cacheInputs = preparedCache.cacheInputs({ ...entry, repository: sourcePolicy.repository }, cliManifest, scripts, process.env, toolSources);
+                    entry.cacheInputs = preparedCache.cacheInputs({ ...entry, repository: sourcePolicy.repository }, buildInputs.cli, scripts, process.env, toolSources);
+                    entry.cacheInputs.dependencyScope = buildInputs.scope;
+                    write(path.join(work, 'cache-input-files.json'), { scope: buildInputs.scope, packages: buildInputs.packages, files: buildInputs.cli.files });
                     console.log('[Engine SDK cache inputs] ' + JSON.stringify(entry.cacheInputs));
                 }
                 const restored = key ? await timed('cacheRestoreMs', () => preparedCache.restore(key, cacheDirectory)) : null;

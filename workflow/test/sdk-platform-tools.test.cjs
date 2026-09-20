@@ -1,3 +1,4 @@
+require('./sdk-compiler-dependencies.test.cjs');
 /* eslint-disable @typescript-eslint/no-require-imports */
 /* global require, process, __dirname */
 const { test } = require('node:test');
