@@ -110,12 +110,18 @@ npm run test:sdk-tags -- --cli .publish/sdk/full-ci-candidate --test-root . --ou
 
 父工作流同时运行最多 2 个 CLI / 平台，每个平台同时执行最多 3 个版本的准备和测试，共最多 6 个版本任务。fail-fast: false 保留其他组合的结果。实际并发仍受 runner 配额和排队限制。
 
-各版本从自己的 native/external-config.json 解析 external 仓库和 ref，并锁定解析出的 commit。每个 runner 保留独立 checkout 和 node_modules，不跨版本共用可写目录。已有本地 external 只有仓库及目标 commit 匹配才可复用；独立 runner 不会自动继承公共准备任务的 external。npm 缓存复用下载内容，完整 Engine SDK 缓存在这条并行 CI 路径中暂不启用。
+各版本从自己的 native/external-config.json 解析 external 仓库和 ref，并锁定解析出的 commit。每个 runner 保留独立 checkout 和 node_modules，不跨版本共用可写目录。已有本地 external 只有仓库及目标 commit 匹配才可复用；独立 runner 不会自动继承公共准备任务的 external。npm 缓存复用下载内容，完整 Engine SDK 缓存已接入并行 CI 路径，命中后跳过 external 下载、安装和编译。
 
 共享 CLI 和测试源码分别作为 sdk-cli-*、sdk-tests-* 制品保留 3 天。恢复时校验归档 SHA256、平台、架构、Node ABI 和 CLI manifest；测试执行器继续逐文件验证 SDK。源码快照与每版本 source-report、安装编译日志、测试结果一并保留。
 
 Actions 分别显示依赖安装、开发引擎获取、开发引擎安装、CLI/工具准备，以及每版本引擎准备和完整测试耗时。引擎准备日志中的子命令记录开始时间、退出码和耗时。平台工具缓存已接入：编译前恢复 candidate/static/tools，按完整/最小工具模式、平台、架构、Node 版本和候选下载脚本及校验脚本摘要隔离。每个工具校验来源 URL、文件清单、大小、权限及 SHA256；缺失或损坏的工具单独重新下载。兼容性矩阵设置 MINIMAL_DOWNLOAD_TOOLS=true，只准备标记为 essential 的工具；源码快照 manifest 的 toolsMode 标记为 minimal。成功补全后保存新的缓存代次，纯命中不重复上传；失败不保存。缓存恢复、校验/补下载、保存均为独立步骤，并汇总复用数、下载数和校验/下载耗时。首次未命中仍需下载全部工具，净收益需结合恢复和保存耗时评估。
 
-本地 test:sdk-tags 默认仍串行执行，--prepare-only 仅表示产物准备完成。
+本地 test:sdk-tags 默认仍串行执行，--prepare-only 仅表示产物准备完成。本地可通过 --prepared-cache 显式启用 GitHub Actions 缓存；CI 通过 SDK_PREPARED_CACHE=true 启用。缓存收益需要对比冷启动和后续命中的实际耗时。
 
 普通 PR Test 每个平台使用一个 runner，只准备一次环境，然后串行执行 unit 和 E2E。Windows 与 macOS 仍并行，保留原有类型检查、测试分组校验、Jest 缓存、AssetDB 条件测试、E2E debug 参数和覆盖率报告。SDK 兼容性矩阵中的 unit/E2E 独立副本并发执行不受此调整影响。
+
+### Prepared engine cache
+
+The source-shard workflow enables `SDK_PREPARED_CACHE=true`. The key includes engine and external commits, platform/Node/image identity, compiler and runtime dependencies, platform tools, preparation scripts and build settings. CLI application commits alone do not invalidate it. Cache restoration verifies the archive and every SDK file; missing, unavailable or corrupt caches fall back to a complete build. Per-stage timings and the cache key are recorded in `source-report.json`.
+
+A hit still checks out the pinned engine source to validate its version and resolve external identity. It skips external checkout, npm installation, compilation and SDK packing, but always runs full unit/E2E tests. Cache entries contain immutable SDKs, never test working directories. Generation suffixes allow a later run to replace a rejected cache. Default-branch push/scheduled runs populate caches accessible to PRs; PR caches remain subject to GitHub branch scope. The first run pays the additional archive/upload cost; compare a subsequent hit before assessing savings.

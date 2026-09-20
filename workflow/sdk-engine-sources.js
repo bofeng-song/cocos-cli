@@ -52,7 +52,7 @@ function run(command, args, cwd, logFile, timeoutMs = 30 * 60 * 1000) {
     return new Promise((resolve, reject) => {
         const fd = fs.openSync(logFile, 'a');
         const started = Date.now();
-        fs.writeSync(fd, `[${new Date(started).toISOString()}] ${command} ${args.join(' ')}\n`);
+        fs.writeSync(fd, `\n[${new Date(started).toISOString()}] ${command} ${args.join(' ')}\n`);
         const child = spawn(command, args, { cwd, stdio: ['ignore', fd, fd], windowsHide: true, detached: process.platform !== 'win32', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
         let expired = false;
         const timer = setTimeout(() => {
@@ -136,6 +136,11 @@ async function prepareSources(options) {
         if (!npmCli) throw new Error('Cannot locate the npm CLI bundled with Node.js');
         const catalog = { schemaVersion: 1, coverage: 'published', snapshotId: path.basename(output), engines: [], clis: [] };
         let externalCache = options.externalCache;
+        const preparedCache = require('./sdk-prepared-cache');
+        const cliManifest = options.preparedCache ? JSON.parse(fs.readFileSync(path.join(options.cli, 'cli-sdk.json'), 'utf8')) : null;
+        const scripts = options.preparedCache ? ['sdk-source-compile.cjs', 'build-simulator-runtime.js', 'build-simulator.js', 'pack-sdk.js', 'sdk-engine-sources.js', 'sdk-prepared-cache.js', 'engine-path.js'].map(file => [file, fs.readFileSync(path.join(__dirname, file), 'utf8')]) : [];
+        if (options.preparedCache) scripts.push(['harness-lock', fs.readFileSync(path.join(__dirname, '../package-lock.json'), 'utf8')]);
+        if (options.preparedCache && (process.env.SKIP_SIMULATOR_BUILD === '1' || process.env.SKIP_SIMULATOR_RUNTIME_BUILD === '1')) throw Error('Prepared SDK caching requires complete simulator builds');
         for (let index = 0; index < report.refs.length; index++) {
             const entry = report.refs[index];
             if (options.resume && entry.status === 'passed' && entry.sdk) {
@@ -149,8 +154,14 @@ async function prepareSources(options) {
             const log = path.join(work, 'build.log');
             entry.status = 'building'; delete entry.error; save();
             console.log('[Engine SDK] Preparing ' + entry.ref + ' at ' + entry.commit);
+            entry.timings = {};
+            const timed = async (name, action) => {
+                const start = performance.now();
+                try { return await action(); }
+                finally { entry.timings[name] = Math.round(performance.now() - start); save(); console.log('[Engine SDK] ' + name + ': ' + entry.timings[name] + 'ms'); }
+            };
             try {
-                await checkout(sourcePolicy.repository, entry.commit, source, log);
+                await timed('sourceCheckoutMs', () => checkout(sourcePolicy.repository, entry.commit, source, log));
                 const version = JSON.parse(fs.readFileSync(path.join(source, 'package.json'), 'utf8')).version;
                 if ((!entry.baseline && entry.version !== version) || !policies.some(policy => matchEngineVersion(version, policy).supported)) throw new Error(`Source package version ${version} does not match supported tag ${entry.tag || entry.ref}`);
                 entry.version = version;
@@ -163,15 +174,25 @@ async function prepareSources(options) {
                 const commit = map.get(`refs/tags/${external.checkout}^{}`) || map.get(`refs/tags/${external.checkout}`) || map.get(`refs/heads/${external.checkout}`);
                 if (!commit) throw new Error('External dependency ref not found');
                 entry.external = { repository, ref: external.checkout, commit }; save();
-                await checkout(repository, commit, path.join(source, 'native/external'), log, externalCache);
+                const key = options.preparedCache ? preparedCache.cacheKey({ ...entry, repository: sourcePolicy.repository }, cliManifest, scripts) : null;
+                const cacheDirectory = key ? path.resolve(output, '..', 'prepared-engine-cache', key) : null;
+                entry.cacheKey = key;
+                const restored = key ? await timed('cacheRestoreMs', () => preparedCache.restore(key, cacheDirectory)) : null;
+                if (restored && restored.version === version) {
+                    entry.sdk = restored; entry.status = 'passed'; entry.cache = 'hit';
+                    if (!catalog.engines.some(other => other.revision === restored.revision && other.version === restored.version)) catalog.engines.push(restored); save(); continue;
+                }
+                entry.cache = key ? 'miss' : 'disabled';
+                await timed('externalCheckoutMs', () => checkout(repository, commit, path.join(source, 'native/external'), log, externalCache));
                 externalCache = path.join(source, 'native/external');
-                await run(process.execPath, [npmCli, 'ci'], source, log);
+                await timed('installMs', () => run(process.execPath, [npmCli, 'ci'], source, log));
                 // Compile through the prepared CLI toolchain; never rebuild in the developer checkout.
-                await run(process.execPath, [path.join(__dirname, 'sdk-source-compile.cjs'), path.resolve(options.cli), source], work, log);
-                await run(process.execPath, [path.join(__dirname, 'build-simulator-runtime.js'), '--enginePath', source], work, log);
+                await timed('compileMs', () => run(process.execPath, [path.join(__dirname, 'sdk-source-compile.cjs'), path.resolve(options.cli), source], work, log));
+                await timed('simulatorMs', () => run(process.execPath, [path.join(__dirname, 'build-simulator-runtime.js'), '--enginePath', source], work, log));
                 const artifact = path.join(work, `engine-sdk-${Date.now()}`);
-                await packSdk({ kind: 'engine', source, output: artifact });
+                await timed('packMs', () => packSdk({ kind: 'engine', source, output: artifact }));
                 const descriptor = await describeArtifact(artifact, 'engine');
+                if (key) descriptor.preparedArchive = await timed('cacheSaveMs', () => preparedCache.save(key, cacheDirectory, descriptor));
                 entry.sdk = descriptor; entry.status = 'passed';
                 console.log('[Engine SDK] Prepared ' + entry.ref + ': ' + descriptor.version + ' ' + descriptor.revision);
                 if (!catalog.engines.some(other => other.revision === descriptor.revision && other.version === descriptor.version)) catalog.engines.push(descriptor);
@@ -191,9 +212,9 @@ async function prepareSources(options) {
     save(); return report;
 }
 async function main() {
-    const { values } = parseArgs({ options: { cli: { type: 'string' }, output: { type: 'string' }, cache: { type: 'string' }, 'test-root': { type: 'string' }, resume: { type: 'boolean' }, 'validation-tag': { type: 'string' }, 'external-cache': { type: 'string' }, 'plan-only': { type: 'boolean' }, 'prepare-only': { type: 'boolean' } } });
+    const { values } = parseArgs({ options: { cli: { type: 'string' }, output: { type: 'string' }, cache: { type: 'string' }, 'test-root': { type: 'string' }, resume: { type: 'boolean' }, 'validation-tag': { type: 'string' }, 'external-cache': { type: 'string' }, 'plan-only': { type: 'boolean' }, 'prepare-only': { type: 'boolean' }, 'prepared-cache': { type: 'boolean' } } });
     if (!values.output || (!values.cli && !values['plan-only'])) throw new Error('Provide --cli prepared SDK and new --output directory');
-    const result = await prepareSources({ ...values, testRoot: values['test-root'], planOnly: values['plan-only'], prepareOnly: values['prepare-only'], validationTag: values['validation-tag'], externalCache: values['external-cache'] });
+    const result = await prepareSources({ ...values, testRoot: values['test-root'], planOnly: values['plan-only'], prepareOnly: values['prepare-only'], preparedCache: values['prepared-cache'], validationTag: values['validation-tag'], externalCache: values['external-cache'] });
     console.log(JSON.stringify({ status: result.status, refs: result.refs.map(({ ref, commit, status }) => ({ ref, commit, status })), errors: result.errors }));
     process.exitCode = ['passed', 'planned', 'prepared'].includes(result.status) ? 0 : 1;
 }

@@ -48,7 +48,7 @@ async function prepare(job, directory, output, dependencies = { prepareSources }
     const refs = selectRefs(manifest.sourceSnapshot, [readPolicy(cli)], policy);
     if (manifest.repository !== policy.repository || refs.length !== manifest.engines.length
         || refs.some((ref, index) => ref.commit !== manifest.engines[index].source.commit || ref.ref !== manifest.engines[index].source.ref)) throw Error('Frozen source plan mismatch');
-    const report = await dependencies.prepareSources({ cli, output: path.join(output, 'sources'), prepareOnly: true,
+    const report = await dependencies.prepareSources({ cli, output: path.join(output, 'sources'), prepareOnly: true, preparedCache: process.env.SDK_PREPARED_CACHE === 'true',
         frozenRefs: manifest.sourceSnapshot, refIndex: job.index });
     if (report.status !== 'prepared' || report.refs.length !== 1 || report.refs[0].commit !== job.engineCommit) throw Error('Engine preparation failed: ' + JSON.stringify(report.errors));
 }

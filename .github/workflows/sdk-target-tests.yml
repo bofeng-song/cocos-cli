@@ -137,6 +137,8 @@ jobs:
           if-no-files-found: error
 
   verify:
+    env:
+      SDK_PREPARED_CACHE: 'true'
     name: Prepare engine and full unit/E2E (${{ matrix.id }}, ${{ matrix.engineVersion }}, ${{ matrix.runner }})
     needs: plan
     strategy:
@@ -166,10 +168,13 @@ jobs:
           name: sdk-tests-${{ matrix.target }}
           path: bundle
       - name: Prepare only this engine SDK
-        working-directory: harness
+        uses: actions/github-script@v7
         env:
           SHARD: ${{ toJson(matrix) }}
-        run: node workflow/sdk-source-shards.js prepare ../bundle ../verification
+        with:
+          script: |
+            // Run inside an action so the cache client inherits its runtime credentials.
+            require('node:child_process').execFileSync('node', ['workflow/sdk-source-shards.js', 'prepare', '../bundle', '../verification'], { cwd: 'harness', stdio: 'inherit', env: process.env });
       - name: Run complete unit and E2E for this engine
         working-directory: harness
         env:

@@ -258,10 +258,57 @@ test('platform pipelines start independently and publication requires all result
     assert(workflow.jobs.gate.steps.some(step => step.run?.includes('plan plans matrix.json')));
     assert(workflow.jobs.gate.steps.some(step => step.run?.includes('aggregate matrix.json results')));
     assert(workflow.jobs.verified.needs.includes('gate'));
-    assert(target.jobs.build.steps.some(step => step.run?.includes('--plan-only')));
+    assert(target.jobs.build.steps.some(step => (step.run || step.with?.script)?.includes('--plan-only')));
     assert(target.jobs.plan.steps.some(step => step.with?.name?.startsWith('sdk-plan-')));
     assert(workflow.jobs.verified.steps.every(step => !step.run));
 });
+
+test('prepared SDK cache invalidates build inputs and rejects corrupt restored files', async t => {
+    const { cacheKey, checkFiles, save, restore } = require('../sdk-prepared-cache');
+    const dir = fixture(t), source = path.join(dir, 'source'), artifact = path.join(dir, 'artifact');
+    write(path.join(source, 'package.json'), { version: '4.0.0', name: 'engine' });
+    for (const file of REQUIRED.engine) write(path.join(source, file), 'prepared');
+    await packSdk({ kind: 'engine', source, output: artifact });
+    const descriptor = await describeArtifact(artifact, 'engine');
+    const entry = { version: '4.0.0', commit: 'a', external: { commit: 'b' } };
+    const cli = { files: [{ path: 'packages/engine-compiler/dist/index.js', sha256: 'compiler' }] };
+    const key = cacheKey(entry, cli, ['script']);
+    assert.notEqual(key, cacheKey({ ...entry, commit: 'c' }, cli, ['script']));
+    assert.notEqual(key, cacheKey({ ...entry, external: { commit: 'c' } }, cli, ['script']));
+    assert.notEqual(key, cacheKey(entry, cli, ['changed-script']));
+    assert.notEqual(key, cacheKey(entry, { files: [{ ...cli.files[0], sha256: 'changed' }] }, ['script']));
+    assert.equal(key, cacheKey(entry, { ...cli, revision: 'another-cli-commit' }, ['script']));
+    assert.notEqual(key, cacheKey(entry, { files: [...cli.files, { path: 'static/tools/cmake', sha256: 'different-tool' }] }, ['script']));
+    const stored = path.join(dir, 'stored');
+    const client = {
+        saveCache: async ([directory], savedKey) => { assert(savedKey === key || savedKey.startsWith(key + '-')); fs.cpSync(directory, stored, { recursive: true }); },
+        restoreCache: async ([directory], restoredKey) => { assert(restoredKey === key || restoredKey.startsWith(key + '-')); fs.cpSync(stored, directory, { recursive: true }); return key; },
+    };
+    assert.equal(await restore(key, path.join(dir, 'miss'), { restoreCache: async () => undefined }), null);
+    assert.equal(await restore(key, path.join(dir, 'unavailable'), { restoreCache: async () => { throw Error('Network unavailable'); } }), null);
+    await save(key, path.join(dir, 'upload'), descriptor, client);
+    const cached = await restore(key, path.join(dir, 'download'), client);
+    assert.equal(cached.revision, descriptor.revision);
+    fs.writeFileSync(path.join(cached.location, 'package.json'), 'corrupt');
+    await assert.rejects(checkFiles(cached.location, cached));
+    fs.writeFileSync(path.join(stored, 'engine.tar'), 'corrupt');
+    assert.equal(await restore(key, path.join(dir, 'bad'), client), null);
+});
+
+test('source shards download shared inputs only and publication downloads only CLI', () => {
+    const yaml = require('js-yaml');
+    const target = yaml.load(fs.readFileSync(path.join(root, '.github/workflows/sdk-target-tests.yml'), 'utf8'));
+    const downloads = target.jobs.verify.steps.filter(step => step.uses === 'actions/download-artifact@v4').map(step => step.with.name);
+    assert.equal(downloads.length, 2);
+    assert(!downloads.some(name => name.startsWith('sdk-engine-')));
+    assert(target.jobs.verify.steps.some(step => step.with?.script?.includes("'sdk-source-shards.js'") || step.with?.script?.includes("'workflow/sdk-source-shards.js', 'prepare'")));
+    assert(target.jobs.verify.steps.some(step => step.run?.includes('sdk-source-shards.js verify')));
+    assert(downloads.some(name => name.startsWith('sdk-cli-')));
+    assert(downloads.some(name => name.startsWith('sdk-tests-')));
+    const parent = yaml.load(fs.readFileSync(path.join(root, '.github/workflows/sdk-tag-matrix.yml'), 'utf8'));
+    assert(parent.jobs.verified.steps.find(step => step.uses === 'actions/download-artifact@v4').with.name.startsWith('sdk-cli-'));
+});
+
 
 test('automatic source matrix keeps only the newest supported alpha and no duplicate branch baseline', () => {
     const commit = 'a'.repeat(40), peeled = 'b'.repeat(40);
@@ -298,4 +345,10 @@ test('PR tests prepare once per platform and run unit before E2E', () => {
     assert.equal(job.steps[e2e].if, undefined);
     assert(job.steps.some(step => step.name === 'Restore Jest cache'));
     assert(job.steps.some(step => step.name === 'Check E2E coverage'));
+});
+
+test('source shard enables prepared SDK caching without skipping full verification', () => {
+    const workflow = require('js-yaml').load(fs.readFileSync(path.join(root, '.github/workflows/sdk-target-tests.yml'), 'utf8'));
+    assert.equal(workflow.jobs.verify.env.SDK_PREPARED_CACHE, 'true');
+    assert(workflow.jobs.verify.steps.some(step => step.run?.includes('sdk-source-shards.js verify')));
 });
