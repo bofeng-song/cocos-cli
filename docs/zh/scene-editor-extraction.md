@@ -16,12 +16,9 @@ CLI 独立保留非烘焙 MCP、场景数据操作、脚本/资源管线、构�
 
 CLI Launcher 的三类 preview 方法和 `preview` / `simulator` 预览命令迁到私有包。原生编译脚本保留；普通构建后 `run` 保留。Simulator SDK 只保留构建和产物查询，IDE 将预览/会话调用切换到私有包，参见 [模拟器文档](simulator.md)。
 
-烘焙的程序化 API 仍保留，只有以下 13 个 MCP 工具取消注册（不能通过 tools/call 调用）：
+烘焙的程序化 API 仍保留。2026-09-20 调整：Light Probe 的查询设置、烘焙、清理三个 MCP 工具保留在 CLI，允许用户通过 MCP 操作当前场景；Gizmo 和鼠标交互仍在私有包。只有以下 10 个 MCP 工具取消注册（不能通过 tools/call 调用）：
 
 ```
-scene-query-light-probe-settings
-scene-bake-light-probes
-scene-clear-light-probes
 scene-bake-lightmap
 scene-query-lightmap-bake-info
 scene-clear-lightmap
@@ -34,7 +31,7 @@ scene-bake-reflection-probes
 scene-clear-reflection-probes
 ```
 
-MCP 工具由 104 个减至 91 个；基线测试逐项比较其余工具的声明、参数、返回类型与装饰器。底层取消/查询/清理仍用于 CLI 烘焙任务生命周期。
+MCP 场景工具基线由 104 个减至 94 个（91 个非烘焙工具 + 3 个 Light Probe 工具）；基线测试逐项比较保留工具的声明、参数、返回类型与装饰器。底层取消/查询/清理仍用于 CLI 烘焙任务生命周期。
 
 ## 后端与环境
 

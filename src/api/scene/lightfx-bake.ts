@@ -1,5 +1,5 @@
 import { COMMON_STATUS, CommonResultType } from '../base/schema-base';
-import { description, param, result, title } from '../decorator/decorator';
+import { description, param, result, title, tool } from '../decorator/decorator';
 import { Scene } from '../../core/scene';
 import {
     SchemaClearCountResult, SchemaLightFXCancelResult, SchemaLightmapBakeInfo,
@@ -15,6 +15,7 @@ async function execute<T>(operation: () => Promise<T>): Promise<CommonResultType
 
 export class LightFXBakeApi {
 
+    @tool('scene-query-light-probe-settings')
     @title('Query light probe settings')
     @description('Read only the seven light-probe panel settings from the active scene, including property types and readonly flags. Does not read baked probe data, modify the scene, or start a bake.')
     @result(SchemaLightProbeSettings)
@@ -22,6 +23,7 @@ export class LightFXBakeApi {
         return execute(() => Scene.LightProbeBake.querySettings());
     }
 
+    @tool('scene-bake-light-probes')
     @title('Bake light probes')
     @description('Bake all light probes with the effective panel settings and write both settings and spherical-harmonic coefficients back to the current scene.')
     @result(SchemaLightProbeBakeResult)
@@ -29,6 +31,7 @@ export class LightFXBakeApi {
         return execute(() => Scene.LightProbeBake.bake(options));
     }
 
+    @tool('scene-clear-light-probes')
     @title('Clear baked light probes')
     @description('Clear spherical-harmonic bake results from all light probes in the current scene.')
     @result(SchemaClearCountResult)

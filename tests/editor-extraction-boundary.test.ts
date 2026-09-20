@@ -5,13 +5,12 @@ import baseline from './fixtures/mcp-before-editor-extraction.json';
 
 const root = path.resolve(__dirname, '..');
 const removed = new Set([
-    'scene-query-light-probe-settings', 'scene-bake-light-probes', 'scene-clear-light-probes',
     'scene-bake-lightmap', 'scene-query-lightmap-bake-info', 'scene-clear-lightmap', 'scene-cancel-lightfx-bake',
     'scene-start-reflection-probe-bake', 'scene-query-reflection-probe-bake', 'scene-cancel-reflection-probe-bake',
     'scene-bake-reflection-probe', 'scene-bake-reflection-probes', 'scene-clear-reflection-probes',
 ]);
 
-it('preserves every non-baking MCP declaration and removes only the agreed tools', () => {
+it('preserves non-baking and light-probe MCP declarations and removes only the agreed tools', () => {
     const actual: typeof baseline = [];
     for (const file of new Set(baseline.map(tool => tool.file))) {
         const source = ts.createSourceFile(file, fs.readFileSync(path.join(root, file), 'utf8'), ts.ScriptTarget.Latest, true);
@@ -31,7 +30,7 @@ it('preserves every non-baking MCP declaration and removes only the agreed tools
     }
     expect(baseline).toHaveLength(104);
     expect(actual.sort((a, b) => a.name.localeCompare(b.name))).toEqual(baseline.filter(t => !removed.has(t.name)));
-    expect(actual).toHaveLength(91);
+    expect(actual).toHaveLength(94);
 });
 
 it('publishes a CLI without private package dependencies or preview commands', () => {

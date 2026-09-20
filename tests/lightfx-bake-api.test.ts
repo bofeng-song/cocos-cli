@@ -15,7 +15,7 @@ import { LightFXBakeApi } from '../src/api/scene/lightfx-bake';
 
 describe('LightFX bake API', () => {
     beforeEach(() => { probeBake.mockReset(); lightmapBake.mockReset(); queryLightmapBakeInfo.mockReset(); queryLightProbeSettings.mockReset(); probeCancel.mockReset(); lightmapCancel.mockReset(); });
-    it('keeps the typed programmatic settings read without exposing an MCP tool', async () => {
+    it('exposes the typed light-probe settings read as an MCP tool', async () => {
         const number = (value: number) => ({ value, type: 'Number', readonly: false });
         const boolean = (value: boolean) => ({ value, type: 'Boolean', readonly: true });
         const data = {
@@ -26,12 +26,18 @@ describe('LightFX bake API', () => {
         expect(SchemaLightProbeSettings.safeParse({ ...data, giScale: boolean(true) }).success).toBe(false);
         expect(SchemaLightProbeSettings.safeParse({ ...data, showWireframe: number(1) }).success).toBe(false);
         const tool = toolRegistry.get('scene-query-light-probe-settings');
-        expect(tool).toBeUndefined();
+        expect(tool?.meta.methodName).toBe('queryLightProbeSettings');
         queryLightProbeSettings.mockResolvedValue(data);
         await expect(new LightFXBakeApi().queryLightProbeSettings()).resolves.toEqual({ code: COMMON_STATUS.SUCCESS, data });
         expect(queryLightProbeSettings).toHaveBeenCalledWith();
         expect(probeBake).not.toHaveBeenCalled();
         expect(lightmapBake).not.toHaveBeenCalled();
+    });
+    it('registers probe bake and clear while keeping the other baking tools private', () => {
+        expect(toolRegistry.get('scene-bake-light-probes')?.meta.methodName).toBe('bakeLightProbes');
+        expect(toolRegistry.get('scene-clear-light-probes')?.meta.methodName).toBe('clearLightProbes');
+        expect(toolRegistry.has('scene-bake-lightmap')).toBe(false);
+        expect(toolRegistry.has('scene-cancel-lightfx-bake')).toBe(false);
     });
     it('reports an unavailable scene from the settings read without starting a bake', async () => {
         queryLightProbeSettings.mockRejectedValue(new Error('No scene is currently open.'));
