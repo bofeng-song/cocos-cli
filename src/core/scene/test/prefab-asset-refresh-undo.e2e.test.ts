@@ -88,6 +88,47 @@ describe('prefab asset updates through scene undo and redo', () => {
         expect(child).not.toBeNull();
         expect(child?.prefab.state).toBe(PrefabState.PrefabChild);
         expect(child?.prefab.isAddedChild).toBe(false);
+
+        const beforeResave = await rpc.request('Node', 'queryNodeTree', [{ path: '/' }]);
+        for (let cycle = 0; cycle < 4; cycle++) {
+            expect((await rpc.request('Undo', 'undo', [])).success).toBe(true);
+            expect((await rpc.request('Redo', 'redo', [])).success).toBe(true);
+        }
+        graph[childIndex]._name = 'ResavedChild';
+        await assetManager.saveAsset(prefabUrl, JSON.stringify(graph));
+        let resynced = false;
+        for (let attempt = 0; attempt < 100; attempt++) {
+            if (await rpc.request('Node', 'queryNodeTree', [{ path: 'Instance/ResavedChild' }])) {
+                resynced = true;
+                break;
+            }
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        expect(resynced).toBe(true);
+        const afterResave = await rpc.request('Node', 'queryNodeTree', [{ path: '/' }]);
+        expect(afterResave?.children.map(node => node.name)).toEqual(beforeResave?.children.map(node => node.name));
+        const instance = await rpc.request('Node', 'queryNodeTree', [{ path: 'Instance' }]);
+        expect(instance?.children.map(node => node.name)).toEqual(['ResavedChild']);
+
+        await EditorProxy.save({});
+        const prefab = await EditorProxy.open({ urlOrUUID: prefabUrl });
+        expect(prefab).toBeTruthy();
+        const prefabPath = prefab!.name;
+        await rpc.request('Node', 'createByType', [{ path: prefabPath, name: 'EditedChild', nodeType: NodeType.EMPTY }]);
+        await EditorProxy.save({});
+        for (let cycle = 0; cycle < 4; cycle++) {
+            expect((await rpc.request('Undo', 'undo', [])).success).toBe(true);
+            expect((await rpc.request('Redo', 'redo', [])).success).toBe(true);
+        }
+        await EditorProxy.save({});
+        const savedGraph = JSON.parse(await readFile(join(directory, 'Updated.prefab'), 'utf8'));
+        expect(savedGraph.filter((item: any) => item.__type__ === 'cc.Node').map((item: any) => item._name).sort())
+            .toEqual([prefabPath, 'ResavedChild', 'EditedChild'].sort());
+        await EditorProxy.open({ urlOrUUID: sceneUrl });
+        const finalTree = await rpc.request('Node', 'queryNodeTree', [{ path: '/' }]);
+        expect(finalTree?.children.map(node => node.name)).toEqual(beforeResave?.children.map(node => node.name));
+        const updatedInstance = await rpc.request('Node', 'queryNodeTree', [{ path: 'Instance' }]);
+        expect(updatedInstance?.children.map(node => node.name)).toEqual(['ResavedChild', 'EditedChild']);
     });
 
 });

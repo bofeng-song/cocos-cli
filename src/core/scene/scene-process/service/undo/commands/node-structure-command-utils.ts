@@ -260,7 +260,12 @@ function restoreSubtreeUuids(node: Node, snapshot: INodeUuidSnapshot): void {
     // 修复当前节点 uuid
     if (snapshot.uuid && node.uuid !== snapshot.uuid &&
         !isNodeInCurrentScene(editorNode.getNode?.(snapshot.uuid) as Node | null)) {
-        node['_id'] = snapshot.uuid;
+        if (editorNode.getNode?.(node.uuid) === node) {
+            editorNode.changeNodeUUID(node.uuid, snapshot.uuid);
+        } else {
+            // Detached objects are not available through the manager yet.
+            node['_id'] = snapshot.uuid;
+        }
     }
 
     // 修复组件 uuid（按顺序对应）
@@ -270,7 +275,11 @@ function restoreSubtreeUuids(node: Node, snapshot: INodeUuidSnapshot): void {
         const comp = components[i];
         if (targetUuid && comp?.uuid && comp.uuid !== targetUuid &&
             !editorComponent?.getComponent?.(targetUuid)) {
-            comp['_id'] = targetUuid;
+            if (editorComponent?.getComponent?.(comp.uuid) === comp) {
+                editorComponent.changeUUID(comp.uuid, targetUuid);
+            } else {
+                comp['_id'] = targetUuid;
+            }
         }
     }
 

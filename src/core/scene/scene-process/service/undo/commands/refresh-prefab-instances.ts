@@ -48,7 +48,14 @@ export function refreshPrefabInstances(root: Node): void {
     for (const [key, target] of before) replacements.set(target, after.get(key) ?? null);
     for (const [key, target] of after) {
         const uuid = uuids.get(key);
-        if (uuid) (target as unknown as { _id: string })._id = uuid;
+        if (!uuid || target.uuid === uuid) continue;
+        if (target instanceof Node && EditorExtends.Node.getNode(target.uuid) === target) {
+            EditorExtends.Node.changeNodeUUID(target.uuid, uuid);
+        } else if (target instanceof Component && EditorExtends.Component.getComponent(target.uuid) === target) {
+            EditorExtends.Component.changeUUID(target.uuid, uuid);
+        } else {
+            (target as unknown as { _id: string })._id = uuid;
+        }
     }
 
     // Mounted components and override values can still reference objects from
