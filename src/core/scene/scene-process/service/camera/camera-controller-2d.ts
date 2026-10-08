@@ -92,7 +92,7 @@ export class CameraController2D extends CameraControllerBase {
         this._gridMeshComp.node.active = false;
         this._initGrid();
         this._ruler = new Ruler2D();
-        this._ruler.onNeedRedraw = () => this._refreshRuler();
+        this._ruler.onNeedRedraw = () => this.updateGrid();
         this._ruler.init();
         this._initMode();
         this.initOriginAxis();
@@ -209,7 +209,6 @@ export class CameraController2D extends CameraControllerBase {
         const gridY = ((this._size.height - contentHeight) / 2 - contentY * scale) * this._grid.yDirection;
         this._grid.xAxisSync(gridX, scale);
         this._grid.yAxisSync(gridY, scale);
-        this.updateGrid();
         this.adjustCamera(immediate);
 
         if (contentBounds) {
@@ -278,12 +277,12 @@ export class CameraController2D extends CameraControllerBase {
             this._posAnim = tweenPosition(startPos, targetPos, 300);
             this._posAnim.step((pos: Vec3) => {
                 this.node.setWorldPosition(pos);
-                this._refreshRuler();
+                this.updateGrid();
             });
         }
 
         this._updateOrthoHeight(scale);
-        this._refreshRuler();
+        this.updateGrid();
 
         try {
             const { Service } = require('../core/decorator');
@@ -304,16 +303,19 @@ export class CameraController2D extends CameraControllerBase {
     // ---------- 网格数据更新 ----------
 
     private _updateGridData() {
-        this._grid.updateRange();
+        const view = this._rulerView();
+        this._grid.updateRange(view);
 
         const positions: number[] = [];
         const colors: number[] = [];
         const indices: number[] = [];
 
-        const left = this._grid.left;
-        const right = this._grid.right;
-        const top = this._grid.top;
-        const bottom = this._grid.bottom;
+        const { xMin: left, xMax: right, yMin: top, yMax: bottom } = view;
+        // 与 Creator 一致，将线段两端延伸到视图外，避免边沿露出端点。
+        const lineLeft = Math.fround(Math.min(left, right)) - 100;
+        const lineRight = Math.fround(Math.max(left, right)) + 100;
+        const lineTop = Math.fround(Math.min(top, bottom)) - 100;
+        const lineBottom = Math.fround(Math.max(top, bottom)) + 100;
 
         const r = this._lineColor.r / 255;
         const g = this._lineColor.g / 255;
@@ -333,12 +335,12 @@ export class CameraController2D extends CameraControllerBase {
                     if (idx + 2 > _maxTicks * _maxTicks) break;
                     // 如果显示了中心轴，就跳过绘制网格的垂直中线
                     if (this.originAxisY_Visible && 0 === tick) continue;
-                    // 竖线：固定 x，从 bottom 到 top
-                    positions.push(tick, bottom);
+                    // 竖线：固定 x，两端延伸到视图外
+                    positions.push(tick, lineTop);
                     colors.push(r, g, b, alpha);
                     idx++;
 
-                    positions.push(tick, top);
+                    positions.push(tick, lineBottom);
                     colors.push(r, g, b, alpha);
                     idx++;
                 }
@@ -357,11 +359,11 @@ export class CameraController2D extends CameraControllerBase {
                     // 如果显示了中心轴，就跳过绘制网格的横向中线
                     if (this.originAxisX_Visible && 0 === tick) continue;
                     // 横线：固定 y，从 left 到 right
-                    positions.push(left, tick);
+                    positions.push(lineLeft, tick);
                     colors.push(r, g, b, alpha);
                     idx++;
 
-                    positions.push(right, tick);
+                    positions.push(lineRight, tick);
                     colors.push(r, g, b, alpha);
                     idx++;
                 }
@@ -394,18 +396,6 @@ export class CameraController2D extends CameraControllerBase {
 
         this.updateOriginAxis();
         this._ruler?.updateTicks(this._grid, this._rulerView());
-    }
-
-    /**
-     * 相机更新后立即用最新矩阵刷新刻度。
-     * 各交互流程（缩放/拖拽/复位/resize）都以 adjustCamera 收尾，
-     * 在此处重画可保证刻度不再滞后一帧。
-     */
-    private _refreshRuler(): void {
-        if (!this._ruler || !this._grid) {
-            return;
-        }
-        this._ruler.updateTicks(this._grid, this._rulerView());
     }
 
     /**
@@ -469,10 +459,7 @@ export class CameraController2D extends CameraControllerBase {
     updateOriginAxis() {
         if (!this._originAxisHorizontalMeshComp?.node?.active) return;
 
-        const left = this._grid.left;
-        const right = this._grid.right;
-        const top = this._grid.top;
-        const bottom = this._grid.bottom;
+        const { xMin: left, xMax: right, yMin: top, yMax: bottom } = this._rulerView();
 
         const positions: number[] = [];
         const colors: number[] = [];
@@ -588,7 +575,6 @@ export class CameraController2D extends CameraControllerBase {
         this._grid.yAxisScaleAt(py, newScale);
 
         this.setScale2D(newScale);
-        this.updateGrid();
         this.adjustCamera();
     }
 
@@ -692,14 +678,12 @@ export class CameraController2D extends CameraControllerBase {
         const height = this._size.height;
         this._grid.resize(width, height);
         this._ruler?.resize();
-        this.updateGrid();
         this.adjustCamera();
     }
 
     // ---------- refresh ----------
 
     refresh() {
-        this.updateGrid();
         this.adjustCamera();
         try {
             const { Service } = require('../core/decorator');
@@ -726,7 +710,6 @@ export class CameraController2D extends CameraControllerBase {
         this._grid.yAxisScaleAt(py, finalScale);
 
         this.setScale2D(finalScale);
-        this.updateGrid();
         this.adjustCamera();
     }
 
@@ -743,7 +726,6 @@ export class CameraController2D extends CameraControllerBase {
     }
 
     onDesignResolutionChange() {
-        this.updateGrid();
         this.adjustCamera();
     }
 }
