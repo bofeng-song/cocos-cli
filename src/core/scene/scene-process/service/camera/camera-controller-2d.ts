@@ -41,6 +41,7 @@ export class CameraController2D extends CameraControllerBase {
     private _ruler!: Ruler2D;
     private _contentRect!: Rect;
     private _scale2D = 1;
+    private _active = false;
 
     protected _wheelSpeed = 6;
     protected _near = 1;
@@ -92,7 +93,7 @@ export class CameraController2D extends CameraControllerBase {
         this._gridMeshComp.node.active = false;
         this._initGrid();
         this._ruler = new Ruler2D();
-        this._ruler.onNeedRedraw = () => this.updateGrid();
+        this._ruler.onNeedRedraw = () => this._refreshGridAndRuler();
         this._ruler.init();
         this._initMode();
         this.initOriginAxis();
@@ -129,6 +130,7 @@ export class CameraController2D extends CameraControllerBase {
     // ---------- active ----------
 
     set active(value: boolean) {
+        this._active = value;
         if (value) {
             // 正交投影
             this._camera.projection = Camera.ProjectionType.ORTHO;
@@ -277,19 +279,12 @@ export class CameraController2D extends CameraControllerBase {
             this._posAnim = tweenPosition(startPos, targetPos, 300);
             this._posAnim.step((pos: Vec3) => {
                 this.node.setWorldPosition(pos);
-                this.updateGrid();
+                this._refreshGridAndRuler();
             });
         }
 
         this._updateOrthoHeight(scale);
-        this.updateGrid();
-
-        try {
-            const { Service } = require('../core/decorator');
-            Service.Engine?.repaintInEditMode?.();
-        } catch (e) {
-            // Engine may not be ready
-        }
+        this._refreshGridAndRuler();
     }
 
     // ---------- 更新正交高度 ----------
@@ -302,8 +297,7 @@ export class CameraController2D extends CameraControllerBase {
 
     // ---------- 网格数据更新 ----------
 
-    private _updateGridData() {
-        const view = this._rulerView();
+    private _updateGridData(view: IRulerView) {
         this._grid.updateRange(view);
 
         const positions: number[] = [];
@@ -386,16 +380,38 @@ export class CameraController2D extends CameraControllerBase {
     }
 
     updateGrid() {
-        if (!this._gridMeshComp) return;
+        // 2D/3D 共用相机，非激活时不能用 3D 投影计算 2D 刻度范围
+        if (!this._active || !this._gridMeshComp) {
+            return;
+        }
 
-        const { positions, colors, indices } = this._updateGridData();
+        const view = this._rulerView();
+        const { positions, colors, indices } = this._updateGridData(view);
 
         CameraUtils.updateVBAttr(this._gridMeshComp, 'a_position', positions);
         CameraUtils.updateVBAttr(this._gridMeshComp, gfx.AttributeName.ATTR_COLOR, colors);
         CameraUtils.updateIB(this._gridMeshComp, indices);
 
-        this.updateOriginAxis();
-        this._ruler?.updateTicks(this._grid, this._rulerView());
+        this.updateOriginAxis(view);
+        this._ruler?.updateTicks(this._grid, view);
+    }
+
+    /**
+     * 相机或宿主视口变化后同步刷新网格和刻度
+     *
+     * 缩放、平移和聚焦动画都会改变可见范围，需要在相机更新后重建网格
+     */
+    private _refreshGridAndRuler(): void {
+        if (!this._active || !this._grid) {
+            return;
+        }
+        this.updateGrid();
+        try {
+            const { Service } = require('../core/decorator');
+            Service.Engine?.repaintInEditMode?.();
+        } catch {
+            // 引擎服务可能尚未就绪
+        }
     }
 
     /**
@@ -456,10 +472,16 @@ export class CameraController2D extends CameraControllerBase {
         }
     }
 
-    updateOriginAxis() {
-        if (!this._originAxisHorizontalMeshComp?.node?.active) return;
+    updateOriginAxis(view?: IRulerView) {
+        if (!this._active || !this._originAxisHorizontalMeshComp?.node?.active) {
+            return;
+        }
 
-        const { xMin: left, xMax: right, yMin: top, yMax: bottom } = this._rulerView();
+        view ??= this._rulerView();
+        const left = view.xMin;
+        const right = view.xMax;
+        const top = view.yMax;
+        const bottom = view.yMin;
 
         const positions: number[] = [];
         const colors: number[] = [];
