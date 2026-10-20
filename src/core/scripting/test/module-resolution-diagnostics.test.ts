@@ -7,7 +7,10 @@ import path from 'path';
 
 describe('source module resolution diagnostics', () => {
     test('real ModLo reports a missing TS dependency and resolves it after creation', () => {
-        const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cli-resolution-diagnostic-'));
+        // ModLo canonicalizes asset prefixes. macOS /var temp paths resolve under /private/var.
+        // Use the same canonical path for the importer and the asset prefix.
+        const temporaryRoot = fs.realpathSync(os.tmpdir());
+        const directory = fs.realpathSync(fs.mkdtempSync(path.join(temporaryRoot, 'cli-resolution-diagnostic-')));
         try {
             const source = path.join(directory, 'Importer.ts');
             fs.writeFileSync(source, "import './Value';");
@@ -22,7 +25,7 @@ describe('source module resolution diagnostics', () => {
             expect(resolved.isExternal).toBe(false);
             expect(report).toHaveBeenCalledTimes(1);
         } finally {
-            expect(path.resolve(directory).startsWith(path.resolve(os.tmpdir()) + path.sep)).toBe(true);
+            expect(path.resolve(directory).startsWith(temporaryRoot + path.sep)).toBe(true);
             expect(path.basename(directory).startsWith('cli-resolution-diagnostic-')).toBe(true);
             fs.rmSync(directory, { recursive: true, force: true });
         }
