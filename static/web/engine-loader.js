@@ -1,3 +1,4 @@
+import { installModuleMapDiagnostics } from '/static/web/module-map-runtime.js';
 /* global window, document, System, fetch */
 
 /**
@@ -28,7 +29,7 @@ export async function loadEngine(options = {}) {
         '/scripting/import-map-global',
     ];
     for (const src of sources) {
-        const res = await fetch(new URL(src, env.serverURL));
+        const res = await fetch(new URL(src, env.serverURL), { cache: 'no-store' });
         const text = await res.text();
         const script = document.createElement('script');
         script.type = 'systemjs-importmap';
@@ -40,6 +41,10 @@ export async function loadEngine(options = {}) {
         const url = new URL('/scripting/x/resolution-detail-map', env.serverURL);
         return fetch(url).then((response) => response.json()).then((json) => ({ json, url: url.href }));
     });
+
+    // Consume maps appended after SystemJS startup, even after its initial script scan.
+    await System.prepareImport(true);
+    installModuleMapDiagnostics(System, env.serverURL);
 
     await import('/static/web/editor-stub-preload.js');
     if (options.preview) {
