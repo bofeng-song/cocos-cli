@@ -3,7 +3,7 @@ import { register } from './core/decorator';
 import { ServiceEvents } from './core/global-events';
 import type { ISelectionService, ISelectionEvents, IChangeNodeOptions } from '../../common';
 import { NodeEventType } from '../../common';
-import type { Node } from 'cc';
+import { ParticleSystem2D, type Node } from 'cc';
 import { getEditorNodeByUuid, getEditorNodePath, getEditorNodeUuidByPath } from './utils/editor-node';
 import { normalizeNodePath } from '../../../engine/editor-extends/manager/path-utils';
 
@@ -136,6 +136,19 @@ export class SelectionService extends BaseService<ISelectionEvents> implements I
             for (const comp of node.components) {
                 if (comp?.onFocusInEditor) {
                     comp.onFocusInEditor();
+                    if (comp instanceof ParticleSystem2D) {
+                        // Match ParticleSystem2D's focus group: climb through emitter nodes,
+                        // then include every emitter below the first non-emitter ancestor.
+                        let root = comp.node;
+                        while (root.parent && root.getComponent(ParticleSystem2D)) {
+                            root = root.parent;
+                        }
+                        for (const emitter of root.getComponentsInChildren(ParticleSystem2D)) {
+                            if (emitter.enabledInHierarchy && emitter.preview && !emitter.active) {
+                                emitter.resetSystem();
+                            }
+                        }
+                    }
                 }
             }
         } catch (e) {
