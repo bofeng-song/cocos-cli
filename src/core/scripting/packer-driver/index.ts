@@ -534,6 +534,8 @@ export class PackerDriver {
         return compilationState.run(async () => {
             let assetChanges: AssetChange[] = [];
             const featureChanged = this._featureChanged;
+            let featuresApplied = !featureChanged;
+            let assetChangesApplied = false;
             try {
                 this._building = true;
                 this._currentTaskId = taskId || null;
@@ -549,6 +551,7 @@ export class PackerDriver {
                 if (this._featureChanged) {
                     this._featureChanged = false;
                     await this._syncEngineFeatures(this._features);
+                    featuresApplied = true;
                 }
                 assetChanges = this._assetChangeQueue;
                 this._assetChangeQueue = [];
@@ -560,11 +563,16 @@ export class PackerDriver {
                 await this.beforeEditorBuildDelegate.dispatch(assetChanges.filter(item => item.type === AssetActionEnum.change) as ModifiedAssetChange[]);
                 const nonDTSChanges = assetChanges.filter(item => !item.filePath.endsWith('.d.ts'));
 
-                let err: Error | null = null;
-                for (const [, target] of Object.entries(this._targets)) {
+                // Finish applying the batch to every target before compiling any target.
+                for (const target of Object.values(this._targets)) {
                     if (assetChanges.length !== 0) {
                         await target.applyAssetChanges(nonDTSChanges);
                     }
+                }
+                assetChangesApplied = true;
+
+                let err: Error | null = null;
+                for (const target of Object.values(this._targets)) {
                     const buildResult = await target.build();
                     if (buildResult.err) {
                         err = buildResult.err;
@@ -581,9 +589,12 @@ export class PackerDriver {
                 }
                 eventEmitter.emit('compiled', 'project');
             } catch (error) {
-                // Preserve ordering: newer changes already queued must be applied last.
-                this._assetChangeQueue.unshift(...assetChanges);
-                if (featureChanged) this._featureChanged = true;
+                // Retry interrupted application, not compilation diagnostics. Replaying applied
+                // changes would re-register failed entries removed by deleteCacheFile().
+                if (!assetChangesApplied) {
+                    this._assetChangeQueue.unshift(...assetChanges);
+                }
+                if (!featuresApplied) this._featureChanged = true;
                 throw error;
             } finally {
                 this._building = false;

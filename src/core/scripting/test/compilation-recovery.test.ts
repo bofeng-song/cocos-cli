@@ -50,7 +50,72 @@ describe('script compilation failure recovery', () => {
         const { driver: d, state, compiled } = driver({ applyAssetChanges: async () => {}, build: async () => ({ err: error }), deleteCacheFile: jest.fn() });
         await expect(d._startBuild()).rejects.toBe(error);
         expect(compiled).not.toHaveBeenCalled();
+        expect(d._assetChangeQueue).toEqual([]);
         expect(state.getStatus()).toMatchObject({ state: 'failed', error: { file: 'Broken.ts' } });
+    });
+
+    it('does not re-register a rejected script when importing another script or fixing it later', async () => {
+        const entries = new Set<string>();
+        let broken = true;
+        const error = Object.assign(new SyntaxError('Unexpected token'), { file: 'Broken.ts' });
+        const target = {
+            applyAssetChanges: jest.fn(async (changes: any[]) => {
+                for (const change of changes) entries.add(change.filePath);
+            }),
+            build: jest.fn(async () => entries.has('Broken.ts') && broken ? { err: error } : {}),
+            deleteCacheFile: jest.fn((file: string) => entries.delete(file)),
+        };
+        const { driver: d, state, compiled } = driver(target);
+        const bad = { filePath: 'Broken.ts', type: 'change' };
+        const good = { filePath: 'Good.ts', type: 'change' };
+        d._assetChangeQueue = [bad];
+        await expect(d._startBuild()).rejects.toBe(error);
+        expect(entries.has('Broken.ts')).toBe(false);
+        d._assetChangeQueue.push(good);
+        await expect(d._startBuild()).resolves.toBeUndefined();
+        expect(target.applyAssetChanges).toHaveBeenLastCalledWith([good]);
+        expect(entries.has('Broken.ts')).toBe(false);
+        expect(state.getStatus()).toMatchObject({ state: 'ready', revision: 1 });
+        broken = false;
+        d._assetChangeQueue.push(bad);
+        await expect(d._startBuild()).resolves.toBeUndefined();
+        expect(entries.has('Broken.ts')).toBe(true);
+        expect(compiled).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries an interrupted application across all targets before building any target', async () => {
+        const error = new Error('Entry update failed');
+        const first = { applyAssetChanges: jest.fn(async () => {}), build: jest.fn(async () => ({})) };
+        const second = {
+            applyAssetChanges: jest.fn().mockRejectedValueOnce(error).mockResolvedValue(undefined),
+            build: jest.fn(async () => ({})),
+        };
+        const { driver: d, change } = driver(first);
+        d._targets = { editor: first, preview: second };
+        await expect(d._startBuild()).rejects.toBe(error);
+        expect(d._assetChangeQueue).toEqual([change]);
+        expect(first.build).not.toHaveBeenCalled();
+        expect(second.build).not.toHaveBeenCalled();
+        await d._startBuild();
+        expect(first.applyAssetChanges).toHaveBeenCalledTimes(2);
+        expect(second.applyAssetChanges).toHaveBeenCalledTimes(2);
+        expect(first.build).toHaveBeenCalledTimes(1);
+        expect(second.build).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves newer queued changes without replaying applied changes or engine features', async () => {
+        const error = Object.assign(new Error('Syntax error'), { file: 'Broken.ts' });
+        const { driver: d, change } = driver({
+            applyAssetChanges: async () => {},
+            build: async () => { d._assetChangeQueue.push({ filePath: 'New.ts', type: 'change' }); return { err: error }; },
+            deleteCacheFile: jest.fn(),
+        });
+        d._featureChanged = true;
+        d._syncEngineFeatures = jest.fn(async () => {});
+        await expect(d._startBuild()).rejects.toBe(error);
+        expect(d._assetChangeQueue).toEqual([{ filePath: 'New.ts', type: 'change' }]);
+        expect(d._assetChangeQueue).not.toContain(change);
+        expect(d._featureChanged).toBe(false);
     });
 
     it('serializes overlapping iterations', async () => {
