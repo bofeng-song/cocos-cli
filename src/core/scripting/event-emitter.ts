@@ -1,6 +1,7 @@
+import { CompilationState } from './compilation-state';
 import { EventEmitter } from 'events';
 
-export type EventType = 'pack-build-end' | 'pack-build-start' | 'compiled' | 'compile-start';
+export type EventType = 'pack-build-end' | 'pack-build-start' | 'compiled' | 'compile-start' | 'compilation-status';
 
 /**
  * 用于事件派发
@@ -14,3 +15,4 @@ export class CustomEvent extends EventEmitter {
 }
 
 export const eventEmitter = new CustomEvent();
+export const compilationState = new CompilationState(status => eventEmitter.emit('compilation-status', status));
