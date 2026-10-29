@@ -9,6 +9,7 @@ import { IProperty } from '../../../@types/public';
 
 const NodeMgr = EditorExtends.Node;
 
+import { validateNodeName } from '../../../../engine/editor-extends/manager/path-utils';
 import get from 'lodash/get';
 import set from 'lodash/set';
 import findLast from 'lodash/findLast';
@@ -489,13 +490,20 @@ export class NodeManager {
             console.warn('previewSetNodeProperty failed：node not found', uuid);
             return false;
         }
-        if (!info.search) {
+        const container = info.search ? get(node, info.search) : node;
+        if (!info.key || container == null || !(info.key in Object(container))) {
             console.warn('previewSetNodeProperty failed：property path error', path);
             return false;
         }
         // 需要自己记录设置前的属性，在取消时还原效果;
-        let target = get(node, info.search) ? get(node, info.search)[info.key] : undefined;
-        if (!target) {
+        if (path === 'name') {
+            const error = validateNodeName(dump.value as string);
+            if (error) {
+                throw new Error(error);
+            }
+        }
+        let target = container[info.key];
+        if (target === undefined || target === null) {
             // 属性为空时使用默认值
             target = dumpUtil.getDefaultValue(dump.type);
         }
@@ -523,7 +531,8 @@ export class NodeManager {
             console.warn('cancelPreviewSetNodeProperty failed:node not found', uuid);
             return false;
         }
-        if (!info.search) {
+        const container = info.search ? get(node, info.search) : node;
+        if (!info.key || container == null || !(info.key in Object(container))) {
             console.warn('cancelPreviewSetNodeProperty failed:property path error', path);
             return false;
         }
@@ -536,8 +545,23 @@ export class NodeManager {
             return false;
         }
         // 清理掉原来的数据
-        cache?.delete(path);
-        return await this.setProperty(uuid, path, dump, false);
+        let restored: boolean;
+        if (path === 'name') {
+            // Cached names are trusted restoration data, including legacy empty names.
+            this.emit('node:before-change', node);
+            NodeMgr.updateNodeName(uuid, dump.value as string);
+            this.emit('node:change', node, { type: NodeOperationType.SET_PROPERTY, propPath: path, record: false });
+            restored = true;
+        } else {
+            restored = await this.setProperty(uuid, path, dump, false);
+        }
+        if (restored) {
+            cache.delete(path);
+            if (cache.size === 0) {
+                this._previewPropertysCache.delete(uuid);
+            }
+        }
+        return restored;
     }
 
     /**
@@ -568,6 +592,12 @@ export class NodeManager {
         }
 
         // 触发修改前的事件
+        if (path === 'name') {
+            const error = validateNodeName(dump.value as string);
+            if (error) {
+                throw new Error(error);
+            }
+        }
         this.emit('node:before-change', node);
         if (path === 'parent' && node.parent) {
             // 发送节点修改消息
@@ -575,7 +605,11 @@ export class NodeManager {
         }
 
         // 恢复数据
-        await dumpUtil.restoreProperty(node, path, dump);
+        if (path === 'name') {
+            NodeMgr.updateNodeName(node.uuid, dump.value as string);
+        } else {
+            await dumpUtil.restoreProperty(node, path, dump);
+        }
 
         // 触发修改后的事件
         this.emit('node:change', node, { type: NodeOperationType.SET_PROPERTY, propPath: path, record: record });
