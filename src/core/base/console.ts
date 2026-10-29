@@ -126,6 +126,8 @@ export class NewConsole {
      * 开始记录资源导入日志
      * */
     public record(logDest?: string) {
+        // SDK callers can start recording without going through a Launcher.
+        this.init(logDest || this.logDest);
         this.logDest = normalizeLogFilePath(logDest || this.logDest);
         if (this._start) {
             this.resetPinoLogger();
