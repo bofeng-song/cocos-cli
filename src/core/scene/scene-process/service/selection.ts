@@ -136,10 +136,18 @@ export class SelectionService extends BaseService<ISelectionEvents> implements I
             for (const comp of node.components) {
                 if (comp?.onFocusInEditor) {
                     comp.onFocusInEditor();
-                    // Preview-enabled 2D emitters can remain idle after scene loading.
-                    // Preserve the focus hook and only start emitters that are not running.
-                    if (comp instanceof ParticleSystem2D && comp.enabledInHierarchy && comp.preview && !comp.active) {
-                        comp.resetSystem();
+                    if (comp instanceof ParticleSystem2D) {
+                        // Match ParticleSystem2D's focus group: climb through emitter nodes,
+                        // then include every emitter below the first non-emitter ancestor.
+                        let root = comp.node;
+                        while (root.parent && root.getComponent(ParticleSystem2D)) {
+                            root = root.parent;
+                        }
+                        for (const emitter of root.getComponentsInChildren(ParticleSystem2D)) {
+                            if (emitter.enabledInHierarchy && emitter.preview && !emitter.active) {
+                                emitter.resetSystem();
+                            }
+                        }
                     }
                 }
             }
