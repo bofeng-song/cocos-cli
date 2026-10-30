@@ -1,3 +1,4 @@
+import { compilationState } from '../../../scripting/event-emitter';
 import { describeChunkImport } from './module-diagnostic';
 import type { Request, Response, NextFunction } from 'express';
 import path, { isAbsolute, join, relative } from 'path';
@@ -107,6 +108,13 @@ function getAssetLibraryBaseUrl(serverBaseUrl: string): string {
  * 不包含各自专属的 `/` 入口路由。
  */
 export const scriptingRoutes = [
+    {
+        url: '/scripting/compilation-status',
+        handler: async (_req: Request, res: Response) => {
+            res.setHeader('Cache-Control', 'no-store');
+            return res.json(compilationState.getStatus());
+        },
+    },
     {
         url: '/scripting/module-diagnostic',
         async handler(req: Request, res: Response, next: NextFunction): Promise<Response | void> {

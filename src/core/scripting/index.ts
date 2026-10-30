@@ -308,3 +308,5 @@ export type { SharedSettings, IPluginScriptInfo } from './interface';
 export type { CCEModuleMap } from '../engine/@types/config';
 export type { EventType } from './event-emitter';
 export type { TypeScriptAssetInfoCache } from './shared/cache';
+
+export { compilationState } from './event-emitter';

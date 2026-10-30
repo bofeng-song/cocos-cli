@@ -28,7 +28,7 @@ import { existsSync } from 'fs';
 import { url2path } from '../../assets/utils';
 import { compressUuid } from '../../builder/worker/builder/utils';
 import { TypeScriptConfigBuilder } from '../intelligence';
-import { eventEmitter } from '../event-emitter';
+import { eventEmitter, compilationState } from '../event-emitter';
 import { DBInfo } from '../@types/config-export';
 import path from 'path';
 
@@ -531,60 +531,76 @@ export class PackerDriver {
      * @param taskId 任务ID，用于跟踪任务状态
      */
     private async _startBuild(taskId?: string) {
-        // 目前不能直接跳过，因为调用编译接口时是期望立即执行的，如果跳过会导致编译任务无法执行。
-        // if (this._building) {
-        //     this._logger.debug('Build iteration already started, skip.');
-        //     return;
-        // }
-        this._building = true;
-        this._currentTaskId = taskId || null;
-        eventEmitter.emit('compile-start', 'project', taskId);
+        return compilationState.run(async () => {
+            let assetChanges: AssetChange[] = [];
+            const featureChanged = this._featureChanged;
+            let featuresApplied = !featureChanged;
+            let assetChangesApplied = false;
+            try {
+                this._building = true;
+                this._currentTaskId = taskId || null;
+                eventEmitter.emit('compile-start', 'project', taskId);
 
-        this._logger.clear();
-        this._logger.debug(
-            'Build iteration starts.\n' +
-            `Number of accumulated asset changes: ${this._assetChangeQueue.length}\n` +
-            `Feature changed: ${this._featureChanged}` +
-            (taskId ? `\nTask ID: ${taskId}` : ''),
-        );
-        if (this._featureChanged) {
-            this._featureChanged = false;
-            await this._syncEngineFeatures(this._features);
-        }
-        const assetChanges = this._assetChangeQueue;
-        this._assetChangeQueue = [];
-        const beforeTasks = this._beforeBuildTasks.slice();
-        this._beforeBuildTasks.length = 0;
-        for (const beforeTask of beforeTasks) {
-            beforeTask();
-        }
-        await this.beforeEditorBuildDelegate.dispatch(assetChanges.filter(item => item.type === AssetActionEnum.change) as ModifiedAssetChange[]);
-        const nonDTSChanges = assetChanges.filter(item => !item.filePath.endsWith('.d.ts'));
-        
-        let err: Error | null = null;
-        for (const [, target] of Object.entries(this._targets)) {
-            if (assetChanges.length !== 0) {
-                await target.applyAssetChanges(nonDTSChanges);
-            }
-            const buildResult = await target.build();
-            if (buildResult.err) {
-                err = buildResult.err;
-                target.deleteCacheFile((err as any).file);
-                continue;
-            }
-            if (buildResult.depsGraph) {
-                this._depsGraph = buildResult.depsGraph;
-            }
-            this._needUpdateDepsCache = true;
-        }
-        this._building = false;
-        this._currentTaskId = null;
+                this._logger.clear();
+                this._logger.debug(
+                    'Build iteration starts.\n' +
+                    `Number of accumulated asset changes: ${this._assetChangeQueue.length}\n` +
+                    `Feature changed: ${this._featureChanged}` +
+                    (taskId ? `\nTask ID: ${taskId}` : ''),
+                );
+                if (this._featureChanged) {
+                    this._featureChanged = false;
+                    await this._syncEngineFeatures(this._features);
+                    featuresApplied = true;
+                }
+                assetChanges = this._assetChangeQueue;
+                this._assetChangeQueue = [];
+                const beforeTasks = this._beforeBuildTasks.slice();
+                this._beforeBuildTasks.length = 0;
+                for (const beforeTask of beforeTasks) {
+                    beforeTask();
+                }
+                await this.beforeEditorBuildDelegate.dispatch(assetChanges.filter(item => item.type === AssetActionEnum.change) as ModifiedAssetChange[]);
+                const nonDTSChanges = assetChanges.filter(item => !item.filePath.endsWith('.d.ts'));
 
-        eventEmitter.emit('compiled', 'project');
+                // Finish applying the batch to every target before compiling any target.
+                for (const target of Object.values(this._targets)) {
+                    if (assetChanges.length !== 0) {
+                        await target.applyAssetChanges(nonDTSChanges);
+                    }
+                }
+                assetChangesApplied = true;
 
-        if (err) {
-            throw err;
-        }
+                let err: Error | null = null;
+                for (const target of Object.values(this._targets)) {
+                    const buildResult = await target.build();
+                    if (buildResult.err) {
+                        err = buildResult.err;
+                        target.deleteCacheFile((err as any).file);
+                        continue;
+                    }
+                    if (buildResult.depsGraph) {
+                        this._depsGraph = buildResult.depsGraph;
+                    }
+                    this._needUpdateDepsCache = true;
+                }
+                if (err) {
+                    throw err;
+                }
+                eventEmitter.emit('compiled', 'project');
+            } catch (error) {
+                // Retry interrupted application, not compilation diagnostics. Replaying applied
+                // changes would re-register failed entries removed by deleteCacheFile().
+                if (!assetChangesApplied) {
+                    this._assetChangeQueue.unshift(...assetChanges);
+                }
+                if (!featuresApplied) this._featureChanged = true;
+                throw error;
+            } finally {
+                this._building = false;
+                this._currentTaskId = null;
+            }
+        });
     }
 
     private static async _createIncrementalRecord(logger: Logger): Promise<IncrementalRecord> {
@@ -654,7 +670,7 @@ export class PackerDriver {
         // 之前剔除这些后端 feature 入口，应该是在 https://github.com/cocos/3d-tasks/issues/5747 中的建议。
         // 但实际上，编辑器环境下的引擎打包的时候，已经把所有模块打进 bundled/index.js 中，见：https://github.com/cocos/cocos-editor/blob/3.8.5/app/builtin/engine/static/engine-compiler/source/index.ts#L114 。
         // 启动引擎也执行了每个后端的代码，详见：https://github.com/cocos/cocos-editor/blob/3.8.5/app/builtin/scene/source/script/3d/manager/startup/engine/index.ts#L97 。
-        // 项目 import 的 cc 在这里被加载： https://github.com/cocos/cocos-editor/blob/3.8.5/packages/lib-programming/src/executor/index.ts#L355 
+        // 项目 import 的 cc 在这里被加载： https://github.com/cocos/cocos-editor/blob/3.8.5/packages/lib-programming/src/executor/index.ts#L355
         // 其包含的导出 features 是根据 _getEngineFeaturesShippedInEditor 这个当前函数返回的 features 决定的。因此，不会包含 loadWasmModuleBox2D， loadWasmModuleBullet， loadWasmModulePhysX 这几个函数。
         // 这个逻辑跟浏览器预览、构建后的运行时环境都有差异，而且没有必要，排除这些方法只会导致差异，并不能带来包体、性能方面的提升。
         return statsQuery.getFeatures();
@@ -994,7 +1010,7 @@ class PackTarget {
         const prerequisiteImports = await this._getPrerequisiteAssetModsWithFilter();
         const source = (this._tentativePrerequisiteImportsMod ? makeTentativePrerequisiteImports : makePrerequisiteImportsMod)(prerequisiteImports);
 
-        console.time('update entry mod');
+        const entryUpdateStart = performance.now();
         if (OPTIMIZE_ENTRY_SOURCE_COMPILATION) {
             // 注意：.source 是一个 setter，其内部会更新 timestamp，导致每次都重新编译入口文件，如果项目比较大，入口文件的编译会非常耗时。
             // 这里优化，只有在有差异的情况下才去更新 source
@@ -1005,7 +1021,7 @@ class PackTarget {
             // 旧的逻辑是每次任意脚本变化，都重新设置入口 source，对大项目影响比较大
             this._entryModSource = this._entryMod.source = source;
         }
-        console.timeEnd('update entry mod');
+        this._logger.debug(`Update entry module: ${performance.now() - entryUpdateStart}ms.`);
     }
 
     public async setEngineIndexModuleSource(source: string): Promise<void> {
