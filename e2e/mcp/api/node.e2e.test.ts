@@ -191,7 +191,6 @@ describe('MCP Node API', () => {
 
     describe('scene-update-node', () => {
         let testNodeName: string;
-        let testNodePath: string;
         let createdNodeId: string;
         let createdNodeResult: unknown;
 
@@ -209,9 +208,7 @@ describe('MCP Node API', () => {
             expect(created.data).toBeDefined();
             expect(created.data.nodeId).toEqual(expect.any(String));
             createdNodeId = created.data.nodeId;
-            testNodePath = created.data.path;
-            expect(testNodePath).toEqual(expect.any(String));
-            expect(testNodePath.length).toBeGreaterThan(0);
+            expect(created.data.path).toBe(`Canvas/${testNodeName}`);
             createdNodeResult = created;
         });
 
@@ -221,7 +218,7 @@ describe('MCP Node API', () => {
             const newName = `Updated-${testNodeName}`;
             const result = await mcpClient.callTool('scene-update-node', {
                 options: {
-                    path: testNodePath,
+                    path: `Canvas/${testNodeName}`,
                     name: newName
                 }
             });
@@ -232,7 +229,7 @@ describe('MCP Node API', () => {
             // 验证更新
             const queryResult = await mcpClient.callTool('scene-query-node', {
                 options: {
-                    path: testNodePath
+                    path: `Canvas/${testNodeName}`
                 }
             });
 
@@ -244,7 +241,7 @@ describe('MCP Node API', () => {
 
         async function queryUpdateNode(stage: string, trace: UpdateTrace) {
             const result = await mcpClient.callTool('scene-query-node', {
-                options: { path: testNodePath, includeChildren: false },
+                options: { path: `Canvas/${testNodeName}`, includeChildren: false },
             });
             trace.push({ stage, time: new Date().toISOString(), result });
             expect(result.code).toBe(200);
@@ -263,7 +260,7 @@ describe('MCP Node API', () => {
                 // Preserve the first assertion failure; a final query is diagnostic only.
                 try {
                     const result = await mcpClient.callTool('scene-query-node', {
-                        options: { path: testNodePath, includeChildren: false },
+                        options: { path: `Canvas/${testNodeName}`, includeChildren: false },
                     });
                     trace.push({ stage: 'after-failure', time: new Date().toISOString(), result });
                 } catch (queryError) {
@@ -271,7 +268,7 @@ describe('MCP Node API', () => {
                 }
                 console.error('[NodeUpdateDiagnostic]', JSON.stringify({
                     platform: process.platform, arch: process.arch, nodeVersion: process.version,
-                    path: testNodePath, trace,
+                    path: `Canvas/${testNodeName}`, trace,
                 }, null, 2));
                 throw error;
             }
@@ -283,7 +280,7 @@ describe('MCP Node API', () => {
                 // Avoid an extra pre-update query that could hide the original timing failure.
                 const result = await mcpClient.callTool('scene-update-node', {
                     options: {
-                        path: testNodePath,
+                        path: `Canvas/${testNodeName}`,
                         properties: { position: { x: 100, y: 200, z: 0 }, active: false },
                     },
                 });
@@ -301,7 +298,7 @@ describe('MCP Node API', () => {
             await diagnoseUpdate(async trace => {
                 const before = await queryUpdateNode('before-position-update', trace);
                 const positionResult = await mcpClient.callTool('scene-update-node', {
-                    options: { path: testNodePath, properties: { position: { x: 100, y: 200, z: 0 } } },
+                    options: { path: `Canvas/${testNodeName}`, properties: { position: { x: 100, y: 200, z: 0 } } },
                 });
                 trace.push({ stage: 'position-update-result', time: new Date().toISOString(), result: positionResult });
                 expect(positionResult.code).toBe(200);
@@ -309,7 +306,7 @@ describe('MCP Node API', () => {
                 expect(positioned.nodeId).toBe(before.nodeId);
                 expect(positioned.properties!.position).toEqual({ x: 100, y: 200, z: 0 });
                 const activeResult = await mcpClient.callTool('scene-update-node', {
-                    options: { path: testNodePath, properties: { active: false } },
+                    options: { path: `Canvas/${testNodeName}`, properties: { active: false } },
                 });
                 trace.push({ stage: 'active-update-result', time: new Date().toISOString(), result: activeResult });
                 expect(activeResult.code).toBe(200);
@@ -339,7 +336,7 @@ describe('MCP Node API', () => {
         test('should update node with partial properties', async () => {
             const result = await mcpClient.callTool('scene-update-node', {
                 options: {
-                    path: testNodePath,
+                    path: `Canvas/${testNodeName}`,
                     properties: {
                         scale: { x: 2, y: 2, z: 1 }
                     }
@@ -352,7 +349,7 @@ describe('MCP Node API', () => {
             // 验证更新
             const queryResult = await mcpClient.callTool('scene-query-node', {
                 options: {
-                    path: testNodePath,
+                    path: `Canvas/${testNodeName}`,
                     includeChildren: false,
                 }
             });
