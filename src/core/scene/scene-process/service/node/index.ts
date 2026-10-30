@@ -502,6 +502,9 @@ export class NodeManager {
                 throw new Error(error);
             }
         }
+        if (path === 'name' && node.name.trim() && validateNodeName(node.name)) {
+            throw new Error('Cannot preview a node name containing illegal characters. Rename it directly instead.');
+        }
         let target = container[info.key];
         if (target === undefined || target === null) {
             // 属性为空时使用默认值
@@ -550,8 +553,14 @@ export class NodeManager {
             // Cached names are trusted restoration data, including legacy empty names.
             this.emit('node:before-change', node);
             NodeMgr.updateNodeName(uuid, dump.value as string);
+            restored = node.name === dump.value;
+            if (!restored) {
+                // The engine can reject a name without throwing; align the index with
+                // the actual name and retain the original cached value for retry.
+                NodeMgr.updateNodeName(uuid, node.name);
+                return false;
+            }
             this.emit('node:change', node, { type: NodeOperationType.SET_PROPERTY, propPath: path, record: false });
-            restored = true;
         } else {
             restored = await this.setProperty(uuid, path, dump, false);
         }
