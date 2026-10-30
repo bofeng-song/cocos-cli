@@ -191,17 +191,24 @@ describe('MCP Node API', () => {
 
     describe('scene-update-node', () => {
         let testNodeName: string;
+        let createdNodeId: string;
+        let createdNodeResult: unknown;
 
         beforeEach(async () => {
             // 为每个测试创建一个节点
             testNodeName = `UpdateTestNode-${generateTestId()}`;
-            await mcpClient.callTool('scene-create-node-by-type', {
+            const created = await mcpClient.callTool('scene-create-node-by-type', {
                 options: {
                     path: `Canvas/${testNodeName}`,
                     name: testNodeName,
                     nodeType: 'Empty'
                 }
             });
+            expect(created.code).toBe(200);
+            expect(created.data).toBeDefined();
+            expect(created.data.nodeId).toEqual(expect.any(String));
+            createdNodeId = created.data.nodeId;
+            createdNodeResult = created;
         });
 
         /*
@@ -229,34 +236,88 @@ describe('MCP Node API', () => {
             expect(queryResult.data.name).toBe(newName);
         }); */
 
-        test('should update node properties', async () => {
-            const result = await mcpClient.callTool('scene-update-node', {
-                options: {
-                    path: `Canvas/${testNodeName}`,
-                    properties: {
-                        position: { x: 100, y: 200, z: 0 },
-                        active: false
-                    }
-                }
-            });
+        type UpdateTrace = { stage: string; time: string; result: unknown }[];
 
+        async function queryUpdateNode(stage: string, trace: UpdateTrace) {
+            const result = await mcpClient.callTool('scene-query-node', {
+                options: { path: `Canvas/${testNodeName}`, includeChildren: false },
+            });
+            trace.push({ stage, time: new Date().toISOString(), result });
             expect(result.code).toBe(200);
             expect(result.data).toBeDefined();
+            expect(result.data.nodeId).toEqual(expect.any(String));
+            expect(result.data.nodeId.length).toBeGreaterThan(0);
+            expect(result.data.properties).toBeDefined();
+            return result.data;
+        }
 
-            // 验证更新
-            const queryResult = await mcpClient.callTool('scene-query-node', {
-                options: {
-                    path: `Canvas/${testNodeName}`,
-                    includeChildren: false,
+        async function diagnoseUpdate(run: (trace: UpdateTrace) => Promise<void>) {
+            const trace: UpdateTrace = [{ stage: 'created-node', time: new Date().toISOString(), result: createdNodeResult }];
+            try {
+                await run(trace);
+            } catch (error) {
+                // Preserve the first assertion failure; a final query is diagnostic only.
+                try {
+                    const result = await mcpClient.callTool('scene-query-node', {
+                        options: { path: `Canvas/${testNodeName}`, includeChildren: false },
+                    });
+                    trace.push({ stage: 'after-failure', time: new Date().toISOString(), result });
+                } catch (queryError) {
+                    trace.push({ stage: 'after-failure-query-error', time: new Date().toISOString(), result: String(queryError) });
                 }
-            });
-
-            expect(queryResult.code).toBe(200);
-            if (queryResult.data.properties) {
-                expect(queryResult.data.properties.position?.x).toBe(100);
-                expect(queryResult.data.properties.position?.y).toBe(200);
-                expect(queryResult.data.properties.active).toBe(false);
+                console.error('[NodeUpdateDiagnostic]', JSON.stringify({
+                    platform: process.platform, arch: process.arch, nodeVersion: process.version,
+                    path: `Canvas/${testNodeName}`, trace,
+                }, null, 2));
+                throw error;
             }
+        }
+
+        test('should update node properties', async () => {
+            // Keep the original combined operation as a separate regression case.
+            await diagnoseUpdate(async trace => {
+                // Avoid an extra pre-update query that could hide the original timing failure.
+                const result = await mcpClient.callTool('scene-update-node', {
+                    options: {
+                        path: `Canvas/${testNodeName}`,
+                        properties: { position: { x: 100, y: 200, z: 0 }, active: false },
+                    },
+                });
+                trace.push({ stage: 'combined-update-result', time: new Date().toISOString(), result });
+                expect(result.code).toBe(200);
+                expect(result.data).toBeDefined();
+                const after = await queryUpdateNode('after-combined-update', trace);
+                expect(after.nodeId).toBe(createdNodeId);
+                expect(after.properties!.position).toEqual({ x: 100, y: 200, z: 0 });
+                expect(after.properties!.active).toBe(false);
+            });
+        });
+
+        test('should preserve position when deactivating a node after a separate position update', async () => {
+            await diagnoseUpdate(async trace => {
+                const before = await queryUpdateNode('before-position-update', trace);
+                const positionResult = await mcpClient.callTool('scene-update-node', {
+                    options: { path: `Canvas/${testNodeName}`, properties: { position: { x: 100, y: 200, z: 0 } } },
+                });
+                trace.push({ stage: 'position-update-result', time: new Date().toISOString(), result: positionResult });
+                expect(positionResult.code).toBe(200);
+                const positioned = await queryUpdateNode('after-position-update', trace);
+                expect(positioned.nodeId).toBe(before.nodeId);
+                expect(positioned.properties!.position).toEqual({ x: 100, y: 200, z: 0 });
+                const activeResult = await mcpClient.callTool('scene-update-node', {
+                    options: { path: `Canvas/${testNodeName}`, properties: { active: false } },
+                });
+                trace.push({ stage: 'active-update-result', time: new Date().toISOString(), result: activeResult });
+                expect(activeResult.code).toBe(200);
+                const inactive = await queryUpdateNode('after-active-update', trace);
+                expect(inactive.nodeId).toBe(before.nodeId);
+                expect(inactive.properties!.position).toEqual({ x: 100, y: 200, z: 0 });
+                expect(inactive.properties!.active).toBe(false);
+                const final = await queryUpdateNode('subsequent-query', trace);
+                expect(final.nodeId).toBe(before.nodeId);
+                expect(final.properties!.position).toEqual({ x: 100, y: 200, z: 0 });
+                expect(final.properties!.active).toBe(false);
+            });
         });
 
         test('should handle invalid node path for update', async () => {
